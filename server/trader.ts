@@ -89,13 +89,16 @@ interface TradeLog {
   entry: number | null;
   stop: number | null;
   target: number | null;
+  trail: number | null;
   pnl: number | null;
   cumPnl: number;
   volume: number | null;
   bias: string | null;
   confluence: number | null;
+  confluenceLabel: string | null;
   sentiment: string | null;
   dataSource: string | null;
+  volumeType: string | null;
 }
 
 interface Bar {
@@ -108,35 +111,51 @@ interface Bar {
   wick: number;
   body: number;
   bullish: boolean;
+  range: number;
 }
 
 interface OpenTrade {
   entry: number;
   stop: number;
   target: number;
+  trail: number;
+  initialStop: number;
   market: string;
   timeframe: string;
   pattern: string;
   direction: "LONG" | "SHORT";
   riskPoints: number;
+  highSinceEntry: number;
+  lowSinceEntry: number;
+  barsSinceEntry: number;
+  trailActivated: boolean;
 }
 
 interface MarketState {
   price: number;
   bias: "UPTREND" | "DOWNTREND" | "SIDEWAYS";
   biasStrength: number;
+  ema9: number;
   ema21: number;
   sma200: number;
   pivotHigh: number;
   pivotLow: number;
   pivotHighAge: number;
   pivotLowAge: number;
+  priorPivotHigh: number;
+  priorPivotLow: number;
   volatility: number;
   trendDuration: number;
   consecutiveBars: number;
   lastBarDirection: boolean;
   avgVolume: number;
   sentiment: "BUYERS_CONTROL" | "SELLERS_CONTROL" | "NEUTRAL";
+  recentSwingHigh: number;
+  recentSwingLow: number;
+  higherPivotHighs: number;
+  higherPivotLows: number;
+  lowerPivotHighs: number;
+  lowerPivotLows: number;
 }
 
 interface TraderSession {
@@ -198,7 +217,8 @@ function makeBar(open: number, close: number, vol: number): Bar {
   const body = Math.abs(close - open);
   const tail = bullish ? (open - low) : (close - low);
   const wick = bullish ? (high - close) : (high - open);
-  return { open: r2(open), high, low, close: r2(close), volume: vol, tail: r2(tail), wick: r2(wick), body: r2(body), bullish };
+  const range = high - low;
+  return { open: r2(open), high, low, close: r2(close), volume: vol, tail: r2(tail), wick: r2(wick), body: r2(body), bullish, range: r2(range) };
 }
 
 function initMarketState(market: string): MarketState {
@@ -206,13 +226,30 @@ function initMarketState(market: string): MarketState {
   const biases: Array<"UPTREND" | "DOWNTREND" | "SIDEWAYS"> = ["UPTREND", "DOWNTREND", "SIDEWAYS"];
   return {
     price: r2(base), bias: biases[Math.floor(Math.random() * 3)],
-    biasStrength: rand(0.3, 0.8), ema21: base, sma200: base - rand(-8, 8),
+    biasStrength: rand(0.3, 0.8), ema9: base, ema21: base, sma200: base - rand(-8, 8),
     pivotHigh: r2(base + rand(5, 15)), pivotLow: r2(base - rand(5, 15)),
     pivotHighAge: 0, pivotLowAge: 0,
+    priorPivotHigh: r2(base + rand(10, 25)), priorPivotLow: r2(base - rand(10, 25)),
     volatility: rand(0.5, 2.0), trendDuration: 0,
     consecutiveBars: 0, lastBarDirection: true,
     avgVolume: 1800, sentiment: "NEUTRAL",
+    recentSwingHigh: r2(base + rand(3, 8)), recentSwingLow: r2(base - rand(3, 8)),
+    higherPivotHighs: 0, higherPivotLows: 0,
+    lowerPivotHighs: 0, lowerPivotLows: 0,
   };
+}
+
+function updateTrendFromPivots(state: MarketState) {
+  if (state.higherPivotHighs >= 2 && state.higherPivotLows >= 2) {
+    state.bias = "UPTREND";
+    state.biasStrength = Math.min(1.0, (state.higherPivotHighs + state.higherPivotLows) * 0.15);
+  } else if (state.lowerPivotHighs >= 2 && state.lowerPivotLows >= 2) {
+    state.bias = "DOWNTREND";
+    state.biasStrength = Math.min(1.0, (state.lowerPivotHighs + state.lowerPivotLows) * 0.15);
+  } else {
+    state.bias = "SIDEWAYS";
+    state.biasStrength = rand(0.1, 0.4);
+  }
 }
 
 function generateBar(state: MarketState, livePrice?: PolygonPrice | null): Bar {
@@ -223,7 +260,8 @@ function generateBar(state: MarketState, livePrice?: PolygonPrice | null): Bar {
   if (livePrice) {
     const basePrice = livePrice.price;
     const open = state.price;
-    const tickNoise = rand(-2.5, 2.5) * (state.volatility || 1.0);
+    const greedBias = state.sentiment === "BUYERS_CONTROL" ? rand(0.3, 1.0) : state.sentiment === "SELLERS_CONTROL" ? -rand(0.3, 1.0) : 0;
+    const tickNoise = rand(-2.5, 2.5) * (state.volatility || 1.0) + greedBias;
     const close = r2(basePrice + tickNoise);
     const volume = Math.round(livePrice.volume / 500) || Math.round(rand(800, 3000));
     const move = close - open;
@@ -233,30 +271,8 @@ function generateBar(state: MarketState, livePrice?: PolygonPrice | null): Bar {
       state.trendDuration = 0;
     }
 
-    if (move > 0.5) state.bias = "UPTREND";
-    else if (move < -0.5) state.bias = "DOWNTREND";
-    else state.bias = "SIDEWAYS";
-    state.biasStrength = Math.min(1.0, Math.abs(move) / 5);
-
     const bar = makeBar(open, close, volume);
-
-    state.price = close;
-    state.ema21 = r2((state.ema21 * 20 + close) / 21);
-    state.sma200 = r2((state.sma200 * 199 + close) / 200);
-    state.avgVolume = Math.round((state.avgVolume * 14 + volume) / 15);
-
-    if (bar.high > state.pivotHigh) { state.pivotHigh = bar.high; state.pivotHighAge = 0; }
-    if (bar.low < state.pivotLow) { state.pivotLow = bar.low; state.pivotLowAge = 0; }
-    if (Math.random() < 0.06) { state.pivotHigh = bar.high; state.pivotHighAge = 0; }
-    if (Math.random() < 0.06) { state.pivotLow = bar.low; state.pivotLowAge = 0; }
-
-    if (bar.bullish === state.lastBarDirection) { state.consecutiveBars++; }
-    else { state.consecutiveBars = 1; state.lastBarDirection = bar.bullish; }
-
-    if (state.consecutiveBars >= 3 && bar.bullish) state.sentiment = "BUYERS_CONTROL";
-    else if (state.consecutiveBars >= 3 && !bar.bullish) state.sentiment = "SELLERS_CONTROL";
-    else if (state.consecutiveBars < 2) state.sentiment = "NEUTRAL";
-
+    updateMarketState(state, bar, close, volume);
     return bar;
   }
 
@@ -280,7 +296,8 @@ function generateBar(state: MarketState, livePrice?: PolygonPrice | null): Bar {
     drift += state.lastBarDirection ? -rand(1, 3) : rand(1, 3);
   }
 
-  const noise = rand(-2.5, 2.5) * state.volatility;
+  const greedBiasSim = state.sentiment === "BUYERS_CONTROL" ? rand(0.3, 1.2) : state.sentiment === "SELLERS_CONTROL" ? -rand(0.3, 1.2) : 0;
+  const noise = rand(-2.5, 2.5) * state.volatility + greedBiasSim;
   let move = drift + noise;
 
   const isClimax = Math.random() < 0.04;
@@ -294,32 +311,72 @@ function generateBar(state: MarketState, livePrice?: PolygonPrice | null): Bar {
   if (Math.abs(move) > 3) volume = Math.round(volume * rand(1.5, 2.5));
   if (state.bias === "UPTREND" && close > open) volume = Math.round(volume * 1.3);
   if (state.bias === "DOWNTREND" && close < open) volume = Math.round(volume * 1.3);
-
   if (Math.abs(state.price - state.pivotHigh) < 2 || Math.abs(state.price - state.pivotLow) < 2) {
     volume = Math.round(volume * rand(1.3, 1.8));
   }
 
   const bar = makeBar(open, close, volume);
+  updateMarketState(state, bar, close, volume);
+  return bar;
+}
 
+function updateMarketState(state: MarketState, bar: Bar, close: number, volume: number) {
   state.price = close;
+  state.ema9 = r2((state.ema9 * 8 + close) / 9);
   state.ema21 = r2((state.ema21 * 20 + close) / 21);
   state.sma200 = r2((state.sma200 * 199 + close) / 200);
   state.avgVolume = Math.round((state.avgVolume * 14 + volume) / 15);
 
-  if (bar.high > state.pivotHigh) { state.pivotHigh = bar.high; state.pivotHighAge = 0; }
-  if (bar.low < state.pivotLow) { state.pivotLow = bar.low; state.pivotLowAge = 0; }
-  if (Math.random() < 0.06) { state.pivotHigh = bar.high; state.pivotHighAge = 0; }
-  if (Math.random() < 0.06) { state.pivotLow = bar.low; state.pivotLowAge = 0; }
+  if (bar.high > state.recentSwingHigh) state.recentSwingHigh = bar.high;
+  if (bar.low < state.recentSwingLow) state.recentSwingLow = bar.low;
+
+  if (bar.high > state.pivotHigh) {
+    const prevPH = state.pivotHigh;
+    state.priorPivotHigh = prevPH;
+    state.pivotHigh = bar.high;
+    state.pivotHighAge = 0;
+    if (bar.high > prevPH) {
+      state.higherPivotHighs++;
+      state.lowerPivotHighs = Math.max(0, state.lowerPivotHighs - 1);
+    } else {
+      state.lowerPivotHighs++;
+      state.higherPivotHighs = Math.max(0, state.higherPivotHighs - 1);
+    }
+  }
+  if (bar.low < state.pivotLow) {
+    const prevPL = state.pivotLow;
+    state.priorPivotLow = prevPL;
+    state.pivotLow = bar.low;
+    state.pivotLowAge = 0;
+    if (bar.low < prevPL) {
+      state.lowerPivotLows++;
+      state.higherPivotLows = Math.max(0, state.higherPivotLows - 1);
+    } else {
+      state.higherPivotLows++;
+      state.lowerPivotLows = Math.max(0, state.lowerPivotLows - 1);
+    }
+  }
+  if (Math.random() < 0.06) {
+    state.priorPivotHigh = state.pivotHigh;
+    state.pivotHigh = bar.high;
+    state.pivotHighAge = 0;
+  }
+  if (Math.random() < 0.06) {
+    state.priorPivotLow = state.pivotLow;
+    state.pivotLow = bar.low;
+    state.pivotLowAge = 0;
+  }
 
   if (bar.bullish === state.lastBarDirection) { state.consecutiveBars++; }
   else { state.consecutiveBars = 1; state.lastBarDirection = bar.bullish; }
 
-  const recentBullish = bar.bullish;
-  if (state.consecutiveBars >= 3 && recentBullish) state.sentiment = "BUYERS_CONTROL";
-  else if (state.consecutiveBars >= 3 && !recentBullish) state.sentiment = "SELLERS_CONTROL";
+  if (state.consecutiveBars >= 3 && bar.bullish) state.sentiment = "BUYERS_CONTROL";
+  else if (state.consecutiveBars >= 3 && !bar.bullish) state.sentiment = "SELLERS_CONTROL";
   else if (state.consecutiveBars < 2) state.sentiment = "NEUTRAL";
 
-  return bar;
+  if (state.pivotHighAge > 8 && state.pivotLowAge > 8) {
+    updateTrendFromPivots(state);
+  }
 }
 
 function hasBottomingTail(bar: Bar): boolean {
@@ -330,17 +387,33 @@ function hasToppingTail(bar: Bar): boolean {
   return bar.wick > bar.body * 1.5 && bar.wick > 0.5;
 }
 
-function isEndingVolume(bars: Bar[], avgVol: number): boolean {
-  if (bars.length < 3) return false;
+function classifyVolume(bars: Bar[], avgVol: number): "IGNITING" | "ENDING" | "RESTING" | "NORMAL" {
+  if (bars.length < 3) return "NORMAL";
   const curr = bars[bars.length - 1];
-  return curr.volume > avgVol * 2.5 && curr.body > 2;
+  const prev = bars[bars.length - 2];
+
+  const isExtendedMove = countConsecutiveDown(bars) >= 5 || countConsecutiveUp(bars) >= 5;
+  if (isExtendedMove && curr.volume > avgVol * 2.5 && curr.body > 2) {
+    return "ENDING";
+  }
+
+  if (curr.volume > avgVol * 1.5 && curr.volume > prev.volume * 1.3) {
+    return "IGNITING";
+  }
+
+  if (curr.volume < avgVol * 0.6 && curr.body < 1.0) {
+    return "RESTING";
+  }
+
+  return "NORMAL";
+}
+
+function isEndingVolume(bars: Bar[], avgVol: number): boolean {
+  return classifyVolume(bars, avgVol) === "ENDING";
 }
 
 function isIgnitingVolume(bars: Bar[], avgVol: number): boolean {
-  if (bars.length < 2) return false;
-  const curr = bars[bars.length - 1];
-  const prev = bars[bars.length - 2];
-  return curr.volume > avgVol * 1.5 && curr.volume > prev.volume * 1.3;
+  return classifyVolume(bars, avgVol) === "IGNITING";
 }
 
 function countConsecutiveDown(bars: Bar[]): number {
@@ -361,25 +434,83 @@ function countConsecutiveUp(bars: Bar[]): number {
   return count;
 }
 
+function hasLargeBars(bars: Bar[], count: number): boolean {
+  const recent = bars.slice(-count);
+  const avgRange = recent.reduce((s, b) => s + b.range, 0) / recent.length;
+  const largeBars = recent.filter(b => b.range > avgRange * 1.5);
+  return largeBars.length >= Math.ceil(count * 0.4);
+}
+
+function isNearMA(price: number, ma: number, threshold: number = 3): boolean {
+  return Math.abs(price - ma) < threshold;
+}
+
 function calcConfluence(factors: boolean[]): number {
   return factors.filter(Boolean).length;
 }
 
-function detect3BarPlayBuy(bars: Bar[]): boolean {
-  if (bars.length < 4) return false;
-  const [b1, b2, b3, b4] = bars.slice(-4);
-  return b2.close < b1.close && b3.close < b2.close && b4.close > b3.high && b4.bullish;
+function confluenceDescription(score: number, total: number): string {
+  const pct = score / total;
+  if (pct >= 0.8) return `${score}/${total} - A+ Setup`;
+  if (pct >= 0.65) return `${score}/${total} - High Probability`;
+  if (pct >= 0.5) return `${score}/${total} - Moderate`;
+  if (pct >= 0.35) return `${score}/${total} - Low Odds`;
+  return `${score}/${total} - Weak`;
 }
 
-function detect3BarPlaySell(bars: Bar[]): boolean {
-  if (bars.length < 4) return false;
-  const [b1, b2, b3, b4] = bars.slice(-4);
-  return b2.close > b1.close && b3.close > b2.close && b4.close < b3.low && !b4.bullish;
+function detect3BarPlayBuy(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
+  if (bars.length < 5) return { detected: false, confluence: 0, confluenceLabel: "" };
+  const b = bars.slice(-5);
+  const [b0, b1, b2, b3, b4] = b;
+  const threeDown = !b1.bullish && !b2.bullish && !b3.bullish;
+  const reversal = b4.bullish && b4.close > b3.high;
+  const volumeIncrease = b4.volume > b3.volume * 1.2;
+
+  if (threeDown && reversal) {
+    const factors = [
+      volumeIncrease,
+      b4.close > state.ema9,
+      b4.close > state.ema21,
+      b4.close > state.sma200,
+      hasBottomingTail(b3) || hasBottomingTail(b4),
+      isNearMA(b4.close, state.ema21) || isNearMA(b4.close, state.ema9),
+      state.bias !== "DOWNTREND",
+      Math.abs(state.price - state.pivotLow) < 8,
+    ];
+    const conf = calcConfluence(factors);
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+  }
+  return { detected: false, confluence: 0, confluenceLabel: "" };
 }
 
-function detectBuySetup(bars: Bar[], state: MarketState): { detected: boolean; confluence: number } {
-  if (bars.length < 5) return { detected: false, confluence: 0 };
-  const recent = bars.slice(-5);
+function detect3BarPlaySell(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
+  if (bars.length < 5) return { detected: false, confluence: 0, confluenceLabel: "" };
+  const b = bars.slice(-5);
+  const [b0, b1, b2, b3, b4] = b;
+  const threeUp = b1.bullish && b2.bullish && b3.bullish;
+  const reversal = !b4.bullish && b4.close < b3.low;
+  const volumeIncrease = b4.volume > b3.volume * 1.2;
+
+  if (threeUp && reversal) {
+    const factors = [
+      volumeIncrease,
+      b4.close < state.ema9,
+      b4.close < state.ema21,
+      b4.close < state.sma200,
+      hasToppingTail(b3) || hasToppingTail(b4),
+      isNearMA(b4.close, state.ema21) || isNearMA(b4.close, state.ema9),
+      state.bias !== "UPTREND",
+      Math.abs(state.price - state.pivotHigh) < 8,
+    ];
+    const conf = calcConfluence(factors);
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+  }
+  return { detected: false, confluence: 0, confluenceLabel: "" };
+}
+
+function detectBuySetup(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
+  if (bars.length < 6) return { detected: false, confluence: 0, confluenceLabel: "" };
+  const recent = bars.slice(-6);
   const curr = recent[recent.length - 1];
   const prev = recent[recent.length - 2];
   const low = Math.min(...recent.map(b => b.low));
@@ -388,20 +519,24 @@ function detectBuySetup(bars: Bar[], state: MarketState): { detected: boolean; c
     const factors = [
       curr.close > state.ema21,
       curr.close > state.sma200,
+      curr.close > state.ema9,
       hasBottomingTail(prev) || hasBottomingTail(curr),
       isIgnitingVolume(bars, state.avgVolume),
-      Math.abs(state.price - state.pivotLow) < 5,
+      Math.abs(state.price - state.pivotLow) < 5 || Math.abs(state.price - state.priorPivotLow) < 5,
       state.bias === "UPTREND",
       countConsecutiveDown(bars) >= 3,
+      isNearMA(prev.low, state.ema21) || isNearMA(prev.low, state.ema9),
+      curr.volume > state.avgVolume,
     ];
-    return { detected: true, confluence: calcConfluence(factors) };
+    const conf = calcConfluence(factors);
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
   }
-  return { detected: false, confluence: 0 };
+  return { detected: false, confluence: 0, confluenceLabel: "" };
 }
 
-function detectSellSetup(bars: Bar[], state: MarketState): { detected: boolean; confluence: number } {
-  if (bars.length < 5) return { detected: false, confluence: 0 };
-  const recent = bars.slice(-5);
+function detectSellSetup(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
+  if (bars.length < 6) return { detected: false, confluence: 0, confluenceLabel: "" };
+  const recent = bars.slice(-6);
   const curr = recent[recent.length - 1];
   const prev = recent[recent.length - 2];
   const high = Math.max(...recent.map(b => b.high));
@@ -410,58 +545,75 @@ function detectSellSetup(bars: Bar[], state: MarketState): { detected: boolean; 
     const factors = [
       curr.close < state.ema21,
       curr.close < state.sma200,
+      curr.close < state.ema9,
       hasToppingTail(prev) || hasToppingTail(curr),
       isIgnitingVolume(bars, state.avgVolume),
-      Math.abs(state.price - state.pivotHigh) < 5,
+      Math.abs(state.price - state.pivotHigh) < 5 || Math.abs(state.price - state.priorPivotHigh) < 5,
       state.bias === "DOWNTREND",
       countConsecutiveUp(bars) >= 3,
+      isNearMA(prev.high, state.ema21) || isNearMA(prev.high, state.ema9),
+      curr.volume > state.avgVolume,
     ];
-    return { detected: true, confluence: calcConfluence(factors) };
+    const conf = calcConfluence(factors);
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
   }
-  return { detected: false, confluence: 0 };
+  return { detected: false, confluence: 0, confluenceLabel: "" };
 }
 
-function detectBreakoutLong(bars: Bar[], state: MarketState): { detected: boolean; confluence: number } {
-  if (bars.length < 3) return { detected: false, confluence: 0 };
+function detectBreakoutLong(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
+  if (bars.length < 3) return { detected: false, confluence: 0, confluenceLabel: "" };
   const curr = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
-  if (curr.close > state.pivotHigh && prev.close <= state.pivotHigh && curr.bullish) {
+  const breaksPriorPivot = curr.close > state.priorPivotHigh && prev.close <= state.priorPivotHigh;
+  const breaksCurrentPivot = curr.close > state.pivotHigh && prev.close <= state.pivotHigh;
+
+  if (breaksPriorPivot || breaksCurrentPivot) {
+    if (!curr.bullish) return { detected: false, confluence: 0, confluenceLabel: "" };
     const factors = [
       isIgnitingVolume(bars, state.avgVolume),
       curr.close > state.ema21,
+      curr.close > state.ema9,
       curr.close > state.sma200,
       state.bias !== "DOWNTREND",
       curr.body > 1.5,
       state.pivotHighAge > 5,
+      curr.volume > state.avgVolume * 1.3,
     ];
-    return { detected: true, confluence: calcConfluence(factors) };
+    const conf = calcConfluence(factors);
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
   }
-  return { detected: false, confluence: 0 };
+  return { detected: false, confluence: 0, confluenceLabel: "" };
 }
 
-function detectBreakoutShort(bars: Bar[], state: MarketState): { detected: boolean; confluence: number } {
-  if (bars.length < 3) return { detected: false, confluence: 0 };
+function detectBreakoutShort(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
+  if (bars.length < 3) return { detected: false, confluence: 0, confluenceLabel: "" };
   const curr = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
-  if (curr.close < state.pivotLow && prev.close >= state.pivotLow && !curr.bullish) {
+  const breaksPriorPivot = curr.close < state.priorPivotLow && prev.close >= state.priorPivotLow;
+  const breaksCurrentPivot = curr.close < state.pivotLow && prev.close >= state.pivotLow;
+
+  if (breaksPriorPivot || breaksCurrentPivot) {
+    if (curr.bullish) return { detected: false, confluence: 0, confluenceLabel: "" };
     const factors = [
       isIgnitingVolume(bars, state.avgVolume),
       curr.close < state.ema21,
+      curr.close < state.ema9,
       curr.close < state.sma200,
       state.bias !== "UPTREND",
       curr.body > 1.5,
       state.pivotLowAge > 5,
+      curr.volume > state.avgVolume * 1.3,
     ];
-    return { detected: true, confluence: calcConfluence(factors) };
+    const conf = calcConfluence(factors);
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
   }
-  return { detected: false, confluence: 0 };
+  return { detected: false, confluence: 0, confluenceLabel: "" };
 }
 
-function detectClimaxReversal(bars: Bar[], state: MarketState): { detected: boolean; direction: "LONG" | "SHORT"; confluence: number } {
-  if (bars.length < 6) return { detected: false, direction: "LONG", confluence: 0 };
-  const recent = bars.slice(-6);
-  const curr = recent[recent.length - 1];
-  const prev = recent[recent.length - 2];
+function detectClimaxReversal(bars: Bar[], state: MarketState): { detected: boolean; direction: "LONG" | "SHORT"; confluence: number; confluenceLabel: string } {
+  if (bars.length < 7) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "" };
+  const curr = bars[bars.length - 1];
+  const prev = bars[bars.length - 2];
 
   const downBars = countConsecutiveDown(bars);
   const upBars = countConsecutiveUp(bars);
@@ -469,53 +621,72 @@ function detectClimaxReversal(bars: Bar[], state: MarketState): { detected: bool
   if (isEndingVolume(bars, state.avgVolume) && downBars >= 5 && curr.bullish && hasBottomingTail(curr)) {
     const factors = [
       downBars >= 7,
-      Math.abs(state.price - state.pivotLow) < 5,
-      curr.close > state.ema21 || Math.abs(curr.close - state.ema21) < 3,
+      hasLargeBars(bars, 6),
+      Math.abs(state.price - state.pivotLow) < 5 || Math.abs(state.price - state.priorPivotLow) < 5,
+      curr.close > state.ema9 || isNearMA(curr.close, state.ema21),
       hasBottomingTail(prev),
       curr.volume > state.avgVolume * 3,
+      state.price < state.sma200,
     ];
-    return { detected: true, direction: "LONG", confluence: calcConfluence(factors) };
+    const conf = calcConfluence(factors);
+    return { detected: true, direction: "LONG", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
   }
 
   if (isEndingVolume(bars, state.avgVolume) && upBars >= 5 && !curr.bullish && hasToppingTail(curr)) {
     const factors = [
       upBars >= 7,
-      Math.abs(state.price - state.pivotHigh) < 5,
-      curr.close < state.ema21 || Math.abs(curr.close - state.ema21) < 3,
+      hasLargeBars(bars, 6),
+      Math.abs(state.price - state.pivotHigh) < 5 || Math.abs(state.price - state.priorPivotHigh) < 5,
+      curr.close < state.ema9 || isNearMA(curr.close, state.ema21),
       hasToppingTail(prev),
       curr.volume > state.avgVolume * 3,
+      state.price > state.sma200,
     ];
-    return { detected: true, direction: "SHORT", confluence: calcConfluence(factors) };
+    const conf = calcConfluence(factors);
+    return { detected: true, direction: "SHORT", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
   }
-  return { detected: false, direction: "LONG", confluence: 0 };
+  return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "" };
 }
 
-function detectMABounce(bars: Bar[], state: MarketState): { detected: boolean; direction: "LONG" | "SHORT"; confluence: number } {
-  if (bars.length < 4) return { detected: false, direction: "LONG", confluence: 0 };
+function detectMABounce(bars: Bar[], state: MarketState): { detected: boolean; direction: "LONG" | "SHORT"; confluence: number; confluenceLabel: string } {
+  if (bars.length < 4) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "" };
   const curr = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
-  const emaZone = state.ema21 * 0.002;
+  const ema21Zone = state.ema21 * 0.002;
+  const ema9Zone = state.ema9 * 0.002;
 
-  if (prev.low <= state.ema21 + emaZone && prev.low >= state.ema21 - emaZone && curr.close > prev.high && curr.bullish && state.bias === "UPTREND") {
+  const touchesEma21Long = prev.low <= state.ema21 + ema21Zone && prev.low >= state.ema21 - ema21Zone;
+  const touchesEma9Long = prev.low <= state.ema9 + ema9Zone && prev.low >= state.ema9 - ema9Zone;
+
+  if ((touchesEma21Long || touchesEma9Long) && curr.close > prev.high && curr.bullish && state.bias === "UPTREND") {
     const factors = [
       hasBottomingTail(prev),
       isIgnitingVolume(bars, state.avgVolume),
       curr.body > 1,
       Math.abs(state.price - state.pivotLow) < 8,
+      curr.close > state.ema9,
+      curr.close > state.ema21,
     ];
-    return { detected: true, direction: "LONG", confluence: calcConfluence(factors) };
+    const conf = calcConfluence(factors);
+    return { detected: true, direction: "LONG", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
   }
 
-  if (prev.high >= state.ema21 - emaZone && prev.high <= state.ema21 + emaZone && curr.close < prev.low && !curr.bullish && state.bias === "DOWNTREND") {
+  const touchesEma21Short = prev.high >= state.ema21 - ema21Zone && prev.high <= state.ema21 + ema21Zone;
+  const touchesEma9Short = prev.high >= state.ema9 - ema9Zone && prev.high <= state.ema9 + ema9Zone;
+
+  if ((touchesEma21Short || touchesEma9Short) && curr.close < prev.low && !curr.bullish && state.bias === "DOWNTREND") {
     const factors = [
       hasToppingTail(prev),
       isIgnitingVolume(bars, state.avgVolume),
       curr.body > 1,
       Math.abs(state.price - state.pivotHigh) < 8,
+      curr.close < state.ema9,
+      curr.close < state.ema21,
     ];
-    return { detected: true, direction: "SHORT", confluence: calcConfluence(factors) };
+    const conf = calcConfluence(factors);
+    return { detected: true, direction: "SHORT", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
   }
-  return { detected: false, direction: "LONG", confluence: 0 };
+  return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "" };
 }
 
 function sentimentLabel(s: MarketState): string {
@@ -524,18 +695,76 @@ function sentimentLabel(s: MarketState): string {
   return "NEUTRAL";
 }
 
+function manageTrailingStop(trade: OpenTrade, bar: Bar, state: MarketState): void {
+  trade.barsSinceEntry++;
+
+  if (trade.direction === "LONG") {
+    if (bar.high > trade.highSinceEntry) trade.highSinceEntry = bar.high;
+
+    const moved = trade.highSinceEntry - trade.entry;
+    const risk = trade.riskPoints;
+
+    if (moved >= risk * 1.0 && !trade.trailActivated) {
+      trade.trail = r2(trade.entry);
+      trade.trailActivated = true;
+    }
+
+    if (trade.trailActivated) {
+      const newTrail = r2(trade.highSinceEntry - risk * 0.6);
+      if (newTrail > trade.trail) trade.trail = newTrail;
+      trade.stop = Math.max(trade.stop, trade.trail);
+    }
+
+    if (trade.barsSinceEntry >= 3 && !trade.trailActivated) {
+      const swingLow = Math.min(bar.low, state.recentSwingLow);
+      const breakeven = trade.entry - 0.25;
+      if (swingLow > breakeven) {
+        trade.stop = r2(Math.max(trade.stop, swingLow - 0.5));
+      }
+    }
+  } else {
+    if (bar.low < trade.lowSinceEntry) trade.lowSinceEntry = bar.low;
+
+    const moved = trade.entry - trade.lowSinceEntry;
+    const risk = trade.riskPoints;
+
+    if (moved >= risk * 1.0 && !trade.trailActivated) {
+      trade.trail = r2(trade.entry);
+      trade.trailActivated = true;
+    }
+
+    if (trade.trailActivated) {
+      const newTrail = r2(trade.lowSinceEntry + risk * 0.6);
+      if (newTrail < trade.trail) trade.trail = newTrail;
+      trade.stop = Math.min(trade.stop, trade.trail);
+    }
+
+    if (trade.barsSinceEntry >= 3 && !trade.trailActivated) {
+      const swingHigh = Math.max(bar.high, state.recentSwingHigh);
+      const breakeven = trade.entry + 0.25;
+      if (swingHigh < breakeven) {
+        trade.stop = r2(Math.min(trade.stop, swingHigh + 0.5));
+      }
+    }
+  }
+}
+
+function makeLog(overrides: Partial<TradeLog> & { id: number; timestamp: string; cumPnl: number }): TradeLog {
+  return {
+    market: "--", timeframe: "--", pattern: "--", action: "--", direction: "--",
+    entry: null, stop: null, target: null, trail: null,
+    pnl: null, volume: null, bias: null,
+    confluence: null, confluenceLabel: null, sentiment: null,
+    dataSource: null, volumeType: null,
+    ...overrides,
+  };
+}
+
 async function simulateTick(session: TraderSession) {
   const ts = getESTTime();
   if (!isTradingHours() && !session.forceTrading) {
     if (session.logs.length === 0 || session.logs[session.logs.length - 1].action !== "MARKET CLOSED") {
-      session.logs.push({
-        id: logIdCounter++, timestamp: ts,
-        market: "--", timeframe: "--", pattern: "--",
-        action: "MARKET CLOSED", direction: "--",
-        entry: null, stop: null, target: null, pnl: null,
-        cumPnl: session.cumPnl, volume: null, bias: null,
-        confluence: null, sentiment: null, dataSource: null,
-      });
+      session.logs.push(makeLog({ id: logIdCounter++, timestamp: ts, cumPnl: session.cumPnl, action: "MARKET CLOSED" }));
     }
     return;
   }
@@ -551,10 +780,13 @@ async function simulateTick(session: TraderSession) {
       if (livePrice) {
         const s = initMarketState(mk);
         s.price = r2(livePrice.price);
+        s.ema9 = s.price;
         s.ema21 = s.price;
         s.sma200 = s.price;
         s.pivotHigh = r2(s.price + rand(3, 10));
         s.pivotLow = r2(s.price - rand(3, 10));
+        s.recentSwingHigh = r2(s.price + rand(2, 6));
+        s.recentSwingLow = r2(s.price - rand(2, 6));
         session.marketState[mk] = s;
       } else {
         session.marketState[mk] = initMarketState(mk);
@@ -567,36 +799,83 @@ async function simulateTick(session: TraderSession) {
       const t = session.openTrades[tradeKey];
       const bar = generateBar(state, livePrice);
 
+      manageTrailingStop(t, bar, state);
+
       let hit = false;
       if (t.direction === "LONG") {
         if (bar.low <= t.stop) {
-          const pnl = r2((t.stop - t.entry) * pointValue);
+          const exitPrice = t.trailActivated ? t.stop : t.stop;
+          const pnl = r2((exitPrice - t.entry) * pointValue);
           session.cumPnl = r2(session.cumPnl + pnl);
-          session.losses++;
-          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "STOPPED OUT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state), dataSource });
+          if (pnl >= 0) session.wins++; else session.losses++;
+          const action = t.trailActivated && t.stop > t.initialStop ? "TRAILED OUT" : "STOPPED OUT";
+          session.logs.push(makeLog({
+            id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
+            pattern: t.pattern, action, direction: t.direction,
+            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
+            pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
+            sentiment: sentimentLabel(state), dataSource,
+          }));
           delete session.openTrades[tradeKey]; hit = true;
         } else if (bar.high >= t.target) {
           const pnl = r2((t.target - t.entry) * pointValue);
           session.cumPnl = r2(session.cumPnl + pnl);
           session.wins++;
-          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "TARGET HIT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state), dataSource });
+          session.logs.push(makeLog({
+            id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
+            pattern: t.pattern, action: "TARGET HIT", direction: t.direction,
+            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
+            pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
+            sentiment: sentimentLabel(state), dataSource,
+          }));
           delete session.openTrades[tradeKey]; hit = true;
+        } else if (t.trailActivated && t.barsSinceEntry % 3 === 0) {
+          session.logs.push(makeLog({
+            id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
+            pattern: t.pattern, action: "TRAIL UPDATED", direction: t.direction,
+            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
+            cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
+            sentiment: sentimentLabel(state), dataSource,
+          }));
         }
       } else {
         if (bar.high >= t.stop) {
-          const pnl = r2((t.entry - t.stop) * pointValue);
+          const exitPrice = t.trailActivated ? t.stop : t.stop;
+          const pnl = r2((t.entry - exitPrice) * pointValue);
           session.cumPnl = r2(session.cumPnl + pnl);
-          session.losses++;
-          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "STOPPED OUT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state), dataSource });
+          if (pnl >= 0) session.wins++; else session.losses++;
+          const action = t.trailActivated && t.stop < t.initialStop ? "TRAILED OUT" : "STOPPED OUT";
+          session.logs.push(makeLog({
+            id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
+            pattern: t.pattern, action, direction: t.direction,
+            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
+            pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
+            sentiment: sentimentLabel(state), dataSource,
+          }));
           delete session.openTrades[tradeKey]; hit = true;
         } else if (bar.low <= t.target) {
           const pnl = r2((t.entry - t.target) * pointValue);
           session.cumPnl = r2(session.cumPnl + pnl);
           session.wins++;
-          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "TARGET HIT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state), dataSource });
+          session.logs.push(makeLog({
+            id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
+            pattern: t.pattern, action: "TARGET HIT", direction: t.direction,
+            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
+            pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
+            sentiment: sentimentLabel(state), dataSource,
+          }));
           delete session.openTrades[tradeKey]; hit = true;
+        } else if (t.trailActivated && t.barsSinceEntry % 3 === 0) {
+          session.logs.push(makeLog({
+            id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
+            pattern: t.pattern, action: "TRAIL UPDATED", direction: t.direction,
+            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
+            cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
+            sentiment: sentimentLabel(state), dataSource,
+          }));
         }
       }
+      if (!hit && t.trailActivated) continue;
       if (!hit) continue;
     }
 
@@ -612,116 +891,134 @@ async function simulateTick(session: TraderSession) {
       if (session.bars[barKey].length > 30) session.bars[barKey].shift();
 
       const bars = session.bars[barKey];
-      if (bars.length < 6) continue;
+      if (bars.length < 7) continue;
+
+      const volType = classifyVolume(bars, state.avgVolume);
 
       let detectedPattern = "";
       let direction: "LONG" | "SHORT" = "LONG";
       let confluence = 0;
+      let confluenceLabel = "";
 
       if (session.patterns.includes("3bar")) {
-        if (detect3BarPlayBuy(bars)) {
+        const buyResult = detect3BarPlayBuy(bars, state);
+        if (buyResult.detected) {
           detectedPattern = "3 Bar Play";
           direction = "LONG";
-          confluence = calcConfluence([
-            isIgnitingVolume(bars, state.avgVolume),
-            bar.close > state.ema21,
-            bar.close > state.sma200,
-            state.bias !== "DOWNTREND",
-            hasBottomingTail(bars[bars.length - 2]),
-          ]);
-        } else if (detect3BarPlaySell(bars)) {
-          detectedPattern = "3 Bar Play Sell";
-          direction = "SHORT";
-          confluence = calcConfluence([
-            isIgnitingVolume(bars, state.avgVolume),
-            bar.close < state.ema21,
-            bar.close < state.sma200,
-            state.bias !== "UPTREND",
-            hasToppingTail(bars[bars.length - 2]),
-          ]);
+          confluence = buyResult.confluence;
+          confluenceLabel = buyResult.confluenceLabel;
+        } else {
+          const sellResult = detect3BarPlaySell(bars, state);
+          if (sellResult.detected) {
+            detectedPattern = "3 Bar Play";
+            direction = "SHORT";
+            confluence = sellResult.confluence;
+            confluenceLabel = sellResult.confluenceLabel;
+          }
         }
       }
 
       if (!detectedPattern && session.patterns.includes("buysetup")) {
         const buy = detectBuySetup(bars, state);
-        if (buy.detected) { detectedPattern = "Buy Setup"; direction = "LONG"; confluence = buy.confluence; }
+        if (buy.detected) { detectedPattern = "Buy Setup"; direction = "LONG"; confluence = buy.confluence; confluenceLabel = buy.confluenceLabel; }
         else {
           const sell = detectSellSetup(bars, state);
-          if (sell.detected) { detectedPattern = "Sell Setup"; direction = "SHORT"; confluence = sell.confluence; }
+          if (sell.detected) { detectedPattern = "Sell Setup"; direction = "SHORT"; confluence = sell.confluence; confluenceLabel = sell.confluenceLabel; }
         }
       }
 
       if (!detectedPattern && session.patterns.includes("breakout")) {
         const bl = detectBreakoutLong(bars, state);
-        if (bl.detected) { detectedPattern = "Breakout Long"; direction = "LONG"; confluence = bl.confluence; }
+        if (bl.detected) { detectedPattern = "Pivot Breakout"; direction = "LONG"; confluence = bl.confluence; confluenceLabel = bl.confluenceLabel; }
         else {
           const bs = detectBreakoutShort(bars, state);
-          if (bs.detected) { detectedPattern = "Breakout Short"; direction = "SHORT"; confluence = bs.confluence; }
+          if (bs.detected) { detectedPattern = "Pivot Breakout"; direction = "SHORT"; confluence = bs.confluence; confluenceLabel = bs.confluenceLabel; }
         }
       }
 
       if (!detectedPattern && session.patterns.includes("climax")) {
         const c = detectClimaxReversal(bars, state);
-        if (c.detected) { detectedPattern = "Climax Reversal"; direction = c.direction; confluence = c.confluence; }
+        if (c.detected) { detectedPattern = "Climax Reversal"; direction = c.direction; confluence = c.confluence; confluenceLabel = c.confluenceLabel; }
       }
 
       if (!detectedPattern && session.patterns.includes("mabounce")) {
         const m = detectMABounce(bars, state);
-        if (m.detected) { detectedPattern = "MA Bounce"; direction = m.direction; confluence = m.confluence; }
+        if (m.detected) { detectedPattern = "MA Bounce"; direction = m.direction; confluence = m.confluence; confluenceLabel = m.confluenceLabel; }
       }
 
       if (detectedPattern && !session.openTrades[tradeKey]) {
         const minConf = 2;
-        const entryGate = confluence >= 4 ? 0.55 : confluence >= minConf ? 0.35 : 0.12;
+        const entryGate = confluence >= 5 ? 0.65 : confluence >= 4 ? 0.50 : confluence >= minConf ? 0.30 : 0.10;
 
         if (confluence >= minConf && Math.random() < entryGate) {
           const entry = state.price;
-          const baseRisk = rand(2, 5);
-          const riskPoints = Math.round(baseRisk * 4) / 4;
-          const rewardRatio = confluence >= 4 ? rand(2.0, 3.5) : rand(1.5, 2.5);
+          const recentBars = bars.slice(-5);
+          let stopLevel: number;
+
+          if (direction === "LONG") {
+            const swingLow = Math.min(...recentBars.map(b => b.low));
+            stopLevel = swingLow - rand(0.25, 1.0);
+          } else {
+            const swingHigh = Math.max(...recentBars.map(b => b.high));
+            stopLevel = swingHigh + rand(0.25, 1.0);
+          }
+
+          const riskPoints = r2(Math.abs(entry - stopLevel));
+          const clampedRisk = Math.max(1.5, Math.min(riskPoints, 6));
+          const rewardRatio = confluence >= 5 ? rand(2.5, 4.0) : confluence >= 4 ? rand(2.0, 3.5) : rand(1.5, 2.5);
           let stop: number, target: number;
 
           if (direction === "LONG") {
-            stop = r2(entry - riskPoints);
-            target = r2(entry + riskPoints * rewardRatio);
+            stop = r2(entry - clampedRisk);
+            target = r2(entry + clampedRisk * rewardRatio);
           } else {
-            stop = r2(entry + riskPoints);
-            target = r2(entry - riskPoints * rewardRatio);
+            stop = r2(entry + clampedRisk);
+            target = r2(entry - clampedRisk * rewardRatio);
           }
 
-          session.openTrades[tradeKey] = { entry, stop, target, market: mk, timeframe: tf, pattern: detectedPattern, direction, riskPoints };
+          session.openTrades[tradeKey] = {
+            entry, stop, target, trail: stop, initialStop: stop,
+            market: mk, timeframe: tf, pattern: detectedPattern,
+            direction, riskPoints: clampedRisk,
+            highSinceEntry: entry, lowSinceEntry: entry,
+            barsSinceEntry: 0, trailActivated: false,
+          };
 
-          session.logs.push({
+          session.logs.push(makeLog({
             id: logIdCounter++, timestamp: ts, market: mk, timeframe: tf, pattern: detectedPattern,
             action: direction === "LONG" ? "LONG ENTERED" : "SHORT ENTERED", direction,
-            entry, stop, target, pnl: null, cumPnl: session.cumPnl,
-            volume: bar.volume, bias: state.bias, confluence, sentiment: sentimentLabel(state), dataSource,
-          });
+            entry, stop, target, trail: stop,
+            cumPnl: session.cumPnl,
+            volume: bar.volume, bias: state.bias, confluence, confluenceLabel,
+            sentiment: sentimentLabel(state), dataSource, volumeType: volType,
+          }));
           break;
         }
 
         if (Math.random() < 0.45) {
-          session.logs.push({
+          session.logs.push(makeLog({
             id: logIdCounter++, timestamp: ts, market: mk, timeframe: tf, pattern: detectedPattern,
             action: "SIGNAL (no entry)", direction,
-            entry: state.price, stop: null, target: null,
-            pnl: null, cumPnl: session.cumPnl,
-            volume: bar.volume, bias: state.bias, confluence, sentiment: sentimentLabel(state), dataSource,
-          });
+            entry: state.price,
+            cumPnl: session.cumPnl,
+            volume: bar.volume, bias: state.bias, confluence, confluenceLabel,
+            sentiment: sentimentLabel(state), dataSource, volumeType: volType,
+          }));
         }
       }
     }
 
     const lastScan = session.logs[session.logs.length - 1];
-    const isScanDue = !lastScan || lastScan.action === "TRADER STARTED" || lastScan.market !== mk || lastScan.action !== "SCANNING";
+    const priceChanged = lastScan?.entry ? Math.abs(state.price - lastScan.entry) > 0.5 : true;
+    const isScanDue = !lastScan || lastScan.action === "TRADER STARTED" || lastScan.market !== mk || lastScan.action !== "SCANNING" || priceChanged;
     if (isScanDue && !session.openTrades[tradeKey]) {
-      session.logs.push({
-        id: logIdCounter++, timestamp: ts, market: mk, timeframe: "--", pattern: "--",
-        action: "SCANNING", direction: "--",
-        entry: state.price, stop: null, target: null,
-        pnl: null, cumPnl: session.cumPnl,
-        volume: null, bias: state.bias, confluence: null, sentiment: sentimentLabel(state), dataSource,
-      });
+      session.logs.push(makeLog({
+        id: logIdCounter++, timestamp: ts, market: mk,
+        action: "SCANNING",
+        entry: state.price,
+        cumPnl: session.cumPnl,
+        bias: state.bias, sentiment: sentimentLabel(state), dataSource,
+      }));
     }
   }
 
@@ -749,21 +1046,19 @@ export function startTrader(config: {
     wins: 0, losses: 0,
   };
 
-  session.logs.push({
+  session.logs.push(makeLog({
     id: logIdCounter++, timestamp: getESTTime(),
-    market: "--", timeframe: "--", pattern: "--",
-    action: "TRADER STARTED", direction: "--",
-    entry: null, stop: null, target: null, pnl: null, cumPnl: 0,
-    volume: null, bias: null, confluence: null, sentiment: null,
+    action: "TRADER STARTED", cumPnl: 0,
     dataSource: POLYGON_API_KEY ? "POLYGON" : "SIM",
-  });
+  }));
 
   const delay = () => Math.floor(rand(8000, 15000));
   function loop() {
     if (!session.running) return;
     simulateTick(session).then(() => {
       if (session.running) session.timeout = setTimeout(loop, delay());
-    }).catch(() => {
+    }).catch((err) => {
+      console.error("[trader] tick error:", err);
       if (session.running) session.timeout = setTimeout(loop, delay());
     });
   }
@@ -777,14 +1072,10 @@ export function stopTrader(id: string): boolean {
   if (!s) return false;
   s.running = false;
   if (s.timeout) { clearTimeout(s.timeout); s.timeout = null; }
-  s.logs.push({
+  s.logs.push(makeLog({
     id: logIdCounter++, timestamp: getESTTime(),
-    market: "--", timeframe: "--", pattern: "--",
-    action: "TRADER STOPPED", direction: "--",
-    entry: null, stop: null, target: null, pnl: null, cumPnl: s.cumPnl,
-    volume: null, bias: null, confluence: null, sentiment: null,
-    dataSource: null,
-  });
+    action: "TRADER STOPPED", cumPnl: s.cumPnl,
+  }));
   return true;
 }
 

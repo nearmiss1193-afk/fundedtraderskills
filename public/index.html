@@ -379,6 +379,8 @@
     .log-action.stopped { color: #ef4444; }
     .log-action.target { color: #22c55e; }
     .log-action.signal { color: #6366f1; }
+    .log-action.trailed { color: #f59e0b; }
+    .log-action.trail-update { color: #a78bfa; font-weight: 500; }
     .log-action.scanning { color: #4b5563; font-weight: 500; }
     .log-action.system { color: #6b7280; }
 
@@ -405,6 +407,12 @@
     .log-sent.greed { background: rgba(34,197,94,0.1); color: #4ade80; }
     .log-sent.fear { background: rgba(239,68,68,0.1); color: #f87171; }
     .log-sent.neutral { background: rgba(107,114,128,0.08); color: #6b7280; }
+    .log-trail-tag { color: #f59e0b; font-weight: 600; }
+    .log-conf-label { font-size: 0.58rem; color: #6b7280; margin-left: 2px; display: inline-block; }
+    .log-vol-type { font-size: 0.56rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; display: inline-block; margin-right: 2px; }
+    .log-vol-type.igniting { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .log-vol-type.ending { background: rgba(239,68,68,0.12); color: #f87171; }
+    .log-vol-type.resting { background: rgba(107,114,128,0.08); color: #6b7280; }
     .log-src { font-size: 0.58rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; display: inline-block; margin-left: 2px; }
     .log-src.polygon { background: rgba(99,102,241,0.15); color: #818cf8; }
     .log-src.sim { background: rgba(107,114,128,0.1); color: #6b7280; }
@@ -506,7 +514,7 @@
     <div id="panel-trader" class="tab-panel">
       <div class="trader-card">
         <h2>AI Futures Trader</h2>
-        <p class="card-sub">Autonomous pattern-based futures trading engine. Simulated execution on ES Mini &amp; Micro.</p>
+        <p class="card-sub">Autonomous pattern-based futures engine (9/21 EMA + 200 SMA, trailing stops, confluence scoring). Based on Jared Wesley's "Trading With An Edge" (Live Traders).</p>
 
         <div id="trader-status-badge" class="trading-status closed">
           <span class="status-dot"></span>
@@ -723,7 +731,9 @@
       if (action === 'LONG ENTERED') return 'long';
       if (action === 'SHORT ENTERED') return 'short';
       if (action === 'STOPPED OUT') return 'stopped';
+      if (action === 'TRAILED OUT') return 'trailed';
       if (action === 'TARGET HIT') return 'target';
+      if (action === 'TRAIL UPDATED') return 'trail-update';
       if (action.startsWith('SIGNAL')) return 'signal';
       if (action === 'SCANNING') return 'scanning';
       return 'system';
@@ -742,10 +752,18 @@
       return `<span class="log-bias ${cls}">${label}</span>`;
     }
 
-    function confTag(c) {
+    function confTag(c, label) {
       if (c === null || c === undefined) return '';
-      const cls = c >= 4 ? 'high' : c >= 2 ? 'med' : 'low';
-      return `<span class="log-conf ${cls}">${c}/5</span>`;
+      const cls = c >= 5 ? 'high' : c >= 3 ? 'med' : 'low';
+      let html = `<span class="log-conf ${cls}">${c}pt</span>`;
+      if (label) html += `<span class="log-conf-label">${esc(label)}</span>`;
+      return html;
+    }
+
+    function volTypeTag(v) {
+      if (!v || v === 'NORMAL') return '';
+      const cls = v === 'IGNITING' ? 'igniting' : v === 'ENDING' ? 'ending' : 'resting';
+      return `<span class="log-vol-type ${cls}">${v}</span>`;
     }
 
     function sentTag(s) {
@@ -771,11 +789,15 @@
       if (log.target !== null) {
         html += `<span class="log-tp-tag">TP:${log.target.toFixed(2)}</span> `;
       }
+      if (log.trail !== null && log.trail !== undefined && log.trail !== log.stop) {
+        html += `<span class="log-trail-tag">TR:${log.trail.toFixed(2)}</span> `;
+      }
       if (log.pnl !== null) {
         html += formatPnl(log.pnl) + ' ';
       }
       html += biasTag(log.bias);
-      html += confTag(log.confluence);
+      html += confTag(log.confluence, log.confluenceLabel);
+      html += volTypeTag(log.volumeType);
       html += sentTag(log.sentiment);
       html += srcTag(log.dataSource);
       return html;
