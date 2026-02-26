@@ -195,11 +195,11 @@ export async function registerRoutes(
   });
 
   app.post("/api/trader/start", (req, res) => {
-    const { markets, timeframes, riskPct, patterns, customCondition, forceTrading } = req.body;
+    const { markets, timeframes, riskPct, rewardRatio, patterns, customCondition, forceTrading } = req.body;
     if (!markets?.length || !timeframes?.length || !patterns?.length) {
       return res.status(400).json({ error: "markets, timeframes, and patterns are required." });
     }
-    const sessionId = startTrader({ markets, timeframes, riskPct: riskPct || 0.5, patterns, customCondition: customCondition || "", forceTrading: !!forceTrading });
+    const sessionId = startTrader({ markets, timeframes, riskPct: riskPct || 0.5, rewardRatio: rewardRatio || 2, patterns, customCondition: customCondition || "", forceTrading: !!forceTrading });
     res.json({ success: true, sessionId });
   });
 

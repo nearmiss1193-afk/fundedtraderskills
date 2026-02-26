@@ -32,7 +32,8 @@ shared/schema.ts    - Stub
   - **6 Timeframes**: 2min, 5min, 15min, 1hr, 4hr, Daily
   - **Futures Session Hours**: Sunday 6PM – Friday 5PM EST with daily 5-6PM maintenance break
   - **Per-Symbol Specs**: Base price, point value, tick size, volatility profile, avg volume (FUTURES_SPECS map)
-  - **Real Price Data**: Polygon.io API (SPY x 7.8 as ES/MES proxy, free tier compatible)
+  - **Real Price Data**: Polygon.io API (SPY x 7.8 as ES/MES proxy, free tier prev-day aggregates); all other symbols use SIM
+  - **Configurable Risk:Reward**: Dropdown (1:1 through 1:5, default 1:2); TP = risk × R:R ratio; shown in stats panel
   - **Force Trading Mode**: Checkbox to override time window during development
   - **Moving Averages**: 9 EMA + 21 EMA + 200 SMA for trend confirmation and entry filtering
   - **5 Core Patterns**: 3 Bar Play (10-factor), Buy/Sell Setup (12-factor), Pivot Breakout (10-factor), Climax Reversal (9-factor), MA Bounce (8-factor)

@@ -207,6 +207,7 @@ interface TraderSession {
   markets: string[];
   timeframes: string[];
   riskPct: number;
+  rewardRatio: number;
   patterns: string[];
   customCondition: string;
   forceTrading: boolean;
@@ -1182,7 +1183,7 @@ async function simulateTick(session: TraderSession) {
           const minRisk = spec.basePrice * 0.0003;
           const maxRisk = spec.basePrice * 0.0012;
           const clampedRisk = Math.max(minRisk, Math.min(riskPoints, maxRisk));
-          const rewardRatio = confluence >= 5 ? rand(2.5, 4.0) : confluence >= 4 ? rand(2.0, 3.5) : rand(1.5, 2.5);
+          const rewardRatio = session.rewardRatio;
           let stop: number, target: number;
 
           if (direction === "LONG") {
@@ -1249,15 +1250,17 @@ export function startTrader(config: {
   markets: string[];
   timeframes: string[];
   riskPct: number;
+  rewardRatio: number;
   patterns: string[];
   customCondition: string;
   forceTrading: boolean;
 }): string {
   const id = "session_" + Date.now();
+  const rr = Math.max(1, Math.min(config.rewardRatio || 2, 5));
   const session: TraderSession = {
     id, running: true,
     markets: config.markets, timeframes: config.timeframes,
-    riskPct: config.riskPct, patterns: config.patterns,
+    riskPct: config.riskPct, rewardRatio: rr, patterns: config.patterns,
     customCondition: config.customCondition,
     forceTrading: config.forceTrading || false,
     logs: [], cumPnl: 0, timeout: null,
@@ -1306,7 +1309,7 @@ export function getTraderLogs(id: string, after?: number): TradeLog[] {
   return s.logs;
 }
 
-export function getTraderStatus(id: string): { running: boolean; cumPnl: number; tradeCount: number; openPositions: number; wins: number; losses: number } | null {
+export function getTraderStatus(id: string): { running: boolean; cumPnl: number; tradeCount: number; openPositions: number; wins: number; losses: number; rewardRatio: number } | null {
   const s = sessions[id];
   if (!s) return null;
   return {
@@ -1314,6 +1317,7 @@ export function getTraderStatus(id: string): { running: boolean; cumPnl: number;
     tradeCount: s.logs.filter(l => l.action === "LONG ENTERED" || l.action === "SHORT ENTERED").length,
     openPositions: Object.keys(s.openTrades).length,
     wins: s.wins, losses: s.losses,
+    rewardRatio: s.rewardRatio,
   };
 }
 
