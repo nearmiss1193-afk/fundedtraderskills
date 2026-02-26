@@ -375,15 +375,35 @@
 
     .log-action { font-weight: 700; }
     .log-action.long { color: #22c55e; }
+    .log-action.short { color: #f97316; }
     .log-action.stopped { color: #ef4444; }
     .log-action.target { color: #22c55e; }
     .log-action.signal { color: #6366f1; }
     .log-action.system { color: #6b7280; }
 
-    .log-detail { color: #555b6e; font-size: 0.68rem; }
+    .log-detail { color: #8b92a5; font-size: 0.68rem; }
     .log-pnl { font-weight: 700; }
     .log-pnl.pos { color: #22c55e; }
     .log-pnl.neg { color: #ef4444; }
+
+    .log-sltp { display: inline-flex; gap: 0.5rem; align-items: center; }
+    .log-entry-tag { color: #60a5fa; font-weight: 600; }
+    .log-sl-tag { color: #ef4444; font-weight: 600; }
+    .log-tp-tag { color: #22c55e; font-weight: 600; }
+    .log-open-tag { color: #3b82f6; }
+    .log-vol { color: #6b7280; font-size: 0.65rem; }
+    .log-bias { font-size: 0.62rem; font-weight: 600; padding: 1px 5px; border-radius: 3px; display: inline-block; margin-right: 2px; }
+    .log-bias.up { background: rgba(34,197,94,0.12); color: #22c55e; }
+    .log-bias.down { background: rgba(239,68,68,0.12); color: #ef4444; }
+    .log-bias.side { background: rgba(107,114,128,0.12); color: #9ca3af; }
+    .log-conf { font-size: 0.6rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; display: inline-block; margin-right: 2px; }
+    .log-conf.high { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .log-conf.med { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    .log-conf.low { background: rgba(107,114,128,0.12); color: #9ca3af; }
+    .log-sent { font-size: 0.6rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; display: inline-block; }
+    .log-sent.greed { background: rgba(34,197,94,0.1); color: #4ade80; }
+    .log-sent.fear { background: rgba(239,68,68,0.1); color: #f87171; }
+    .log-sent.neutral { background: rgba(107,114,128,0.08); color: #6b7280; }
 
     .log-empty { padding: 2.5rem; text-align: center; color: #3a3e4d; font-size: 0.82rem; }
 
@@ -511,10 +531,13 @@
         <label for="riskPct">Risk Per Trade (% of Account)</label>
         <input id="riskPct" type="number" value="0.5" min="0.1" max="5" step="0.1" style="max-width:160px;" />
 
-        <label>Core Patterns</label>
+        <label>Core Patterns (Jared Wesley / Live Traders)</label>
         <div class="check-group">
-          <label class="check-label"><input type="checkbox" name="pattern" value="3bar" checked /><span class="check-dot"></span><span>3 Bar Play</span></label>
-          <label class="check-label"><input type="checkbox" name="pattern" value="buysetup" checked /><span class="check-dot"></span><span>Buy Setup</span></label>
+          <label class="check-label"><input type="checkbox" name="pattern" value="3bar" checked /><span class="check-dot"></span><span>3 Bar Play (Long &amp; Short)</span></label>
+          <label class="check-label"><input type="checkbox" name="pattern" value="buysetup" checked /><span class="check-dot"></span><span>Buy / Sell Setup</span></label>
+          <label class="check-label"><input type="checkbox" name="pattern" value="breakout" checked /><span class="check-dot"></span><span>Pivot Breakout</span></label>
+          <label class="check-label"><input type="checkbox" name="pattern" value="climax" /><span class="check-dot"></span><span>Climax Reversal</span></label>
+          <label class="check-label"><input type="checkbox" name="pattern" value="mabounce" /><span class="check-dot"></span><span>MA Bounce</span></label>
         </div>
 
         <label for="customCondition">Custom Buy Condition (optional)</label>
@@ -529,6 +552,8 @@
       <div id="trader-dashboard" style="display:none;">
         <div class="trader-stats" id="trader-stats">
           <div class="t-stat"><div class="t-stat-label">Trades</div><div class="t-stat-value" id="stat-trades">0</div></div>
+          <div class="t-stat"><div class="t-stat-label">Wins</div><div class="t-stat-value positive" id="stat-wins">0</div></div>
+          <div class="t-stat"><div class="t-stat-label">Losses</div><div class="t-stat-value negative" id="stat-losses">0</div></div>
           <div class="t-stat"><div class="t-stat-label">Open</div><div class="t-stat-value" id="stat-open">0</div></div>
           <div class="t-stat"><div class="t-stat-label">Simulated P&amp;L</div><div class="t-stat-value" id="stat-pnl">$0.00</div></div>
         </div>
@@ -681,6 +706,7 @@
 
     function actionClass(action) {
       if (action === 'LONG ENTERED') return 'long';
+      if (action === 'SHORT ENTERED') return 'short';
       if (action === 'STOPPED OUT') return 'stopped';
       if (action === 'TARGET HIT') return 'target';
       if (action.startsWith('SIGNAL')) return 'signal';
@@ -693,13 +719,43 @@
       return `<span class="log-pnl ${cls}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span>`;
     }
 
+    function biasTag(bias) {
+      if (!bias) return '';
+      const cls = bias === 'UPTREND' ? 'up' : bias === 'DOWNTREND' ? 'down' : 'side';
+      const label = bias === 'UPTREND' ? 'UP' : bias === 'DOWNTREND' ? 'DN' : 'SW';
+      return `<span class="log-bias ${cls}">${label}</span>`;
+    }
+
+    function confTag(c) {
+      if (c === null || c === undefined) return '';
+      const cls = c >= 4 ? 'high' : c >= 2 ? 'med' : 'low';
+      return `<span class="log-conf ${cls}">${c}/5</span>`;
+    }
+
+    function sentTag(s) {
+      if (!s) return '';
+      const cls = s === 'GREED' ? 'greed' : s === 'FEAR' ? 'fear' : 'neutral';
+      return `<span class="log-sent ${cls}">${s}</span>`;
+    }
+
     function buildLogDetail(log) {
-      const parts = [];
-      if (log.entry !== null) parts.push(`E:${log.entry.toFixed(2)}`);
-      if (log.stop !== null) parts.push(`SL:${log.stop.toFixed(2)}`);
-      if (log.target !== null) parts.push(`TP:${log.target.toFixed(2)}`);
-      if (log.pnl !== null) parts.push(formatPnl(log.pnl));
-      return parts.join(' ');
+      let html = '';
+      if (log.entry !== null) {
+        html += `<span class="log-entry-tag">E:${log.entry.toFixed(2)}</span> `;
+      }
+      if (log.stop !== null) {
+        html += `<span class="log-sl-tag">SL:${log.stop.toFixed(2)}</span> `;
+      }
+      if (log.target !== null) {
+        html += `<span class="log-tp-tag">TP:${log.target.toFixed(2)}</span> `;
+      }
+      if (log.pnl !== null) {
+        html += formatPnl(log.pnl) + ' ';
+      }
+      html += biasTag(log.bias);
+      html += confTag(log.confluence);
+      html += sentTag(log.sentiment);
+      return html;
     }
 
     async function pollTraderLogs() {
@@ -710,6 +766,8 @@
 
         if (d.status) {
           document.getElementById('stat-trades').textContent = d.status.tradeCount;
+          document.getElementById('stat-wins').textContent = d.status.wins;
+          document.getElementById('stat-losses').textContent = d.status.losses;
           document.getElementById('stat-open').textContent = d.status.openPositions;
           const pnlEl = document.getElementById('stat-pnl');
           pnlEl.textContent = (d.status.cumPnl >= 0 ? '+' : '') + '$' + d.status.cumPnl.toFixed(2);
@@ -723,6 +781,7 @@
           d.logs.forEach(log => {
             const row = document.createElement('div');
             row.className = 'log-row';
+            const dir = log.direction && log.direction !== '--' ? ` [${log.direction}]` : '';
             row.innerHTML = `
               <span class="log-cell log-time">${esc(log.timestamp)}</span>
               <span class="log-cell log-market">${esc(log.market)}</span>
