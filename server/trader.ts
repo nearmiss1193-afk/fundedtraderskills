@@ -1,3 +1,5 @@
+import { addJournalEntry, type JournalEntry } from "./journal";
+
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
 
@@ -970,6 +972,38 @@ function makeLog(overrides: Partial<TradeLog> & { id: number; timestamp: string;
   };
 }
 
+function recordTrade(session: TraderSession, t: OpenTrade, exitPrice: number, pnl: number, ts: string, dataSource: string, confluenceVal?: number, confluenceLabel?: string, reason?: string): void {
+  const spec = getSpec(t.market);
+  const riskPts = Math.abs(t.entry - t.initialStop);
+  const pnlPoints = t.direction === "LONG" ? r2(exitPrice - t.entry) : r2(t.entry - exitPrice);
+  const achievedRR = riskPts > 0 ? Math.round((Math.abs(pnlPoints) / riskPts) * 100) / 100 : 0;
+  const outcome: "WIN" | "LOSS" | "BREAKEVEN" = pnl > spec.pointValue * 0.1 ? "WIN" : pnl < -spec.pointValue * 0.1 ? "LOSS" : "BREAKEVEN";
+
+  const entry: JournalEntry = {
+    id: "trade_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+    timestamp: ts,
+    symbol: t.market,
+    timeframe: t.timeframe,
+    pattern: t.pattern,
+    direction: t.direction,
+    entry: t.entry,
+    stop: t.initialStop,
+    target: t.target,
+    exit: exitPrice,
+    pnlPoints,
+    pnlDollars: pnl,
+    confluence: confluenceVal || 0,
+    confluenceLabel: confluenceLabel || "",
+    outcome,
+    reason: reason || "",
+    notes: "",
+    rewardRatio: session.rewardRatio,
+    achievedRR: pnl >= 0 ? achievedRR : -achievedRR,
+    dataSource: dataSource || "SIM",
+  };
+  try { addJournalEntry(entry); } catch (err) { console.error("[journal] save error:", err); }
+}
+
 async function simulateTick(session: TraderSession) {
   const ts = getESTTime();
   if (!isTradingHours() && !session.forceTrading) {
@@ -1028,6 +1062,7 @@ async function simulateTick(session: TraderSession) {
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
+          recordTrade(session, t, exitPrice, pnl, ts, dataSource);
           delete session.openTrades[tradeKey]; hit = true;
         } else if (bar.high >= t.target) {
           const pnl = r2((t.target - t.entry) * pointValue);
@@ -1040,6 +1075,7 @@ async function simulateTick(session: TraderSession) {
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
+          recordTrade(session, t, t.target, pnl, ts, dataSource);
           delete session.openTrades[tradeKey]; hit = true;
         } else if (t.trailActivated && t.barsSinceEntry % 3 === 0) {
           session.logs.push(makeLog({
@@ -1064,6 +1100,7 @@ async function simulateTick(session: TraderSession) {
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
+          recordTrade(session, t, exitPrice, pnl, ts, dataSource);
           delete session.openTrades[tradeKey]; hit = true;
         } else if (bar.low <= t.target) {
           const pnl = r2((t.entry - t.target) * pointValue);
@@ -1076,6 +1113,7 @@ async function simulateTick(session: TraderSession) {
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
+          recordTrade(session, t, t.target, pnl, ts, dataSource);
           delete session.openTrades[tradeKey]; hit = true;
         } else if (t.trailActivated && t.barsSinceEntry % 3 === 0) {
           session.logs.push(makeLog({
