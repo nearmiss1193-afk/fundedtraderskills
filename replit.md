@@ -35,16 +35,25 @@ shared/schema.ts    - Stub
   - **Real Price Data**: Polygon.io API (SPY x 7.8 as ES/MES proxy, free tier compatible)
   - **Force Trading Mode**: Checkbox to override time window during development
   - **Moving Averages**: 9 EMA + 21 EMA + 200 SMA for trend confirmation and entry filtering
-  - **5 Core Patterns**: 3 Bar Play (3 consecutive + reversal + volume), Buy/Sell Setup (10-factor confluence), Pivot Breakout (prior pivot levels), Climax Reversal (7+ bars extended + ending volume), MA Bounce (9/21 EMA touch + reversal)
+  - **5 Core Patterns**: 3 Bar Play (10-factor), Buy/Sell Setup (12-factor), Pivot Breakout (10-factor), Climax Reversal (9-factor), MA Bounce (8-factor)
   - **Short Selling**: All patterns support both LONG and SHORT entries
-  - **Confluence Scoring**: Multi-factor scoring with descriptive labels (A+ Setup, High Probability, Moderate, etc.)
-  - **Volume Classification**: Igniting (starts move), Ending (exhaustion), Resting (consolidation) per manual
-  - **Trailing Stops**: Activates after 1R move, trails at 0.6R from high/low, breakeven management
+  - **Full Manual Integration** (Trading With An Edge):
+    - 3 Chart Keys: How bar formed (barFormationQuality), where it formed (pivot proximity), how it got here (howDidItGetHere)
+    - 6 Reversal Signs from p.37: bars down, wide range bars, pivot support, volume, green bar, bottoming tail
+    - Multiple concepts converging = higher odds (confluence scoring)
+    - Prior pivots: "where buyers stepped up in the past, they'll likely do it again"
+    - Climactic moves: extended + ending volume + distance from 21 EMA
+    - Consolidation then breakout with igniting volume
+  - **Entry Reason Logging**: Every signal shows WHY (e.g. "at pivot support + increased volume + green bar + bottoming tail + at 21 EMA")
+  - **Confluence Scoring**: Up to 12 factors per pattern with descriptive labels (A+ Setup, High Probability, Moderate, etc.)
+  - **Volume Classification**: Igniting (starts move), Ending (exhaustion), Resting (consolidation) — all relative to avgRange not hardcoded
+  - **Bar Analysis**: isWideRangeBar, isNarrowRangeBar, hasMultipleWideRangeBars, barFormationQuality, distanceFromMA, isExtendedFromMA
+  - **Trailing Stops**: Activates after 1R move, trails at 0.6R from high/low, breakeven management — all relative to riskPoints
   - **Trend Detection**: HPH/HPL counting for uptrend, LPH/LPL for downtrend, with pivot decay
   - **Fear/Greed Dynamics**: Sentiment-biased price movement (BUYERS_CONTROL amplifies upward, SELLERS_CONTROL amplifies downward)
   - **Trade Management**: Entry from recent swing, SL/TP/Trail shown in log, TRAILED OUT vs STOPPED OUT
-  - **Price Scaling**: All noise, drift, stops, and risk calculations scale proportionally to each symbol's base price
-  - **Log Fields**: trail, confluenceLabel, volumeType, dataSource badges, color-coded actions
+  - **Price Scaling**: All thresholds (isNearMA, isNearPivot, hasBottomingTail, classifyVolume) use relative % not hardcoded points
+  - **Log Fields**: trail, confluenceLabel, volumeType, reason, dataSource badges, color-coded actions
 
 ## Symbol Categories (UI)
 

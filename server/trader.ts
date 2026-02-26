@@ -141,6 +141,7 @@ interface TradeLog {
   sentiment: string | null;
   dataSource: string | null;
   volumeType: string | null;
+  reason: string | null;
 }
 
 interface Bar {
@@ -435,20 +436,43 @@ function updateMarketState(state: MarketState, bar: Bar, close: number, volume: 
 }
 
 function hasBottomingTail(bar: Bar): boolean {
-  return bar.tail > bar.body * 1.5 && bar.tail > 0.5;
+  return bar.tail > bar.body * 1.5 && bar.tail > bar.range * 0.25;
 }
 
 function hasToppingTail(bar: Bar): boolean {
-  return bar.wick > bar.body * 1.5 && bar.wick > 0.5;
+  return bar.wick > bar.body * 1.5 && bar.wick > bar.range * 0.25;
+}
+
+function isWideRangeBar(bar: Bar, avgRange: number): boolean {
+  return bar.range > avgRange * 1.5;
+}
+
+function isNarrowRangeBar(bar: Bar, avgRange: number): boolean {
+  return bar.range < avgRange * 0.5;
+}
+
+function getAvgRange(bars: Bar[]): number {
+  if (bars.length < 3) return 1;
+  return bars.reduce((s, b) => s + b.range, 0) / bars.length;
+}
+
+function distanceFromMA(price: number, ma: number): number {
+  if (ma === 0) return 0;
+  return Math.abs(price - ma) / ma;
+}
+
+function isExtendedFromMA(price: number, ma: number): boolean {
+  return distanceFromMA(price, ma) > 0.015;
 }
 
 function classifyVolume(bars: Bar[], avgVol: number): "IGNITING" | "ENDING" | "RESTING" | "NORMAL" {
   if (bars.length < 3) return "NORMAL";
   const curr = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
+  const avgRange = getAvgRange(bars.slice(-10));
 
   const isExtendedMove = countConsecutiveDown(bars) >= 5 || countConsecutiveUp(bars) >= 5;
-  if (isExtendedMove && curr.volume > avgVol * 2.5 && curr.body > 2) {
+  if (isExtendedMove && curr.volume > avgVol * 2.5 && isWideRangeBar(curr, avgRange)) {
     return "ENDING";
   }
 
@@ -456,7 +480,7 @@ function classifyVolume(bars: Bar[], avgVol: number): "IGNITING" | "ENDING" | "R
     return "IGNITING";
   }
 
-  if (curr.volume < avgVol * 0.6 && curr.body < 1.0) {
+  if (curr.volume < avgVol * 0.6 && isNarrowRangeBar(curr, avgRange)) {
     return "RESTING";
   }
 
@@ -491,13 +515,23 @@ function countConsecutiveUp(bars: Bar[]): number {
 
 function hasLargeBars(bars: Bar[], count: number): boolean {
   const recent = bars.slice(-count);
-  const avgRange = recent.reduce((s, b) => s + b.range, 0) / recent.length;
+  const avgRange = getAvgRange(recent);
   const largeBars = recent.filter(b => b.range > avgRange * 1.5);
   return largeBars.length >= Math.ceil(count * 0.4);
 }
 
-function isNearMA(price: number, ma: number, threshold: number = 3): boolean {
-  return Math.abs(price - ma) < threshold;
+function hasMultipleWideRangeBars(bars: Bar[]): boolean {
+  const recent = bars.slice(-7);
+  const avgRange = getAvgRange(recent);
+  return recent.filter(b => isWideRangeBar(b, avgRange)).length >= 3;
+}
+
+function isNearMA(price: number, ma: number): boolean {
+  return distanceFromMA(price, ma) < 0.003;
+}
+
+function isNearPivot(price: number, pivot: number, basePrice: number): boolean {
+  return Math.abs(price - pivot) < basePrice * 0.0015;
 }
 
 function calcConfluence(factors: boolean[]): number {
@@ -513,15 +547,43 @@ function confluenceDescription(score: number, total: number): string {
   return `${score}/${total} - Weak`;
 }
 
-function detect3BarPlayBuy(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
-  if (bars.length < 5) return { detected: false, confluence: 0, confluenceLabel: "" };
+function barFormationQuality(bar: Bar, direction: "LONG" | "SHORT"): number {
+  let quality = 0;
+  if (direction === "LONG") {
+    if (bar.bullish) quality += 2;
+    if (hasBottomingTail(bar)) quality += 2;
+    if (bar.body > bar.range * 0.5) quality += 1;
+    if (bar.wick < bar.body * 0.3) quality += 1;
+  } else {
+    if (!bar.bullish) quality += 2;
+    if (hasToppingTail(bar)) quality += 2;
+    if (bar.body > bar.range * 0.5) quality += 1;
+    if (bar.tail < bar.body * 0.3) quality += 1;
+  }
+  return quality;
+}
+
+function howDidItGetHere(bars: Bar[], direction: "LONG" | "SHORT"): { barsInMove: number; hasLargeAcceleration: boolean; isExtended: boolean } {
+  const barsInMove = direction === "LONG" ? countConsecutiveDown(bars) : countConsecutiveUp(bars);
+  const recent = bars.slice(-(barsInMove + 1));
+  const avgRange = getAvgRange(bars);
+  const hasLargeAcceleration = recent.filter(b => isWideRangeBar(b, avgRange)).length >= Math.max(2, barsInMove * 0.4);
+  const isExtended = barsInMove >= 5;
+  return { barsInMove, hasLargeAcceleration, isExtended };
+}
+
+function detect3BarPlayBuy(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 5) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
   const b = bars.slice(-5);
   const [b0, b1, b2, b3, b4] = b;
   const threeDown = !b1.bullish && !b2.bullish && !b3.bullish;
   const reversal = b4.bullish && b4.close > b3.high;
   const volumeIncrease = b4.volume > b3.volume * 1.2;
+  const avgRange = getAvgRange(bars);
 
   if (threeDown && reversal) {
+    const context = howDidItGetHere(bars, "LONG");
+    const quality = barFormationQuality(b4, "LONG");
     const factors = [
       volumeIncrease,
       b4.close > state.ema9,
@@ -530,16 +592,24 @@ function detect3BarPlayBuy(bars: Bar[], state: MarketState): { detected: boolean
       hasBottomingTail(b3) || hasBottomingTail(b4),
       isNearMA(b4.close, state.ema21) || isNearMA(b4.close, state.ema9),
       state.bias !== "DOWNTREND",
-      Math.abs(state.price - state.pivotLow) < 8,
+      isNearPivot(state.price, state.pivotLow, state.price) || isNearPivot(state.price, state.priorPivotLow, state.price),
+      quality >= 4,
+      b4.volume > state.avgVolume,
     ];
     const conf = calcConfluence(factors);
-    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+    const reasons: string[] = [];
+    if (volumeIncrease) reasons.push("vol spike on reversal");
+    if (hasBottomingTail(b3) || hasBottomingTail(b4)) reasons.push("bottoming tail");
+    if (b4.bullish) reasons.push("green bar");
+    if (isNearMA(b4.close, state.ema21)) reasons.push("at 21 EMA");
+    if (isNearPivot(state.price, state.pivotLow, state.price)) reasons.push("at pivot support");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 4).join(" + ") };
   }
-  return { detected: false, confluence: 0, confluenceLabel: "" };
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
 }
 
-function detect3BarPlaySell(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
-  if (bars.length < 5) return { detected: false, confluence: 0, confluenceLabel: "" };
+function detect3BarPlaySell(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 5) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
   const b = bars.slice(-5);
   const [b0, b1, b2, b3, b4] = b;
   const threeUp = b1.bullish && b2.bullish && b3.bullish;
@@ -547,6 +617,7 @@ function detect3BarPlaySell(bars: Bar[], state: MarketState): { detected: boolea
   const volumeIncrease = b4.volume > b3.volume * 1.2;
 
   if (threeUp && reversal) {
+    const quality = barFormationQuality(b4, "SHORT");
     const factors = [
       volumeIncrease,
       b4.close < state.ema9,
@@ -555,118 +626,166 @@ function detect3BarPlaySell(bars: Bar[], state: MarketState): { detected: boolea
       hasToppingTail(b3) || hasToppingTail(b4),
       isNearMA(b4.close, state.ema21) || isNearMA(b4.close, state.ema9),
       state.bias !== "UPTREND",
-      Math.abs(state.price - state.pivotHigh) < 8,
+      isNearPivot(state.price, state.pivotHigh, state.price) || isNearPivot(state.price, state.priorPivotHigh, state.price),
+      quality >= 4,
+      b4.volume > state.avgVolume,
     ];
     const conf = calcConfluence(factors);
-    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+    const reasons: string[] = [];
+    if (volumeIncrease) reasons.push("vol spike on reversal");
+    if (hasToppingTail(b3) || hasToppingTail(b4)) reasons.push("topping tail");
+    if (!b4.bullish) reasons.push("red bar");
+    if (isNearMA(b4.close, state.ema21)) reasons.push("at 21 EMA");
+    if (isNearPivot(state.price, state.pivotHigh, state.price)) reasons.push("at pivot resistance");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 4).join(" + ") };
   }
-  return { detected: false, confluence: 0, confluenceLabel: "" };
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
 }
 
-function detectBuySetup(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
-  if (bars.length < 6) return { detected: false, confluence: 0, confluenceLabel: "" };
+function detectBuySetup(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 6) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
   const recent = bars.slice(-6);
   const curr = recent[recent.length - 1];
   const prev = recent[recent.length - 2];
   const low = Math.min(...recent.map(b => b.low));
 
   if (prev.low <= low * 1.002 && curr.close > prev.high && curr.bullish) {
+    const context = howDidItGetHere(bars, "LONG");
+    const quality = barFormationQuality(curr, "LONG");
     const factors = [
-      curr.close > state.ema21,
-      curr.close > state.sma200,
-      curr.close > state.ema9,
+      curr.bullish,
       hasBottomingTail(prev) || hasBottomingTail(curr),
-      isIgnitingVolume(bars, state.avgVolume),
-      Math.abs(state.price - state.pivotLow) < 5 || Math.abs(state.price - state.priorPivotLow) < 5,
-      state.bias === "UPTREND",
-      countConsecutiveDown(bars) >= 3,
-      isNearMA(prev.low, state.ema21) || isNearMA(prev.low, state.ema9),
       curr.volume > state.avgVolume,
+      isIgnitingVolume(bars, state.avgVolume),
+      isNearPivot(prev.low, state.pivotLow, state.price) || isNearPivot(prev.low, state.priorPivotLow, state.price),
+      isNearMA(prev.low, state.ema21) || isNearMA(prev.low, state.ema9),
+      countConsecutiveDown(bars) >= 3,
+      hasMultipleWideRangeBars(bars),
+      curr.close > state.ema9,
+      state.bias === "UPTREND" || state.bias === "SIDEWAYS",
+      quality >= 3,
+      context.barsInMove >= 5,
     ];
     const conf = calcConfluence(factors);
-    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+    const reasons: string[] = [];
+    if (context.barsInMove >= 5) reasons.push(`${context.barsInMove} bars down`);
+    if (hasMultipleWideRangeBars(bars)) reasons.push("wide range bars");
+    if (isNearPivot(prev.low, state.pivotLow, state.price)) reasons.push("at pivot support");
+    if (curr.volume > state.avgVolume) reasons.push("increased volume");
+    if (curr.bullish) reasons.push("green bar");
+    if (hasBottomingTail(prev)) reasons.push("bottoming tail");
+    if (isNearMA(prev.low, state.ema21)) reasons.push("at 21 EMA");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
   }
-  return { detected: false, confluence: 0, confluenceLabel: "" };
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
 }
 
-function detectSellSetup(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
-  if (bars.length < 6) return { detected: false, confluence: 0, confluenceLabel: "" };
+function detectSellSetup(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 6) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
   const recent = bars.slice(-6);
   const curr = recent[recent.length - 1];
   const prev = recent[recent.length - 2];
   const high = Math.max(...recent.map(b => b.high));
 
   if (prev.high >= high * 0.998 && curr.close < prev.low && !curr.bullish) {
+    const context = howDidItGetHere(bars, "SHORT");
+    const quality = barFormationQuality(curr, "SHORT");
     const factors = [
-      curr.close < state.ema21,
-      curr.close < state.sma200,
-      curr.close < state.ema9,
+      !curr.bullish,
       hasToppingTail(prev) || hasToppingTail(curr),
-      isIgnitingVolume(bars, state.avgVolume),
-      Math.abs(state.price - state.pivotHigh) < 5 || Math.abs(state.price - state.priorPivotHigh) < 5,
-      state.bias === "DOWNTREND",
-      countConsecutiveUp(bars) >= 3,
-      isNearMA(prev.high, state.ema21) || isNearMA(prev.high, state.ema9),
       curr.volume > state.avgVolume,
+      isIgnitingVolume(bars, state.avgVolume),
+      isNearPivot(prev.high, state.pivotHigh, state.price) || isNearPivot(prev.high, state.priorPivotHigh, state.price),
+      isNearMA(prev.high, state.ema21) || isNearMA(prev.high, state.ema9),
+      countConsecutiveUp(bars) >= 3,
+      hasMultipleWideRangeBars(bars),
+      curr.close < state.ema9,
+      state.bias === "DOWNTREND" || state.bias === "SIDEWAYS",
+      quality >= 3,
+      context.barsInMove >= 5,
     ];
     const conf = calcConfluence(factors);
-    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+    const reasons: string[] = [];
+    if (context.barsInMove >= 5) reasons.push(`${context.barsInMove} bars up`);
+    if (hasMultipleWideRangeBars(bars)) reasons.push("wide range bars");
+    if (isNearPivot(prev.high, state.pivotHigh, state.price)) reasons.push("at pivot resistance");
+    if (curr.volume > state.avgVolume) reasons.push("increased volume");
+    if (!curr.bullish) reasons.push("red bar");
+    if (hasToppingTail(prev)) reasons.push("topping tail");
+    if (isNearMA(prev.high, state.ema21)) reasons.push("at 21 EMA");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
   }
-  return { detected: false, confluence: 0, confluenceLabel: "" };
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
 }
 
-function detectBreakoutLong(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
-  if (bars.length < 3) return { detected: false, confluence: 0, confluenceLabel: "" };
+function detectBreakoutLong(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 3) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
   const curr = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
+  const avgRange = getAvgRange(bars);
   const breaksPriorPivot = curr.close > state.priorPivotHigh && prev.close <= state.priorPivotHigh;
   const breaksCurrentPivot = curr.close > state.pivotHigh && prev.close <= state.pivotHigh;
 
   if (breaksPriorPivot || breaksCurrentPivot) {
-    if (!curr.bullish) return { detected: false, confluence: 0, confluenceLabel: "" };
+    if (!curr.bullish) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
     const factors = [
       isIgnitingVolume(bars, state.avgVolume),
       curr.close > state.ema21,
       curr.close > state.ema9,
       curr.close > state.sma200,
       state.bias !== "DOWNTREND",
-      curr.body > 1.5,
+      isWideRangeBar(curr, avgRange),
       state.pivotHighAge > 5,
       curr.volume > state.avgVolume * 1.3,
+      barFormationQuality(curr, "LONG") >= 3,
+      breaksPriorPivot,
     ];
     const conf = calcConfluence(factors);
-    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+    const pivot = breaksPriorPivot ? "prior pivot" : "current pivot";
+    const reasons: string[] = [`breaks ${pivot}`];
+    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+    if (isWideRangeBar(curr, avgRange)) reasons.push("wide range bar");
+    if (curr.close > state.ema21) reasons.push("above 21 EMA");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 4).join(" + ") };
   }
-  return { detected: false, confluence: 0, confluenceLabel: "" };
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
 }
 
-function detectBreakoutShort(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string } {
-  if (bars.length < 3) return { detected: false, confluence: 0, confluenceLabel: "" };
+function detectBreakoutShort(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 3) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
   const curr = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
+  const avgRange = getAvgRange(bars);
   const breaksPriorPivot = curr.close < state.priorPivotLow && prev.close >= state.priorPivotLow;
   const breaksCurrentPivot = curr.close < state.pivotLow && prev.close >= state.pivotLow;
 
   if (breaksPriorPivot || breaksCurrentPivot) {
-    if (curr.bullish) return { detected: false, confluence: 0, confluenceLabel: "" };
+    if (curr.bullish) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
     const factors = [
       isIgnitingVolume(bars, state.avgVolume),
       curr.close < state.ema21,
       curr.close < state.ema9,
       curr.close < state.sma200,
       state.bias !== "UPTREND",
-      curr.body > 1.5,
+      isWideRangeBar(curr, avgRange),
       state.pivotLowAge > 5,
       curr.volume > state.avgVolume * 1.3,
+      barFormationQuality(curr, "SHORT") >= 3,
+      breaksPriorPivot,
     ];
     const conf = calcConfluence(factors);
-    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+    const pivot = breaksPriorPivot ? "prior pivot" : "current pivot";
+    const reasons: string[] = [`breaks ${pivot}`];
+    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+    if (isWideRangeBar(curr, avgRange)) reasons.push("wide range bar");
+    if (curr.close < state.ema21) reasons.push("below 21 EMA");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 4).join(" + ") };
   }
-  return { detected: false, confluence: 0, confluenceLabel: "" };
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
 }
 
-function detectClimaxReversal(bars: Bar[], state: MarketState): { detected: boolean; direction: "LONG" | "SHORT"; confluence: number; confluenceLabel: string } {
-  if (bars.length < 7) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "" };
+function detectClimaxReversal(bars: Bar[], state: MarketState): { detected: boolean; direction: "LONG" | "SHORT"; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 7) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
   const curr = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
 
@@ -677,71 +796,104 @@ function detectClimaxReversal(bars: Bar[], state: MarketState): { detected: bool
     const factors = [
       downBars >= 7,
       hasLargeBars(bars, 6),
-      Math.abs(state.price - state.pivotLow) < 5 || Math.abs(state.price - state.priorPivotLow) < 5,
+      hasMultipleWideRangeBars(bars),
+      isNearPivot(state.price, state.pivotLow, state.price) || isNearPivot(state.price, state.priorPivotLow, state.price),
       curr.close > state.ema9 || isNearMA(curr.close, state.ema21),
       hasBottomingTail(prev),
       curr.volume > state.avgVolume * 3,
-      state.price < state.sma200,
+      isExtendedFromMA(state.price, state.ema21),
+      curr.bullish,
     ];
     const conf = calcConfluence(factors);
-    return { detected: true, direction: "LONG", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+    const reasons: string[] = [`${downBars} bars down`, "ending volume"];
+    if (hasMultipleWideRangeBars(bars)) reasons.push("large bars");
+    if (isNearPivot(state.price, state.priorPivotLow, state.price)) reasons.push("at prior pivot support");
+    if (hasBottomingTail(curr)) reasons.push("bottoming tail");
+    if (curr.bullish) reasons.push("green bar");
+    if (isExtendedFromMA(state.price, state.ema21)) reasons.push("extended from 21 EMA");
+    return { detected: true, direction: "LONG", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
   }
 
   if (isEndingVolume(bars, state.avgVolume) && upBars >= 5 && !curr.bullish && hasToppingTail(curr)) {
     const factors = [
       upBars >= 7,
       hasLargeBars(bars, 6),
-      Math.abs(state.price - state.pivotHigh) < 5 || Math.abs(state.price - state.priorPivotHigh) < 5,
+      hasMultipleWideRangeBars(bars),
+      isNearPivot(state.price, state.pivotHigh, state.price) || isNearPivot(state.price, state.priorPivotHigh, state.price),
       curr.close < state.ema9 || isNearMA(curr.close, state.ema21),
       hasToppingTail(prev),
       curr.volume > state.avgVolume * 3,
-      state.price > state.sma200,
+      isExtendedFromMA(state.price, state.ema21),
+      !curr.bullish,
     ];
     const conf = calcConfluence(factors);
-    return { detected: true, direction: "SHORT", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+    const reasons: string[] = [`${upBars} bars up`, "ending volume"];
+    if (hasMultipleWideRangeBars(bars)) reasons.push("large bars");
+    if (isNearPivot(state.price, state.priorPivotHigh, state.price)) reasons.push("at prior pivot resistance");
+    if (hasToppingTail(curr)) reasons.push("topping tail");
+    if (!curr.bullish) reasons.push("red bar");
+    if (isExtendedFromMA(state.price, state.ema21)) reasons.push("extended from 21 EMA");
+    return { detected: true, direction: "SHORT", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
   }
-  return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "" };
+  return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
 }
 
-function detectMABounce(bars: Bar[], state: MarketState): { detected: boolean; direction: "LONG" | "SHORT"; confluence: number; confluenceLabel: string } {
-  if (bars.length < 4) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "" };
+function detectMABounce(bars: Bar[], state: MarketState): { detected: boolean; direction: "LONG" | "SHORT"; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 4) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
   const curr = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
-  const ema21Zone = state.ema21 * 0.002;
-  const ema9Zone = state.ema9 * 0.002;
+  const avgRange = getAvgRange(bars);
 
-  const touchesEma21Long = prev.low <= state.ema21 + ema21Zone && prev.low >= state.ema21 - ema21Zone;
-  const touchesEma9Long = prev.low <= state.ema9 + ema9Zone && prev.low >= state.ema9 - ema9Zone;
+  const touchesEma21Long = isNearMA(prev.low, state.ema21);
+  const touchesEma9Long = isNearMA(prev.low, state.ema9);
 
   if ((touchesEma21Long || touchesEma9Long) && curr.close > prev.high && curr.bullish && state.bias === "UPTREND") {
+    const quality = barFormationQuality(curr, "LONG");
     const factors = [
       hasBottomingTail(prev),
       isIgnitingVolume(bars, state.avgVolume),
-      curr.body > 1,
-      Math.abs(state.price - state.pivotLow) < 8,
+      isWideRangeBar(curr, avgRange),
+      isNearPivot(prev.low, state.pivotLow, state.price),
       curr.close > state.ema9,
       curr.close > state.ema21,
+      quality >= 3,
+      curr.volume > state.avgVolume,
     ];
     const conf = calcConfluence(factors);
-    return { detected: true, direction: "LONG", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+    const ma = touchesEma21Long ? "21 EMA" : "9 EMA";
+    const reasons: string[] = [`bounce off ${ma}`];
+    if (hasBottomingTail(prev)) reasons.push("bottoming tail");
+    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+    if (isNearPivot(prev.low, state.pivotLow, state.price)) reasons.push("at pivot support");
+    if (curr.bullish) reasons.push("green bar");
+    return { detected: true, direction: "LONG", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 4).join(" + ") };
   }
 
-  const touchesEma21Short = prev.high >= state.ema21 - ema21Zone && prev.high <= state.ema21 + ema21Zone;
-  const touchesEma9Short = prev.high >= state.ema9 - ema9Zone && prev.high <= state.ema9 + ema9Zone;
+  const touchesEma21Short = isNearMA(prev.high, state.ema21);
+  const touchesEma9Short = isNearMA(prev.high, state.ema9);
 
   if ((touchesEma21Short || touchesEma9Short) && curr.close < prev.low && !curr.bullish && state.bias === "DOWNTREND") {
+    const quality = barFormationQuality(curr, "SHORT");
     const factors = [
       hasToppingTail(prev),
       isIgnitingVolume(bars, state.avgVolume),
-      curr.body > 1,
-      Math.abs(state.price - state.pivotHigh) < 8,
+      isWideRangeBar(curr, avgRange),
+      isNearPivot(prev.high, state.pivotHigh, state.price),
       curr.close < state.ema9,
       curr.close < state.ema21,
+      quality >= 3,
+      curr.volume > state.avgVolume,
     ];
     const conf = calcConfluence(factors);
-    return { detected: true, direction: "SHORT", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length) };
+    const ma = touchesEma21Short ? "21 EMA" : "9 EMA";
+    const reasons: string[] = [`rejection at ${ma}`];
+    if (hasToppingTail(prev)) reasons.push("topping tail");
+    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+    if (isNearPivot(prev.high, state.pivotHigh, state.price)) reasons.push("at pivot resistance");
+    if (!curr.bullish) reasons.push("red bar");
+    return { detected: true, direction: "SHORT", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 4).join(" + ") };
   }
-  return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "" };
+  return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
 }
 
 function sentimentLabel(s: MarketState): string {
@@ -772,9 +924,10 @@ function manageTrailingStop(trade: OpenTrade, bar: Bar, state: MarketState): voi
 
     if (trade.barsSinceEntry >= 3 && !trade.trailActivated) {
       const swingLow = Math.min(bar.low, state.recentSwingLow);
-      const breakeven = trade.entry - 0.25;
+      const tickBuffer = trade.riskPoints * 0.05;
+      const breakeven = trade.entry - tickBuffer;
       if (swingLow > breakeven) {
-        trade.stop = r2(Math.max(trade.stop, swingLow - 0.5));
+        trade.stop = r2(Math.max(trade.stop, swingLow - tickBuffer * 2));
       }
     }
   } else {
@@ -796,9 +949,10 @@ function manageTrailingStop(trade: OpenTrade, bar: Bar, state: MarketState): voi
 
     if (trade.barsSinceEntry >= 3 && !trade.trailActivated) {
       const swingHigh = Math.max(bar.high, state.recentSwingHigh);
-      const breakeven = trade.entry + 0.25;
+      const tickBuffer = trade.riskPoints * 0.05;
+      const breakeven = trade.entry + tickBuffer;
       if (swingHigh < breakeven) {
-        trade.stop = r2(Math.min(trade.stop, swingHigh + 0.5));
+        trade.stop = r2(Math.min(trade.stop, swingHigh + tickBuffer * 2));
       }
     }
   }
@@ -810,7 +964,7 @@ function makeLog(overrides: Partial<TradeLog> & { id: number; timestamp: string;
     entry: null, stop: null, target: null, trail: null,
     pnl: null, volume: null, bias: null,
     confluence: null, confluenceLabel: null, sentiment: null,
-    dataSource: null, volumeType: null,
+    dataSource: null, volumeType: null, reason: null,
     ...overrides,
   };
 }
@@ -956,6 +1110,7 @@ async function simulateTick(session: TraderSession) {
       let direction: "LONG" | "SHORT" = "LONG";
       let confluence = 0;
       let confluenceLabel = "";
+      let entryReason = "";
 
       if (session.patterns.includes("3bar")) {
         const buyResult = detect3BarPlayBuy(bars, state);
@@ -964,6 +1119,7 @@ async function simulateTick(session: TraderSession) {
           direction = "LONG";
           confluence = buyResult.confluence;
           confluenceLabel = buyResult.confluenceLabel;
+          entryReason = buyResult.reason;
         } else {
           const sellResult = detect3BarPlaySell(bars, state);
           if (sellResult.detected) {
@@ -971,36 +1127,37 @@ async function simulateTick(session: TraderSession) {
             direction = "SHORT";
             confluence = sellResult.confluence;
             confluenceLabel = sellResult.confluenceLabel;
+            entryReason = sellResult.reason;
           }
         }
       }
 
       if (!detectedPattern && session.patterns.includes("buysetup")) {
         const buy = detectBuySetup(bars, state);
-        if (buy.detected) { detectedPattern = "Buy Setup"; direction = "LONG"; confluence = buy.confluence; confluenceLabel = buy.confluenceLabel; }
+        if (buy.detected) { detectedPattern = "Buy Setup"; direction = "LONG"; confluence = buy.confluence; confluenceLabel = buy.confluenceLabel; entryReason = buy.reason; }
         else {
           const sell = detectSellSetup(bars, state);
-          if (sell.detected) { detectedPattern = "Sell Setup"; direction = "SHORT"; confluence = sell.confluence; confluenceLabel = sell.confluenceLabel; }
+          if (sell.detected) { detectedPattern = "Sell Setup"; direction = "SHORT"; confluence = sell.confluence; confluenceLabel = sell.confluenceLabel; entryReason = sell.reason; }
         }
       }
 
       if (!detectedPattern && session.patterns.includes("breakout")) {
         const bl = detectBreakoutLong(bars, state);
-        if (bl.detected) { detectedPattern = "Pivot Breakout"; direction = "LONG"; confluence = bl.confluence; confluenceLabel = bl.confluenceLabel; }
+        if (bl.detected) { detectedPattern = "Pivot Breakout"; direction = "LONG"; confluence = bl.confluence; confluenceLabel = bl.confluenceLabel; entryReason = bl.reason; }
         else {
           const bs = detectBreakoutShort(bars, state);
-          if (bs.detected) { detectedPattern = "Pivot Breakout"; direction = "SHORT"; confluence = bs.confluence; confluenceLabel = bs.confluenceLabel; }
+          if (bs.detected) { detectedPattern = "Pivot Breakout"; direction = "SHORT"; confluence = bs.confluence; confluenceLabel = bs.confluenceLabel; entryReason = bs.reason; }
         }
       }
 
       if (!detectedPattern && session.patterns.includes("climax")) {
         const c = detectClimaxReversal(bars, state);
-        if (c.detected) { detectedPattern = "Climax Reversal"; direction = c.direction; confluence = c.confluence; confluenceLabel = c.confluenceLabel; }
+        if (c.detected) { detectedPattern = "Climax Reversal"; direction = c.direction; confluence = c.confluence; confluenceLabel = c.confluenceLabel; entryReason = c.reason; }
       }
 
       if (!detectedPattern && session.patterns.includes("mabounce")) {
         const m = detectMABounce(bars, state);
-        if (m.detected) { detectedPattern = "MA Bounce"; direction = m.direction; confluence = m.confluence; confluenceLabel = m.confluenceLabel; }
+        if (m.detected) { detectedPattern = "MA Bounce"; direction = m.direction; confluence = m.confluence; confluenceLabel = m.confluenceLabel; entryReason = m.reason; }
       }
 
       if (detectedPattern && !session.openTrades[tradeKey]) {
@@ -1051,6 +1208,7 @@ async function simulateTick(session: TraderSession) {
             cumPnl: session.cumPnl,
             volume: bar.volume, bias: state.bias, confluence, confluenceLabel,
             sentiment: sentimentLabel(state), dataSource, volumeType: volType,
+            reason: entryReason || null,
           }));
           break;
         }
@@ -1063,6 +1221,7 @@ async function simulateTick(session: TraderSession) {
             cumPnl: session.cumPnl,
             volume: bar.volume, bias: state.bias, confluence, confluenceLabel,
             sentiment: sentimentLabel(state), dataSource, volumeType: volType,
+            reason: entryReason || null,
           }));
         }
       }

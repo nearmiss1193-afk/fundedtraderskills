@@ -416,6 +416,7 @@
     .log-src { font-size: 0.58rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; display: inline-block; margin-left: 2px; }
     .log-src.polygon { background: rgba(99,102,241,0.15); color: #818cf8; }
     .log-src.sim { background: rgba(107,114,128,0.1); color: #6b7280; }
+    .log-reason { font-size: 0.62rem; color: #a78bfa; font-style: italic; margin-bottom: 2px; letter-spacing: 0.02em; }
 
     .log-empty { padding: 2.5rem; text-align: center; color: #3a3e4d; font-size: 0.82rem; }
 
@@ -714,10 +715,10 @@
           text.textContent = 'FORCE TRADING ACTIVE (time window bypassed)';
         } else if (d.tradingOpen) {
           badge.className = 'trading-status open';
-          text.textContent = 'Trading window OPEN (9:30 AM - 4:00 PM EST)';
+          text.textContent = 'Futures session OPEN (Sun 6PM - Fri 5PM EST)';
         } else {
           badge.className = 'trading-status closed';
-          text.textContent = 'Trading window CLOSED (opens 9:30 AM EST)';
+          text.textContent = 'Futures session CLOSED (maintenance or weekend)';
         }
       } catch {}
     }
@@ -823,19 +824,29 @@
       return `<span class="log-src ${cls}">${s}</span>`;
     }
 
+    function fmtPrice(p) {
+      if (p === null || p === undefined) return '';
+      if (Math.abs(p) >= 1000) return p.toFixed(2);
+      if (Math.abs(p) >= 10) return p.toFixed(2);
+      return p.toFixed(4);
+    }
+
     function buildLogDetail(log) {
       let html = '';
+      if (log.reason) {
+        html += `<div class="log-reason">${esc(log.reason)}</div>`;
+      }
       if (log.entry !== null) {
-        html += `<span class="log-entry-tag">E:${log.entry.toFixed(2)}</span> `;
+        html += `<span class="log-entry-tag">E:${fmtPrice(log.entry)}</span> `;
       }
       if (log.stop !== null) {
-        html += `<span class="log-sl-tag">SL:${log.stop.toFixed(2)}</span> `;
+        html += `<span class="log-sl-tag">SL:${fmtPrice(log.stop)}</span> `;
       }
       if (log.target !== null) {
-        html += `<span class="log-tp-tag">TP:${log.target.toFixed(2)}</span> `;
+        html += `<span class="log-tp-tag">TP:${fmtPrice(log.target)}</span> `;
       }
       if (log.trail !== null && log.trail !== undefined && log.trail !== log.stop) {
-        html += `<span class="log-trail-tag">TR:${log.trail.toFixed(2)}</span> `;
+        html += `<span class="log-trail-tag">TR:${fmtPrice(log.trail)}</span> `;
       }
       if (log.pnl !== null) {
         html += formatPnl(log.pnl) + ' ';
