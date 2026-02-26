@@ -1,9 +1,11 @@
 {
   "riskPct": 1,
-  "rewardRatio": 3,
+  "rewardRatio": 2,
   "enabledPatterns": [
     "3bar",
     "buysetup",
-    "breakout"
+    "breakout",
+    "climax",
+    "mabounce"
   ]
 }

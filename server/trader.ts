@@ -174,6 +174,10 @@ interface OpenTrade {
   lowSinceEntry: number;
   barsSinceEntry: number;
   trailActivated: boolean;
+  confluence: number;
+  confluenceLabel: string;
+  entryReason: string;
+  checklist: { patternMatch: boolean; volumeConfirmation: boolean; maRespect: boolean; priorPivotSR: boolean; barFormation: boolean };
 }
 
 interface MarketState {
@@ -972,7 +976,7 @@ function makeLog(overrides: Partial<TradeLog> & { id: number; timestamp: string;
   };
 }
 
-function recordTrade(session: TraderSession, t: OpenTrade, exitPrice: number, pnl: number, ts: string, dataSource: string, confluenceVal?: number, confluenceLabel?: string, reason?: string): void {
+function recordTrade(session: TraderSession, t: OpenTrade, exitPrice: number, pnl: number, ts: string, dataSource: string): void {
   const spec = getSpec(t.market);
   const riskPts = Math.abs(t.entry - t.initialStop);
   const pnlPoints = t.direction === "LONG" ? r2(exitPrice - t.entry) : r2(t.entry - exitPrice);
@@ -992,14 +996,15 @@ function recordTrade(session: TraderSession, t: OpenTrade, exitPrice: number, pn
     exit: exitPrice,
     pnlPoints,
     pnlDollars: pnl,
-    confluence: confluenceVal || 0,
-    confluenceLabel: confluenceLabel || "",
+    confluence: t.confluence || 0,
+    confluenceLabel: t.confluenceLabel || "",
     outcome,
-    reason: reason || "",
+    reason: t.entryReason || "",
     notes: "",
     rewardRatio: session.rewardRatio,
     achievedRR: pnl >= 0 ? achievedRR : -achievedRR,
     dataSource: dataSource || "SIM",
+    checklist: t.checklist || { patternMatch: true, volumeConfirmation: false, maRespect: false, priorPivotSR: false, barFormation: false },
   };
   try { addJournalEntry(entry); } catch (err) { console.error("[journal] save error:", err); }
 }
@@ -1232,12 +1237,23 @@ async function simulateTick(session: TraderSession) {
             target = r2(entry - clampedRisk * rewardRatio);
           }
 
+          const checklist = {
+            patternMatch: true,
+            volumeConfirmation: (entryReason || "").toLowerCase().includes("vol") || bar.volume > state.avgVolume * 1.15,
+            maRespect: (entryReason || "").toLowerCase().includes("ema") || (entryReason || "").toLowerCase().includes("ma") || isNearMA(state.price, state.ema21) || isNearMA(state.price, state.ema9),
+            priorPivotSR: (entryReason || "").toLowerCase().includes("pivot") || (entryReason || "").toLowerCase().includes("support") || (entryReason || "").toLowerCase().includes("resist") || isNearPivot(state.price, state.pivotHigh, state.price) || isNearPivot(state.price, state.pivotLow, state.price),
+            barFormation: (entryReason || "").toLowerCase().includes("tail") || (entryReason || "").toLowerCase().includes("bar") || (entryReason || "").toLowerCase().includes("green") || (entryReason || "").toLowerCase().includes("red"),
+          };
+
           session.openTrades[tradeKey] = {
             entry, stop, target, trail: stop, initialStop: stop,
             market: mk, timeframe: tf, pattern: detectedPattern,
             direction, riskPoints: clampedRisk,
             highSinceEntry: entry, lowSinceEntry: entry,
             barsSinceEntry: 0, trailActivated: false,
+            confluence, confluenceLabel,
+            entryReason: entryReason || "",
+            checklist,
           };
 
           session.logs.push(makeLog({

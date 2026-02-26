@@ -3,7 +3,7 @@ import { type Server } from "http";
 import path from "path";
 import express from "express";
 import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive } from "./trader";
-import { loadJournal, getJournalStats, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
+import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
 
 let skills: any[] = [];
 
@@ -254,6 +254,12 @@ export async function registerRoutes(
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", "attachment; filename=trade_journal.csv");
     res.send([header, ...rows].join("\n"));
+  });
+
+  app.get("/api/journal/analytics", (_req, res) => {
+    const entries = loadJournal();
+    const analytics = getAdvancedAnalytics(entries);
+    res.json(analytics);
   });
 
   app.get("/api/settings", (_req, res) => {

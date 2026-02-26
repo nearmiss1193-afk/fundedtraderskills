@@ -12,15 +12,24 @@ Minimal Node.js + Express starter for a skill marketplace with autonomous AI ski
 - `POST /api/trader/start` - Start autonomous trader `{ markets, timeframes, riskPct, patterns, customCondition, forceTrading }`
 - `POST /api/trader/stop` - Stop trader `{ sessionId }`
 - `GET /api/trader/logs/:sessionId` - Poll trade logs (optional `?after=id`)
+- `GET /api/journal` - Get journal entries + stats
+- `DELETE /api/journal` - Clear all journal entries
+- `GET /api/journal/csv` - Download journal as CSV
+- `PATCH /api/journal/:id/notes` - Update trade notes
+- `GET /api/journal/analytics` - Advanced analytics (grouped by pattern/symbol/timeframe/confluence + recommendations)
+- `GET /api/settings` - Load trader settings
+- `POST /api/settings` - Save trader settings
 
 ## Structure
 
 ```
-public/index.html   - Static frontend (3 tabs: Create Skill, Permit Checker, AI Futures Trader)
+public/index.html   - Static frontend (4 tabs: Create Skill, Permit Checker, AI Futures Trader, Edge Builder)
 server/routes.ts    - API endpoints
 server/trader.ts    - AI Futures Trader engine (async loop, Polygon.io data, pattern detection, trailing stops)
+server/journal.ts   - Trade journal + settings persistence + advanced analytics
 server/storage.ts   - Stub (in-memory storage in routes.ts)
 shared/schema.ts    - Stub
+data/               - Persistent JSON files (trade_journal.json, trader_settings.json)
 ```
 
 ## Key Features
@@ -47,6 +56,7 @@ shared/schema.ts    - Stub
     - Consolidation then breakout with igniting volume
   - **Entry Reason Logging**: Every signal shows WHY (e.g. "at pivot support + increased volume + green bar + bottoming tail + at 21 EMA")
   - **Confluence Scoring**: Up to 12 factors per pattern with descriptive labels (A+ Setup, High Probability, Moderate, etc.)
+  - **Confluence Checklist**: Each trade records 5 checklist items: Pattern Match, Volume Confirmation, MA Respect, Prior Pivot/SR, Bar Formation
   - **Volume Classification**: Igniting (starts move), Ending (exhaustion), Resting (consolidation) — all relative to avgRange not hardcoded
   - **Bar Analysis**: isWideRangeBar, isNarrowRangeBar, hasMultipleWideRangeBars, barFormationQuality, distanceFromMA, isExtendedFromMA
   - **Trailing Stops**: Activates after 1R move, trails at 0.6R from high/low, breakeven management — all relative to riskPoints
@@ -55,16 +65,23 @@ shared/schema.ts    - Stub
   - **Trade Management**: Entry from recent swing, SL/TP/Trail shown in log, TRAILED OUT vs STOPPED OUT
   - **Price Scaling**: All thresholds (isNearMA, isNearPivot, hasBottomingTail, classifyVolume) use relative % not hardcoded points
   - **Log Fields**: trail, confluenceLabel, volumeType, reason, dataSource badges, color-coded actions
-  - **Trade Journal**: Persistent JSON-backed trade history with sortable/filterable spreadsheet UI
-    - Every completed trade auto-saved to `data/trade_journal.json`
-    - Columns: Timestamp, Symbol, TF, Pattern, Direction, Entry, SL, TP, Exit, P&L, Confluence, Outcome, R:R, Notes
-    - Summary stats: Total Trades, Win Rate, Profit Factor, Total P&L, Best Symbol, Best Pattern, Avg R:R
-    - Toolbar: Search, filter by symbol/pattern/outcome, CSV export, clear all
-    - Sortable columns (click headers), color-coded outcomes (green=WIN, red=LOSS)
-    - Editable notes per trade (click to add)
-    - Settings panel: Risk %, R:R ratio, enabled patterns — persisted to `data/trader_settings.json`
-    - Settings sync to main trader form on save
-    - API: GET/DELETE `/api/journal`, GET `/api/journal/csv`, PATCH `/api/journal/:id/notes`, GET/POST `/api/settings`
+- **Trade Journal**: Persistent JSON-backed trade history with sortable/filterable spreadsheet UI
+  - Every completed trade auto-saved to `data/trade_journal.json`
+  - Columns: Timestamp, Symbol, TF, Pattern, Direction, Entry, SL, TP, Exit, P&L, Confluence Checklist (5 dots), Outcome, R:R, Notes
+  - Summary stats: Total Trades, Win Rate, Profit Factor, Total P&L, Best Symbol, Best Pattern, Avg R:R
+  - Toolbar: Search, filter by symbol/pattern/outcome, CSV export, clear all
+  - Sortable columns (click headers), color-coded outcomes (green=WIN, red=LOSS)
+  - Editable notes per trade (click to add)
+  - Confluence checklist dots with hover tooltip (Pattern, Volume, MA, Pivot/SR, Bar Formation)
+  - Settings panel: Risk %, R:R ratio, enabled patterns — persisted to `data/trader_settings.json`
+  - Settings sync to main trader form on save
+- **Edge Builder Dashboard** (Tab 4) - Advanced analytics based on Live Traders philosophy:
+  - **Overall Metrics**: Total Trades, Win Rate, Profit Factor, Expectancy, Total P&L
+  - **Grouped Statistics**: Performance by Pattern, Symbol, Timeframe, and Confluence Level
+  - **Setup Heatmap**: Color-coded cells showing top/bottom performing setups (hot=green, warm=yellow, cold=red)
+  - **Optimize My Edge**: AI-generated recommendations (e.g. "Increase size on Buy Setup - 59% win rate")
+  - **Pattern Library**: 10 cards covering all long + short patterns from the manual with entry/stop/target rules and confluence tips
+  - API: GET `/api/journal/analytics`
 
 ## Symbol Categories (UI)
 

@@ -529,6 +529,133 @@
       font-size: 0.82rem; font-weight: 700; background: #7c3aed; color: #fff;
     }
     .btn-save-settings:hover { background: #6d28d9; }
+
+    .edge-card {
+      background: #fff; border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      padding: 1.75rem; margin-bottom: 1.5rem;
+    }
+    .edge-card h3 {
+      font-size: 1.15rem; font-weight: 800; margin-bottom: 0.3rem; color: #1a1a2e;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .edge-card h3 .edge-icon { font-size: 1.3rem; }
+    .edge-card .edge-sub { font-size: 0.82rem; color: #6b7280; margin-bottom: 1.2rem; font-style: italic; line-height: 1.4; }
+
+    .edge-overall {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.7rem; margin-bottom: 1.5rem;
+    }
+    .edge-metric {
+      background: linear-gradient(135deg, #f5f0ff, #ede9fe);
+      border: 1px solid #ddd6fe; border-radius: 10px;
+      padding: 0.9rem 0.7rem; text-align: center;
+    }
+    .edge-metric .em-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #7c3aed; margin-bottom: 0.2rem; }
+    .edge-metric .em-value { font-size: 1.3rem; font-weight: 900; color: #1a1a2e; }
+    .edge-metric .em-value.positive { color: #16a34a; }
+    .edge-metric .em-value.negative { color: #ef4444; }
+
+    .edge-section-title {
+      font-size: 0.85rem; font-weight: 800; color: #374151;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      margin: 1.5rem 0 0.7rem; padding-bottom: 0.35rem;
+      border-bottom: 2px solid #e8e5f0;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .edge-section-title .est { font-size: 1rem; }
+
+    .edge-group-table {
+      width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-bottom: 0.5rem;
+    }
+    .edge-group-table th {
+      background: #f8f7fc; color: #7c3aed; font-weight: 700;
+      padding: 0.5rem 0.6rem; text-align: left; border-bottom: 2px solid #e8e5f0;
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .edge-group-table td {
+      padding: 0.5rem 0.6rem; border-bottom: 1px solid #f0eef5; color: #374151;
+    }
+    .edge-group-table tr:hover td { background: #faf8ff; }
+    .edge-group-table .pnl-pos { color: #16a34a; font-weight: 700; }
+    .edge-group-table .pnl-neg { color: #ef4444; font-weight: 700; }
+    .edge-group-table .wr-high { color: #16a34a; font-weight: 700; }
+    .edge-group-table .wr-low { color: #ef4444; font-weight: 700; }
+
+    .edge-heatmap {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.5rem; margin-bottom: 1rem;
+    }
+    .hm-cell {
+      border-radius: 8px; padding: 0.65rem 0.5rem; text-align: center;
+      font-size: 0.72rem; font-weight: 700; border: 1px solid transparent;
+    }
+    .hm-cell .hm-name { font-size: 0.68rem; font-weight: 800; margin-bottom: 0.15rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .hm-cell .hm-wr { font-size: 1rem; font-weight: 900; }
+    .hm-cell .hm-pnl { font-size: 0.65rem; margin-top: 0.1rem; }
+    .hm-hot { background: rgba(22,163,74,0.1); border-color: rgba(22,163,74,0.25); color: #16a34a; }
+    .hm-warm { background: rgba(234,179,8,0.1); border-color: rgba(234,179,8,0.25); color: #ca8a04; }
+    .hm-cold { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.25); color: #ef4444; }
+    .hm-neutral { background: rgba(107,114,128,0.08); border-color: rgba(107,114,128,0.15); color: #6b7280; }
+
+    .edge-recs {
+      list-style: none; padding: 0; margin: 0;
+    }
+    .edge-recs li {
+      background: linear-gradient(135deg, #fffbeb, #fef3c7);
+      border: 1px solid #fde68a; border-radius: 8px;
+      padding: 0.65rem 0.9rem; margin-bottom: 0.5rem;
+      font-size: 0.8rem; font-weight: 600; color: #92400e;
+      display: flex; align-items: flex-start; gap: 0.5rem;
+    }
+    .edge-recs li .rec-icon { font-size: 1rem; flex-shrink: 0; }
+
+    .conf-checklist {
+      display: inline-flex; gap: 2px; align-items: center;
+    }
+    .conf-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block;
+    }
+    .conf-dot.on { background: #22c55e; }
+    .conf-dot.off { background: #e5e7eb; }
+    .conf-tooltip {
+      position: relative; cursor: help;
+    }
+    .conf-tooltip .conf-tip-text {
+      visibility: hidden; position: absolute; bottom: 120%;
+      left: 50%; transform: translateX(-50%);
+      background: #1a1a2e; color: #fff; font-size: 0.65rem;
+      padding: 0.4rem 0.6rem; border-radius: 6px; white-space: nowrap;
+      z-index: 10; pointer-events: none;
+    }
+    .conf-tooltip:hover .conf-tip-text { visibility: visible; }
+
+    .pattern-lib {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.8rem;
+    }
+    .pl-card {
+      background: #f8f7fc; border: 1px solid #e8e5f0; border-radius: 10px;
+      padding: 1rem; transition: box-shadow 0.15s;
+    }
+    .pl-card:hover { box-shadow: 0 2px 12px rgba(124,58,237,0.12); }
+    .pl-card .pl-name { font-size: 0.88rem; font-weight: 800; color: #7c3aed; margin-bottom: 0.2rem; }
+    .pl-card .pl-dir { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; margin-bottom: 0.3rem; }
+    .pl-card .pl-dir.long { color: #16a34a; }
+    .pl-card .pl-dir.short { color: #ef4444; }
+    .pl-card .pl-desc { font-size: 0.78rem; color: #4b5563; line-height: 1.45; margin-bottom: 0.4rem; }
+    .pl-card .pl-rules { font-size: 0.72rem; color: #6b7280; line-height: 1.5; }
+    .pl-card .pl-rules b { color: #374151; }
+    .pl-card .pl-tag { display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-right: 4px; }
+    .pl-tag.reversal { background: rgba(234,179,8,0.15); color: #b45309; }
+    .pl-tag.continuation { background: rgba(59,130,246,0.15); color: #2563eb; }
+    .pl-tag.momentum { background: rgba(22,163,74,0.15); color: #15803d; }
+    .pl-tag.exhaustion { background: rgba(239,68,68,0.15); color: #dc2626; }
+
+    .edge-empty {
+      text-align: center; padding: 2.5rem; color: #9ca3af; font-size: 0.85rem;
+    }
   </style>
 </head>
 <body>
@@ -542,6 +669,7 @@
       <button class="tab-btn active" data-tab="create" onclick="switchTab('create')">Create a Skill</button>
       <button class="tab-btn" data-tab="permit" onclick="switchTab('permit')">Permit Checker</button>
       <button class="tab-btn" data-tab="trader" onclick="switchTab('trader')">AI Futures Trader</button>
+      <button class="tab-btn" data-tab="edge" onclick="switchTab('edge');loadEdgeBuilder()" data-testid="tab-edge-builder">Edge Builder</button>
     </div>
 
     <!-- TAB 1: Create a Skill -->
@@ -836,6 +964,152 @@
       </div>
 
     </div>
+
+    <!-- TAB 4: Edge Builder Dashboard -->
+    <div id="panel-edge" class="tab-panel">
+      <div class="edge-card">
+        <h3><span class="edge-icon">&#9889;</span> Edge Builder Dashboard</h3>
+        <p class="edge-sub">"Consistency is the key to long-term trading success. Review every trade. Refine your edge." &mdash; Jared Wesley, Live Traders</p>
+
+        <div class="edge-overall" id="edge-overall" data-testid="edge-overall">
+          <div class="edge-metric"><div class="em-label">Total Trades</div><div class="em-value" id="edge-total" data-testid="text-edge-total">0</div></div>
+          <div class="edge-metric"><div class="em-label">Overall Win Rate</div><div class="em-value" id="edge-wr" data-testid="text-edge-wr">0%</div></div>
+          <div class="edge-metric"><div class="em-label">Profit Factor</div><div class="em-value" id="edge-pf" data-testid="text-edge-pf">0</div></div>
+          <div class="edge-metric"><div class="em-label">Expectancy</div><div class="em-value" id="edge-exp" data-testid="text-edge-exp">$0</div></div>
+          <div class="edge-metric"><div class="em-label">Total P&amp;L</div><div class="em-value" id="edge-pnl" data-testid="text-edge-pnl">$0</div></div>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#128293;</span> Optimize My Edge</div>
+        <ul class="edge-recs" id="edge-recs" data-testid="edge-recs">
+          <li class="edge-empty">Trade more to unlock personalized recommendations.</li>
+        </ul>
+
+        <div class="edge-section-title"><span class="est">&#127919;</span> Setup Heatmap &mdash; Top &amp; Bottom Performers</div>
+        <div class="edge-heatmap" id="edge-heatmap" data-testid="edge-heatmap">
+          <div class="edge-empty">No data yet. Complete trades to populate the heatmap.</div>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#128200;</span> Performance by Pattern</div>
+        <div style="overflow-x:auto;border:1px solid #e8e5f0;border-radius:8px;margin-bottom:0.5rem;">
+          <table class="edge-group-table" id="edge-by-pattern" data-testid="table-edge-pattern">
+            <thead><tr><th>Pattern</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Avg R:R</th><th>Profit Factor</th><th>Total P&amp;L</th></tr></thead>
+            <tbody id="edge-pattern-body"></tbody>
+          </table>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#128176;</span> Performance by Symbol</div>
+        <div style="overflow-x:auto;border:1px solid #e8e5f0;border-radius:8px;margin-bottom:0.5rem;">
+          <table class="edge-group-table" id="edge-by-symbol" data-testid="table-edge-symbol">
+            <thead><tr><th>Symbol</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Avg R:R</th><th>Profit Factor</th><th>Total P&amp;L</th></tr></thead>
+            <tbody id="edge-symbol-body"></tbody>
+          </table>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#9203;</span> Performance by Timeframe</div>
+        <div style="overflow-x:auto;border:1px solid #e8e5f0;border-radius:8px;margin-bottom:0.5rem;">
+          <table class="edge-group-table" id="edge-by-tf" data-testid="table-edge-tf">
+            <thead><tr><th>Timeframe</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Avg R:R</th><th>Profit Factor</th><th>Total P&amp;L</th></tr></thead>
+            <tbody id="edge-tf-body"></tbody>
+          </table>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#128301;</span> Performance by Confluence Level</div>
+        <div style="overflow-x:auto;border:1px solid #e8e5f0;border-radius:8px;margin-bottom:0.5rem;">
+          <table class="edge-group-table" id="edge-by-conf" data-testid="table-edge-conf">
+            <thead><tr><th>Confluence</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Avg R:R</th><th>Profit Factor</th><th>Total P&amp;L</th></tr></thead>
+            <tbody id="edge-conf-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="edge-card">
+        <h3><span class="edge-icon">&#128218;</span> Pattern Library &mdash; Live Traders Manual</h3>
+        <p class="edge-sub">Master these setups from Jared Wesley's "Trading With An Edge." Every pattern has clear rules for entry, stop, and target.</p>
+
+        <div class="pattern-lib" id="pattern-lib" data-testid="pattern-lib">
+          <div class="pl-card">
+            <div class="pl-name">3 Bar Play</div>
+            <div class="pl-dir long">LONG</div>
+            <div><span class="pl-tag reversal">Reversal</span><span class="pl-tag momentum">Momentum</span></div>
+            <div class="pl-desc">Three consecutive down bars followed by a strong bullish reversal bar that closes above the prior bar's high.</div>
+            <div class="pl-rules"><b>Entry:</b> Break above bar 4 high<br><b>Stop:</b> Below swing low of the 3-bar pullback<br><b>Target:</b> 2:1 R:R minimum or prior resistance<br><b>Confluence:</b> Volume spike on reversal, bottoming tail, at MA support</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">3 Bar Play</div>
+            <div class="pl-dir short">SHORT</div>
+            <div><span class="pl-tag reversal">Reversal</span><span class="pl-tag momentum">Momentum</span></div>
+            <div class="pl-desc">Three consecutive up bars followed by a strong bearish reversal bar that closes below the prior bar's low.</div>
+            <div class="pl-rules"><b>Entry:</b> Break below bar 4 low<br><b>Stop:</b> Above swing high of the 3-bar rally<br><b>Target:</b> 2:1 R:R minimum or prior support<br><b>Confluence:</b> Volume spike on reversal, topping tail, at MA resistance</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Buy Setup</div>
+            <div class="pl-dir long">LONG</div>
+            <div><span class="pl-tag continuation">Continuation</span></div>
+            <div class="pl-desc">Pullback into moving average support in an uptrend with decreasing volume on pullback and increasing volume on reversal.</div>
+            <div class="pl-rules"><b>Entry:</b> Close above 9 EMA after pullback to 21 EMA<br><b>Stop:</b> Below recent swing low<br><b>Target:</b> Prior high or measured move<br><b>Confluence:</b> Volume dries up on pullback, strong bar off MA, trend intact</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Sell Setup</div>
+            <div class="pl-dir short">SHORT</div>
+            <div><span class="pl-tag continuation">Continuation</span></div>
+            <div class="pl-desc">Rally into moving average resistance in a downtrend with decreasing volume on rally and increasing volume on reversal.</div>
+            <div class="pl-rules"><b>Entry:</b> Close below 9 EMA after rally to 21 EMA<br><b>Stop:</b> Above recent swing high<br><b>Target:</b> Prior low or measured move<br><b>Confluence:</b> Volume dries up on rally, weak bar off MA, downtrend intact</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Pivot Breakout</div>
+            <div class="pl-dir long">LONG</div>
+            <div><span class="pl-tag momentum">Momentum</span><span class="pl-tag continuation">Continuation</span></div>
+            <div class="pl-desc">Price breaks above a prior pivot high with expanding volume, confirming a continuation of the uptrend.</div>
+            <div class="pl-rules"><b>Entry:</b> Close above prior pivot high<br><b>Stop:</b> Below breakout bar low or pivot level<br><b>Target:</b> Measured move or next resistance<br><b>Confluence:</b> Volume expansion on breakout, no exhaustion signals, above all MAs</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Pivot Breakout</div>
+            <div class="pl-dir short">SHORT</div>
+            <div><span class="pl-tag momentum">Momentum</span><span class="pl-tag continuation">Continuation</span></div>
+            <div class="pl-desc">Price breaks below a prior pivot low with expanding volume, confirming a continuation of the downtrend.</div>
+            <div class="pl-rules"><b>Entry:</b> Close below prior pivot low<br><b>Stop:</b> Above breakout bar high or pivot level<br><b>Target:</b> Measured move or next support<br><b>Confluence:</b> Volume expansion on breakdown, no exhaustion signals, below all MAs</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Climactic Exhaustion</div>
+            <div class="pl-dir long">LONG (Reversal)</div>
+            <div><span class="pl-tag exhaustion">Exhaustion</span><span class="pl-tag reversal">Reversal</span></div>
+            <div class="pl-desc">Extended downtrend accelerates with wide-range bars and climactic volume, then reverses sharply as sellers exhaust.</div>
+            <div class="pl-rules"><b>Entry:</b> Reversal bar after climax volume<br><b>Stop:</b> Below climax low<br><b>Target:</b> Retracement to prior support-turned-resistance<br><b>Confluence:</b> Extreme volume spike, extended move (5+ bars), bottoming tail, divergence</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Climactic Exhaustion</div>
+            <div class="pl-dir short">SHORT (Reversal)</div>
+            <div><span class="pl-tag exhaustion">Exhaustion</span><span class="pl-tag reversal">Reversal</span></div>
+            <div class="pl-desc">Extended uptrend accelerates with wide-range bars and climactic volume, then reverses sharply as buyers exhaust.</div>
+            <div class="pl-rules"><b>Entry:</b> Reversal bar after climax volume<br><b>Stop:</b> Above climax high<br><b>Target:</b> Retracement to prior resistance-turned-support<br><b>Confluence:</b> Extreme volume spike, extended move (5+ bars), topping tail, divergence</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">MA Bounce</div>
+            <div class="pl-dir long">LONG</div>
+            <div><span class="pl-tag continuation">Continuation</span><span class="pl-tag momentum">Momentum</span></div>
+            <div class="pl-desc">Price pulls back to a key moving average (9, 21, or 200) and bounces with confirmation. The trend continues.</div>
+            <div class="pl-rules"><b>Entry:</b> Bounce off MA with bullish bar<br><b>Stop:</b> Below the MA or swing low<br><b>Target:</b> Prior high or 2R<br><b>Confluence:</b> Multiple MAs converging, volume confirmation, trend alignment</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">MA Bounce</div>
+            <div class="pl-dir short">SHORT</div>
+            <div><span class="pl-tag continuation">Continuation</span><span class="pl-tag momentum">Momentum</span></div>
+            <div class="pl-desc">Price rallies to a key moving average (9, 21, or 200) and rejects with confirmation. The downtrend continues.</div>
+            <div class="pl-rules"><b>Entry:</b> Rejection off MA with bearish bar<br><b>Stop:</b> Above the MA or swing high<br><b>Target:</b> Prior low or 2R<br><b>Confluence:</b> Multiple MAs converging, volume confirmation, trend alignment</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <div id="toast" class="toast"></div>
@@ -1211,7 +1485,7 @@
           <td>${fmtPrice(e.target)}</td>
           <td>${fmtPrice(e.exit)}</td>
           <td class="${pcls}">${e.pnlDollars >= 0 ? '+' : ''}$${e.pnlDollars.toFixed(2)}</td>
-          <td>${e.confluence}</td>
+          <td>${renderChecklist(e)}</td>
           <td class="${ocls}">${e.outcome}</td>
           <td>${e.achievedRR}</td>
           <td class="notes-cell" onclick="editNote('${e.id}')" title="${esc(e.notes || 'Click to add notes')}">${notesTxt}</td>
@@ -1278,6 +1552,94 @@
         });
         showToast('Settings saved');
       } catch { showToast('Failed to save settings'); }
+    }
+
+    function renderChecklist(e) {
+      const cl = e.checklist || {};
+      const items = [
+        { key: 'patternMatch', label: 'Pattern' },
+        { key: 'volumeConfirmation', label: 'Volume' },
+        { key: 'maRespect', label: 'MA' },
+        { key: 'priorPivotSR', label: 'Pivot/SR' },
+        { key: 'barFormation', label: 'Bar' },
+      ];
+      const score = items.filter(i => cl[i.key]).length;
+      const dots = items.map(i =>
+        `<span class="conf-dot ${cl[i.key] ? 'on' : 'off'}" title="${i.label}: ${cl[i.key] ? 'YES' : 'NO'}"></span>`
+      ).join('');
+      return `<span class="conf-tooltip"><span class="conf-checklist">${dots}</span> <span style="font-size:0.68rem;font-weight:700;color:#374151;">${score}/5</span><span class="conf-tip-text">${items.map(i => (cl[i.key] ? '\u2705' : '\u274C') + ' ' + i.label).join(' | ')}</span></span>`;
+    }
+
+    /* ========== Edge Builder ========== */
+    async function loadEdgeBuilder() {
+      try {
+        const d = await (await fetch('/api/journal/analytics')).json();
+        renderEdgeOverall(d.overall);
+        renderEdgeGroupTable('edge-pattern-body', d.byPattern);
+        renderEdgeGroupTable('edge-symbol-body', d.bySymbol);
+        renderEdgeGroupTable('edge-tf-body', d.byTimeframe);
+        renderEdgeGroupTable('edge-conf-body', d.byConfluence);
+        renderEdgeHeatmap(d.byPattern.concat(d.bySymbol));
+        renderEdgeRecs(d.recommendations);
+      } catch (err) { console.error('Edge builder load error:', err); }
+    }
+
+    function renderEdgeOverall(o) {
+      if (!o) return;
+      document.getElementById('edge-total').textContent = o.totalTrades;
+      const wrEl = document.getElementById('edge-wr');
+      wrEl.textContent = o.winRate + '%';
+      wrEl.className = 'em-value' + (o.winRate >= 50 ? ' positive' : o.winRate > 0 ? ' negative' : '');
+      const pfEl = document.getElementById('edge-pf');
+      pfEl.textContent = o.profitFactor >= 99 ? '\u221E' : o.profitFactor;
+      pfEl.className = 'em-value' + (o.profitFactor >= 1.5 ? ' positive' : o.profitFactor > 0 ? '' : '');
+      const expEl = document.getElementById('edge-exp');
+      expEl.textContent = (o.expectancy >= 0 ? '+' : '') + '$' + o.expectancy.toFixed(2);
+      expEl.className = 'em-value' + (o.expectancy >= 0 ? ' positive' : ' negative');
+      const pnlEl = document.getElementById('edge-pnl');
+      pnlEl.textContent = (o.totalPnl >= 0 ? '+' : '') + '$' + o.totalPnl.toFixed(2);
+      pnlEl.className = 'em-value' + (o.totalPnl >= 0 ? ' positive' : ' negative');
+    }
+
+    function renderEdgeGroupTable(tbodyId, rows) {
+      const tbody = document.getElementById(tbodyId);
+      if (!rows || rows.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:1rem;">No data yet</td></tr>'; return; }
+      tbody.innerHTML = rows.map(r => {
+        const wrCls = r.winRate >= 55 ? 'wr-high' : r.winRate < 40 ? 'wr-low' : '';
+        const pnlCls = r.totalPnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+        return `<tr data-testid="row-edge-${esc(r.name)}">
+          <td><b>${esc(r.name)}</b></td>
+          <td>${r.trades}</td>
+          <td>${r.wins}</td>
+          <td class="${wrCls}">${r.winRate}%</td>
+          <td>${r.avgRR}</td>
+          <td>${r.profitFactor >= 99 ? '\u221E' : r.profitFactor}</td>
+          <td class="${pnlCls}">${r.totalPnl >= 0 ? '+' : ''}$${r.totalPnl.toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderEdgeHeatmap(allItems) {
+      const hm = document.getElementById('edge-heatmap');
+      if (!allItems || allItems.length === 0) { hm.innerHTML = '<div class="edge-empty">No data yet. Complete trades to populate the heatmap.</div>'; return; }
+      const sorted = [...allItems].sort((a, b) => b.winRate - a.winRate);
+      const unique = [];
+      const seen = new Set();
+      sorted.forEach(s => { if (!seen.has(s.name)) { seen.add(s.name); unique.push(s); } });
+      hm.innerHTML = unique.slice(0, 12).map(s => {
+        const cls = s.winRate >= 60 ? 'hm-hot' : s.winRate >= 45 ? 'hm-warm' : s.trades === 0 ? 'hm-neutral' : 'hm-cold';
+        return `<div class="hm-cell ${cls}" data-testid="heatmap-${esc(s.name)}">
+          <div class="hm-name">${esc(s.name)}</div>
+          <div class="hm-wr">${s.winRate}%</div>
+          <div class="hm-pnl">${s.totalPnl >= 0 ? '+' : ''}$${s.totalPnl.toFixed(2)} | ${s.trades} trades</div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderEdgeRecs(recs) {
+      const el = document.getElementById('edge-recs');
+      if (!recs || recs.length === 0) { el.innerHTML = '<li class="edge-empty">Trade more to unlock personalized recommendations.</li>'; return; }
+      el.innerHTML = recs.map(r => `<li data-testid="rec-item"><span class="rec-icon">\u{1F4A1}</span> ${esc(r)}</li>`).join('');
     }
 
     loadJournalData();
