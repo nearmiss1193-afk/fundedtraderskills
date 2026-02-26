@@ -19,6 +19,8 @@ Minimal Node.js + Express starter for a skill marketplace with autonomous AI ski
 - `GET /api/journal/analytics` - Advanced analytics (grouped by pattern/symbol/timeframe/confluence + recommendations)
 - `GET /api/settings` - Load trader settings
 - `POST /api/settings` - Save trader settings
+- `GET /api/tradovate/status` - Tradovate connection status
+- `POST /api/tradovate/connect` - Attempt Tradovate connection
 
 ## Structure
 
@@ -27,6 +29,7 @@ public/index.html   - Static frontend (4 tabs: Create Skill, Permit Checker, AI 
 server/routes.ts    - API endpoints
 server/trader.ts    - AI Futures Trader engine (async loop, Polygon.io data, pattern detection, trailing stops)
 server/journal.ts   - Trade journal + settings persistence + advanced analytics
+server/tradovate.ts - Tradovate API integration (auth, bracket orders, position mgmt)
 server/storage.ts   - Stub (in-memory storage in routes.ts)
 shared/schema.ts    - Stub
 data/               - Persistent JSON files (trade_journal.json, trader_settings.json)
@@ -104,9 +107,21 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
 | dataSource | POLYGON (real) / SIM (simulated) |
 | sentiment | GREED / FEAR / NEUTRAL |
 
+- **Tradovate Integration** - Paper trading via Tradovate demo API:
+  - Auto-connects on startup if credentials are set
+  - Places bracket orders (entry + SL + TP) when trader signals entries
+  - Status badge shows connection state in UI
+  - API: `GET /api/tradovate/status`, `POST /api/tradovate/connect`
+  - Falls back gracefully to simulation-only mode when credentials are missing
+
 ## Environment
 
 - `POLYGON_API_KEY` - Polygon.io API key for real futures data (falls back to simulated if missing)
+- `TRADOVATE_USERNAME` - Tradovate demo account username
+- `TRADOVATE_PASSWORD` - Tradovate demo account password
+- `TRADOVATE_APP_ID` - Tradovate application ID
+- `TRADOVATE_CID` - Tradovate client ID
+- `TRADOVATE_SECRET` - Tradovate client secret
 
 ## Running
 

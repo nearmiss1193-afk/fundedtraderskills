@@ -1,4 +1,5 @@
 import { addJournalEntry, type JournalEntry } from "./journal";
+import { connectTradovate, isTradovateConnected, getTradovateStatus, placeBracketOrder } from "./tradovate";
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
@@ -1265,6 +1266,31 @@ async function simulateTick(session: TraderSession) {
             sentiment: sentimentLabel(state), dataSource, volumeType: volType,
             reason: entryReason || null,
           }));
+
+          if (isTradovateConnected()) {
+            placeBracketOrder(mk, direction, entry, stop, target, 1).then(result => {
+              if (result.success) {
+                session.logs.push(makeLog({
+                  id: logIdCounter++, timestamp: getESTTime(), market: mk, timeframe: tf, pattern: detectedPattern,
+                  action: "TRADOVATE ORDER", direction,
+                  entry, stop, target,
+                  reason: `Bracket order placed — Entry: ${result.entryOrderId}, SL: ${result.slOrderId}, TP: ${result.tpOrderId}`,
+                  dataSource: "TRADOVATE",
+                }));
+              } else {
+                session.logs.push(makeLog({
+                  id: logIdCounter++, timestamp: getESTTime(), market: mk, timeframe: tf, pattern: detectedPattern,
+                  action: "TRADOVATE ERROR", direction,
+                  entry, stop, target,
+                  reason: `Order failed: ${result.error}`,
+                  dataSource: "TRADOVATE",
+                }));
+              }
+            }).catch(err => {
+              console.error("[tradovate] Bracket order error:", err);
+            });
+          }
+
           break;
         }
 
@@ -1380,3 +1406,11 @@ export function isTradingOpen(): boolean { return isTradingHours(); }
 export function isForceTradeActive(): boolean {
   return Object.values(sessions).some(s => s.running && s.forceTrading);
 }
+
+export { connectTradovate, getTradovateStatus, isTradovateConnected } from "./tradovate";
+
+connectTradovate().then(result => {
+  console.log(`[trader] Tradovate init: ${result.message}`);
+}).catch(err => {
+  console.log(`[trader] Tradovate init skipped: ${err.message}`);
+});

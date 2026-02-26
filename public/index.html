@@ -383,6 +383,8 @@
     .log-action.trail-update { color: #a78bfa; font-weight: 500; }
     .log-action.scanning { color: #4b5563; font-weight: 500; }
     .log-action.system { color: #6b7280; }
+    .log-action.tradovate { color: #8b5cf6; font-weight: 700; }
+    .log-action.tradovate-err { color: #dc2626; font-weight: 700; }
 
     .log-detail { color: #8b92a5; font-size: 0.68rem; }
     .log-pnl { font-weight: 700; }
@@ -745,6 +747,10 @@
         <div id="trader-status-badge" class="trading-status closed">
           <span class="status-dot"></span>
           <span id="trader-status-text">Checking market hours...</span>
+        </div>
+        <div id="tradovate-status" class="trading-status closed" style="margin-top:0.4rem;" data-testid="tradovate-status">
+          <span class="status-dot"></span>
+          <span id="tradovate-status-text">Tradovate: Checking...</span>
         </div>
 
         <label>Equity Index Futures</label>
@@ -1196,6 +1202,21 @@
           badge.className = 'trading-status closed';
           text.textContent = 'Futures session CLOSED (maintenance or weekend)';
         }
+
+        const tvBadge = document.getElementById('tradovate-status');
+        const tvText = document.getElementById('tradovate-status-text');
+        if (d.tradovate) {
+          if (d.tradovate.connected) {
+            tvBadge.className = 'trading-status open';
+            tvText.textContent = 'Tradovate: Connected — ' + d.tradovate.accountName + ' (Paper)';
+          } else if (d.tradovate.lastError && d.tradovate.lastError !== 'Not initialized') {
+            tvBadge.className = 'trading-status closed';
+            tvText.textContent = 'Tradovate: ' + d.tradovate.lastError;
+          } else {
+            tvBadge.className = 'trading-status closed';
+            tvText.textContent = 'Tradovate: Not connected — set credentials in Secrets';
+          }
+        }
       } catch {}
     }
 
@@ -1260,6 +1281,8 @@
       if (action === 'TRAIL UPDATED') return 'trail-update';
       if (action.startsWith('SIGNAL')) return 'signal';
       if (action === 'SCANNING') return 'scanning';
+      if (action === 'TRADOVATE ORDER') return 'tradovate';
+      if (action === 'TRADOVATE ERROR') return 'tradovate-err';
       return 'system';
     }
 
@@ -1298,7 +1321,7 @@
 
     function srcTag(s) {
       if (!s) return '';
-      const cls = s === 'POLYGON' ? 'polygon' : 'sim';
+      const cls = s === 'POLYGON' ? 'polygon' : s === 'TRADOVATE' ? 'polygon' : 'sim';
       return `<span class="log-src ${cls}">${s}</span>`;
     }
 

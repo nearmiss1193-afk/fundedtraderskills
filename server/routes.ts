@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { type Server } from "http";
 import path from "path";
 import express from "express";
-import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive } from "./trader";
+import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate } from "./trader";
 import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
 
 let skills: any[] = [];
@@ -192,7 +192,17 @@ export async function registerRoutes(
   });
 
   app.get("/api/trader/status", (_req, res) => {
-    res.json({ tradingOpen: isTradingOpen(), forceActive: isForceTradeActive() });
+    const tvStatus = getTradovateStatus();
+    res.json({ tradingOpen: isTradingOpen(), forceActive: isForceTradeActive(), tradovate: tvStatus });
+  });
+
+  app.post("/api/tradovate/connect", async (_req, res) => {
+    const result = await connectTradovate();
+    res.json(result);
+  });
+
+  app.get("/api/tradovate/status", (_req, res) => {
+    res.json(getTradovateStatus());
   });
 
   app.post("/api/trader/start", (req, res) => {
