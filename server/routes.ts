@@ -7,6 +7,21 @@ import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes,
 
 let skills: any[] = [];
 
+interface TradeSignal {
+  symbol: string;
+  direction: string;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit: number;
+  riskReward: string;
+  confluence: number;
+  pattern: string;
+  timestamp: string;
+  source: string;
+}
+
+const signalLog: TradeSignal[] = [];
+
 interface PermitInfo {
   permits: string[];
   estimatedFees: string;
@@ -226,6 +241,41 @@ export async function registerRoutes(
     const logs = getTraderLogs(req.params.sessionId, after);
     const status = getTraderStatus(req.params.sessionId);
     res.json({ logs, status });
+  });
+
+  app.post("/api/trade-signal", (req, res) => {
+    const { symbol, direction, entryPrice, stopLoss, takeProfit, riskReward, confluence, pattern } = req.body;
+    if (!symbol || !direction || entryPrice == null || stopLoss == null || takeProfit == null) {
+      return res.status(400).json({ success: false, error: "Missing required fields: symbol, direction, entryPrice, stopLoss, takeProfit" });
+    }
+    const now = new Date();
+    const estOffset = -5 * 60;
+    const est = new Date(now.getTime() + (now.getTimezoneOffset() + estOffset) * 60000);
+    const ts = est.toLocaleTimeString("en-US", { hour12: true, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+    const signal: TradeSignal = {
+      symbol: String(symbol).toUpperCase(),
+      direction: String(direction),
+      entryPrice: Number(entryPrice),
+      stopLoss: Number(stopLoss),
+      takeProfit: Number(takeProfit),
+      riskReward: riskReward || "1:2",
+      confluence: confluence || 0,
+      pattern: pattern || "Unknown",
+      timestamp: ts,
+      source: req.body.source || "external",
+    };
+
+    signalLog.push(signal);
+    if (signalLog.length > 200) signalLog.shift();
+
+    console.log(`[trade-signal] ${signal.source.toUpperCase()} | ${signal.direction} ${signal.symbol} @ ${signal.entryPrice} | SL: ${signal.stopLoss} TP: ${signal.takeProfit} | ${signal.pattern} (${signal.confluence}) | R:R ${signal.riskReward}`);
+
+    res.json({ success: true, message: "Signal received", signal });
+  });
+
+  app.get("/api/trade-signals", (_req, res) => {
+    res.json({ signals: signalLog, count: signalLog.length });
   });
 
   app.get("/api/journal", (_req, res) => {

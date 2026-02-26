@@ -286,6 +286,21 @@
     .btn-stop:hover { background: #b91c1c; }
     .btn-start:disabled, .btn-stop:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    .btn-test-signal {
+      flex: 0 0 auto;
+      background: #4f46e5;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding: 0.85rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-test-signal:hover { background: #4338ca; }
+
     /* Stats row */
     .trader-stats {
       display: flex;
@@ -866,8 +881,9 @@
         <textarea id="customCondition" placeholder="e.g. Only enter if price is above VWAP and volume spike > 1.5x avg..."></textarea>
 
         <div class="trader-actions">
-          <button id="btn-start-trader" class="btn-start" onclick="startTrader()">Start Autonomous Trader</button>
-          <button id="btn-stop-trader" class="btn-stop" onclick="stopTrader()" disabled>Stop Trading</button>
+          <button id="btn-start-trader" class="btn-start" onclick="startTrader()" data-testid="button-start-trader">Start Autonomous Trader</button>
+          <button id="btn-stop-trader" class="btn-stop" onclick="stopTrader()" disabled data-testid="button-stop-trader">Stop Trading</button>
+          <button class="btn-test-signal" onclick="sendTestSignal()" data-testid="button-test-signal">&#x1f4e1; Test Signal</button>
         </div>
       </div>
 
@@ -1310,6 +1326,32 @@
       if (traderPollInterval) clearInterval(traderPollInterval);
       traderPollInterval = null;
       pollTraderLogs();
+    }
+
+    async function sendTestSignal() {
+      const testSignal = {
+        symbol: "ES",
+        direction: "Long",
+        entryPrice: 5823.50,
+        stopLoss: 5818.00,
+        takeProfit: 5838.50,
+        riskReward: "1:3",
+        confluence: 4,
+        pattern: "3 Bar Play",
+        source: "test-button"
+      };
+      try {
+        const r = await fetch('/api/trade-signal', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(testSignal)
+        });
+        const d = await r.json();
+        if (d.success) {
+          showToast('Test signal sent: ' + d.signal.direction + ' ' + d.signal.symbol + ' @ ' + d.signal.entryPrice);
+        } else {
+          showToast('Signal failed: ' + (d.error || 'Unknown error'));
+        }
+      } catch { showToast('Failed to send test signal'); }
     }
 
     function actionClass(action) {

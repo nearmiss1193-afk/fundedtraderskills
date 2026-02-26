@@ -1,8 +1,36 @@
 import { addJournalEntry, type JournalEntry } from "./journal";
 import { connectTradovate, isTradovateConnected, getTradovateStatus, placeBracketOrder } from "./tradovate";
+import http from "http";
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
+
+const SIGNAL_PORT = parseInt(process.env.PORT || "5000", 10);
+
+function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string) {
+  const payload = JSON.stringify({
+    symbol,
+    direction: direction === "LONG" ? "Long" : "Short",
+    entryPrice: entry,
+    stopLoss: stop,
+    takeProfit: target,
+    riskReward: `1:${rewardRatio}`,
+    confluence,
+    pattern,
+    source: "trader-engine",
+  });
+
+  const req = http.request({
+    hostname: "127.0.0.1",
+    port: SIGNAL_PORT,
+    path: "/api/trade-signal",
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) },
+  });
+  req.on("error", () => {});
+  req.write(payload);
+  req.end();
+}
 
 interface PolygonPrice {
   price: number;
@@ -1275,6 +1303,8 @@ async function simulateTick(session: TraderSession) {
             sentiment: sentimentLabel(state), dataSource, volumeType: volType,
             reason: entryReason || null,
           }));
+
+          emitTradeSignal(mk, direction, entry, stop, target, session.rewardRatio, confluence, detectedPattern);
 
           if (isTradovateConnected()) {
             placeBracketOrder(mk, direction, entry, stop, target, 1).then(result => {

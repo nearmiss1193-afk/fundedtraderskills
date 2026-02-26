@@ -19,6 +19,8 @@ Minimal Node.js + Express starter for a skill marketplace with autonomous AI ski
 - `GET /api/journal/analytics` - Advanced analytics (grouped by pattern/symbol/timeframe/confluence + recommendations)
 - `GET /api/settings` - Load trader settings
 - `POST /api/settings` - Save trader settings
+- `POST /api/trade-signal` - NinjaTrader API bridge endpoint `{ symbol, direction, entryPrice, stopLoss, takeProfit, riskReward, confluence, pattern }`
+- `GET /api/trade-signals` - List recent trade signals (up to 200)
 - `GET /api/tradovate/status` - Tradovate connection status
 - `POST /api/tradovate/connect` - Attempt Tradovate connection
 
