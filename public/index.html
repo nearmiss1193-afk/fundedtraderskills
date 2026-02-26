@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sovereign Skill Hub</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+    h1 { margin-bottom: 1.5rem; }
+    form { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 2rem; }
+    input, textarea { padding: .5rem; border: 1px solid #ccc; border-radius: 4px; font: inherit; }
+    button { padding: .5rem 1rem; background: #111; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    ul { list-style: none; }
+    li { padding: .75rem 0; border-bottom: 1px solid #eee; }
+    li strong { display: block; }
+    li span { color: #555; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <h1>Sovereign Skill Hub</h1>
+
+  <form id="skill-form">
+    <input id="name" placeholder="Skill name" required />
+    <textarea id="description" placeholder="Description" required></textarea>
+    <button type="submit">Add Skill</button>
+  </form>
+
+  <h2>Skills</h2>
+  <ul id="skill-list"></ul>
+
+  <script>
+    const form = document.getElementById('skill-form');
+    const list = document.getElementById('skill-list');
+
+    async function loadSkills() {
+      const res = await fetch('/api/skills');
+      const skills = await res.json();
+      list.innerHTML = skills.map(s =>
+        `<li><strong>${s.name}</strong><span>${s.description}</span></li>`
+      ).join('');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const description = document.getElementById('description').value;
+      await fetch('/api/create-skill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description })
+      });
+      form.reset();
+      loadSkills();
+    });
+
+    loadSkills();
+  </script>
+</body>
+</html>
