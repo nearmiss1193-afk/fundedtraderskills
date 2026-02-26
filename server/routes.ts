@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { type Server } from "http";
 import path from "path";
 import express from "express";
+import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen } from "./trader";
 
 let skills: any[] = [];
 
@@ -187,6 +188,33 @@ export async function registerRoutes(
     }
     const result = getPermitInfo(renovationType, propertyType, county, details || "");
     res.json({ success: true, ...result });
+  });
+
+  app.get("/api/trader/status", (_req, res) => {
+    res.json({ tradingOpen: isTradingOpen() });
+  });
+
+  app.post("/api/trader/start", (req, res) => {
+    const { markets, timeframes, riskPct, patterns, customCondition } = req.body;
+    if (!markets?.length || !timeframes?.length || !patterns?.length) {
+      return res.status(400).json({ error: "markets, timeframes, and patterns are required." });
+    }
+    const sessionId = startTrader({ markets, timeframes, riskPct: riskPct || 0.5, patterns, customCondition: customCondition || "" });
+    res.json({ success: true, sessionId });
+  });
+
+  app.post("/api/trader/stop", (req, res) => {
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ error: "sessionId required." });
+    const stopped = stopTrader(sessionId);
+    res.json({ success: stopped });
+  });
+
+  app.get("/api/trader/logs/:sessionId", (req, res) => {
+    const after = req.query.after ? Number(req.query.after) : undefined;
+    const logs = getTraderLogs(req.params.sessionId, after);
+    const status = getTraderStatus(req.params.sessionId);
+    res.json({ logs, status });
   });
 
   return httpServer;

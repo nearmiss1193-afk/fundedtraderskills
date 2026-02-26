@@ -21,105 +21,50 @@
       color: #fff;
     }
 
-    header h1 {
-      font-size: 2.25rem;
-      font-weight: 800;
-      letter-spacing: -0.025em;
-      margin-bottom: 0.5rem;
-    }
+    header h1 { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em; margin-bottom: 0.5rem; }
+    header p { font-size: 1.05rem; opacity: 0.85; max-width: 480px; margin: 0 auto; line-height: 1.5; }
 
-    header p {
-      font-size: 1.05rem;
-      opacity: 0.85;
-      max-width: 480px;
-      margin: 0 auto;
-      line-height: 1.5;
-    }
-
-    .container {
-      max-width: 660px;
-      margin: -2rem auto 3rem;
-      padding: 0 1rem;
-    }
+    .container { max-width: 720px; margin: -2rem auto 3rem; padding: 0 1rem; }
 
     /* --- Tabs --- */
-    .tabs {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
-    }
+    .tabs { display: flex; gap: 0.4rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
 
     .tab-btn {
-      flex: 1;
-      padding: 0.7rem 0.5rem;
-      font: inherit;
-      font-size: 0.85rem;
-      font-weight: 700;
-      border: 2px solid #e0dce8;
-      border-radius: 10px;
-      background: #fff;
-      color: #555;
-      cursor: pointer;
+      flex: 1; min-width: 120px;
+      padding: 0.65rem 0.4rem;
+      font: inherit; font-size: 0.78rem; font-weight: 700;
+      border: 2px solid #e0dce8; border-radius: 10px;
+      background: #fff; color: #555; cursor: pointer;
       transition: border-color 0.15s, color 0.15s, background 0.15s;
     }
 
-    .tab-btn.active {
-      border-color: #7c3aed;
-      color: #7c3aed;
-      background: #f5f0ff;
-    }
-
+    .tab-btn.active { border-color: #7c3aed; color: #7c3aed; background: #f5f0ff; }
     .tab-btn:hover:not(.active) { border-color: #bbb; }
-
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
     /* --- Card --- */
     .card {
-      background: #fff;
-      border-radius: 12px;
+      background: #fff; border-radius: 12px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.07);
-      padding: 2rem;
-      margin-bottom: 1.5rem;
+      padding: 2rem; margin-bottom: 1.5rem;
     }
 
-    .card h2 {
-      font-size: 1.15rem;
-      font-weight: 700;
-      margin-bottom: 0.25rem;
-      color: #1a1a2e;
-    }
-
-    .card .card-sub {
-      font-size: 0.85rem;
-      color: #888;
-      margin-bottom: 1.25rem;
-      line-height: 1.4;
-    }
+    .card h2 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.25rem; color: #1a1a2e; }
+    .card .card-sub { font-size: 0.85rem; color: #888; margin-bottom: 1.25rem; line-height: 1.4; }
 
     /* --- Form Controls --- */
     label {
-      display: block;
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: #555;
-      margin-bottom: 0.3rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      display: block; font-size: 0.78rem; font-weight: 600; color: #555;
+      margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: 0.04em;
     }
 
     input, textarea, select {
-      width: 100%;
-      padding: 0.7rem 0.85rem;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      font: inherit;
-      font-size: 0.95rem;
-      color: #1a1a2e;
-      background: #fafafa;
-      transition: border-color 0.15s, box-shadow 0.15s;
-      margin-bottom: 1rem;
-      -webkit-appearance: none;
+      width: 100%; padding: 0.7rem 0.85rem;
+      border: 1.5px solid #ddd; border-radius: 8px;
+      font: inherit; font-size: 0.95rem; color: #1a1a2e;
+      background: #fafafa; transition: border-color 0.15s, box-shadow 0.15s;
+      margin-bottom: 1rem; -webkit-appearance: none;
     }
 
     select {
@@ -128,26 +73,17 @@
     }
 
     input:focus, textarea:focus, select:focus {
-      outline: none;
-      border-color: #7c3aed;
-      box-shadow: 0 0 0 3px rgba(124,58,237,0.12);
-      background: #fff;
+      outline: none; border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.12); background: #fff;
     }
 
     textarea { resize: vertical; min-height: 80px; }
 
     .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      padding: 0.75rem 1.25rem;
-      font: inherit;
-      font-size: 0.95rem;
-      font-weight: 700;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 100%; padding: 0.75rem 1.25rem;
+      font: inherit; font-size: 0.95rem; font-weight: 700;
+      border: none; border-radius: 8px; cursor: pointer;
       transition: background 0.15s, transform 0.1s;
     }
 
@@ -158,159 +94,311 @@
 
     /* --- Skills List --- */
     .skill-list { list-style: none; }
-
-    .skill-item {
-      padding: 1rem 0;
-      border-bottom: 1px solid #eee;
-      display: flex;
-      align-items: flex-start;
-      gap: 0.75rem;
-    }
-
+    .skill-item { padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: flex-start; gap: 0.75rem; }
     .skill-item:last-child { border-bottom: none; }
-
-    .skill-number {
-      flex-shrink: 0;
-      width: 28px; height: 28px;
-      border-radius: 50%;
-      background: #ede9fe;
-      color: #7c3aed;
-      font-size: 0.78rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 2px;
-    }
-
+    .skill-number { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: #ede9fe; color: #7c3aed; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
     .skill-info { flex: 1; min-width: 0; }
     .skill-name { font-weight: 700; font-size: 0.95rem; color: #1a1a2e; }
     .skill-desc { font-size: 0.85rem; color: #666; margin-top: 0.15rem; line-height: 1.4; }
     .skill-time { font-size: 0.72rem; color: #aaa; margin-top: 0.25rem; }
-
-    .empty {
-      text-align: center;
-      padding: 2rem 0;
-      color: #aaa;
-      font-size: 0.9rem;
-    }
+    .empty { text-align: center; padding: 2rem 0; color: #aaa; font-size: 0.9rem; }
 
     /* --- Permit Results --- */
     .permit-results { display: none; }
     .permit-results.visible { display: block; }
+    .permit-section { margin-bottom: 1.25rem; }
+    .permit-section:last-child { margin-bottom: 0; }
+    .permit-section h3 { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #7c3aed; margin-bottom: 0.5rem; }
+    .permit-section ul { list-style: none; padding: 0; }
+    .permit-section ul li { padding: 0.4rem 0 0.4rem 1.25rem; position: relative; font-size: 0.88rem; line-height: 1.45; color: #333; }
+    .permit-section ul li::before { content: ''; position: absolute; left: 0; top: 0.65rem; width: 6px; height: 6px; border-radius: 50%; background: #7c3aed; }
+    .permit-section ul.notes-list li::before { background: #f59e0b; }
+    .permit-section ul.steps-list li::before { background: #16a34a; }
+    .permit-meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .meta-badge { flex: 1; min-width: 140px; background: #f5f0ff; border: 1px solid #e8e0f5; border-radius: 8px; padding: 0.75rem 1rem; text-align: center; }
+    .meta-badge .meta-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #888; margin-bottom: 0.2rem; }
+    .meta-badge .meta-value { font-size: 1.1rem; font-weight: 800; color: #1a1a2e; }
+    .links-list a { color: #7c3aed; text-decoration: none; font-weight: 600; }
+    .links-list a:hover { text-decoration: underline; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 1.25rem 0; }
 
-    .permit-section {
-      margin-bottom: 1.25rem;
+    /* ============================================ */
+    /* ===== AI FUTURES TRADER - DARK THEME ======= */
+    /* ============================================ */
+    .trader-card {
+      background: #0f1117;
+      border: 1px solid #1e2130;
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+      color: #c8cdd8;
     }
 
-    .permit-section:last-child { margin-bottom: 0; }
+    .trader-card h2 {
+      color: #e0e4ec;
+      font-size: 1.25rem;
+      margin-bottom: 0.15rem;
+    }
 
-    .permit-section h3 {
-      font-size: 0.82rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #7c3aed;
-      margin-bottom: 0.5rem;
+    .trader-card .card-sub {
+      color: #6b7280;
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .trader-card label {
+      color: #8b92a5;
+      font-size: 0.72rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .trader-card input,
+    .trader-card textarea {
+      background: #181b27;
+      border: 1.5px solid #2a2e3d;
+      color: #e0e4ec;
+      border-radius: 8px;
+    }
+
+    .trader-card input:focus,
+    .trader-card textarea:focus {
+      border-color: #16a34a;
+      box-shadow: 0 0 0 3px rgba(22,163,74,0.15);
+      background: #1a1e2c;
+    }
+
+    .trader-card textarea { min-height: 60px; }
+
+    /* Checkbox groups */
+    .check-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .check-label {
       display: flex;
       align-items: center;
       gap: 0.4rem;
-    }
-
-    .permit-section ul {
-      list-style: none;
-      padding: 0;
-    }
-
-    .permit-section ul li {
-      padding: 0.4rem 0 0.4rem 1.25rem;
-      position: relative;
-      font-size: 0.88rem;
-      line-height: 1.45;
-      color: #333;
-    }
-
-    .permit-section ul li::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0.65rem;
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: #7c3aed;
-    }
-
-    .permit-section ul.notes-list li::before { background: #f59e0b; }
-    .permit-section ul.steps-list li::before { background: #16a34a; }
-
-    .permit-meta {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-bottom: 1.25rem;
-    }
-
-    .meta-badge {
-      flex: 1;
-      min-width: 140px;
-      background: #f5f0ff;
-      border: 1px solid #e8e0f5;
+      padding: 0.45rem 0.75rem;
+      border: 1.5px solid #2a2e3d;
       border-radius: 8px;
-      padding: 0.75rem 1rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #8b92a5;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      user-select: none;
+    }
+
+    .check-label:hover { border-color: #444; }
+
+    .check-label input { display: none; }
+    .check-label input:checked + span { color: #16a34a; }
+    .check-label:has(input:checked) { border-color: #16a34a; background: rgba(22,163,74,0.08); color: #22c55e; }
+
+    .check-dot {
+      width: 14px; height: 14px;
+      border: 2px solid #3a3e4d;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .check-label:has(input:checked) .check-dot {
+      border-color: #16a34a;
+      background: #16a34a;
+    }
+
+    .check-label:has(input:checked) .check-dot::after {
+      content: '';
+      width: 5px; height: 8px;
+      border: solid #fff; border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+      margin-top: -2px;
+    }
+
+    /* Trading hours status */
+    .trading-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .trading-status.open { background: rgba(22,163,74,0.12); color: #22c55e; }
+    .trading-status.closed { background: rgba(239,68,68,0.12); color: #ef4444; }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .trading-status.open .status-dot { background: #22c55e; }
+    .trading-status.closed .status-dot { background: #ef4444; animation: none; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Trader buttons */
+    .trader-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn-start {
+      flex: 1;
+      background: #16a34a;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-start:hover { background: #15803d; }
+
+    .btn-stop {
+      flex: 1;
+      background: #dc2626;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-stop:hover { background: #b91c1c; }
+    .btn-start:disabled, .btn-stop:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Stats row */
+    .trader-stats {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .t-stat {
+      flex: 1;
+      min-width: 100px;
+      background: #181b27;
+      border: 1px solid #2a2e3d;
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
       text-align: center;
     }
 
-    .meta-badge .meta-label {
-      font-size: 0.7rem;
-      font-weight: 600;
+    .t-stat-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 0.15rem; }
+    .t-stat-value { font-size: 1.15rem; font-weight: 800; color: #e0e4ec; }
+    .t-stat-value.positive { color: #22c55e; }
+    .t-stat-value.negative { color: #ef4444; }
+
+    /* Trade log */
+    .trade-log-wrap {
+      background: #0b0d14;
+      border: 1px solid #1e2130;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .trade-log-header {
+      padding: 0.75rem 1rem;
+      background: #131620;
+      border-bottom: 1px solid #1e2130;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .trade-log-header h3 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #8b92a5;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #888;
-      margin-bottom: 0.2rem;
+      letter-spacing: 0.05em;
     }
 
-    .meta-badge .meta-value {
-      font-size: 1.1rem;
-      font-weight: 800;
-      color: #1a1a2e;
+    .log-live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 1.5s ease-in-out infinite;
     }
 
-    .links-list a {
-      color: #7c3aed;
-      text-decoration: none;
-      font-weight: 600;
+    .log-live-dot.stopped { background: #6b7280; animation: none; }
+
+    .trade-log {
+      max-height: 420px;
+      overflow-y: auto;
+      padding: 0;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.72rem;
+      line-height: 1.6;
     }
 
-    .links-list a:hover { text-decoration: underline; }
+    .trade-log::-webkit-scrollbar { width: 6px; }
+    .trade-log::-webkit-scrollbar-track { background: #0b0d14; }
+    .trade-log::-webkit-scrollbar-thumb { background: #2a2e3d; border-radius: 3px; }
 
-    .divider {
-      border: none;
-      border-top: 1px solid #eee;
-      margin: 1.25rem 0;
+    .log-row {
+      display: grid;
+      grid-template-columns: 90px 70px 55px 100px 120px 1fr;
+      gap: 0;
+      padding: 0.4rem 0.75rem;
+      border-bottom: 1px solid #13151e;
+      align-items: center;
     }
+
+    .log-row:hover { background: #131620; }
+
+    .log-cell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-time { color: #4b5563; }
+    .log-market { color: #a78bfa; font-weight: 700; }
+    .log-tf { color: #6b7280; }
+    .log-pattern { color: #f59e0b; font-weight: 600; }
+
+    .log-action { font-weight: 700; }
+    .log-action.long { color: #22c55e; }
+    .log-action.stopped { color: #ef4444; }
+    .log-action.target { color: #22c55e; }
+    .log-action.signal { color: #6366f1; }
+    .log-action.system { color: #6b7280; }
+
+    .log-detail { color: #555b6e; font-size: 0.68rem; }
+    .log-pnl { font-weight: 700; }
+    .log-pnl.pos { color: #22c55e; }
+    .log-pnl.neg { color: #ef4444; }
+
+    .log-empty { padding: 2.5rem; text-align: center; color: #3a3e4d; font-size: 0.82rem; }
 
     /* --- Toast --- */
     .toast {
-      position: fixed;
-      bottom: 1.5rem;
-      left: 50%;
+      position: fixed; bottom: 1.5rem; left: 50%;
       transform: translateX(-50%) translateY(100px);
-      background: #1a1a2e;
-      color: #fff;
-      padding: 0.7rem 1.25rem;
-      border-radius: 8px;
-      font-size: 0.88rem;
-      font-weight: 600;
-      opacity: 0;
-      transition: transform 0.3s, opacity 0.3s;
-      pointer-events: none;
-      z-index: 100;
+      background: #1a1a2e; color: #fff;
+      padding: 0.7rem 1.25rem; border-radius: 8px;
+      font-size: 0.88rem; font-weight: 600;
+      opacity: 0; transition: transform 0.3s, opacity 0.3s;
+      pointer-events: none; z-index: 100;
     }
 
-    .toast.show {
-      transform: translateX(-50%) translateY(0);
-      opacity: 1;
-    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
   </style>
 </head>
 <body>
@@ -322,7 +410,8 @@
   <div class="container">
     <div class="tabs">
       <button class="tab-btn active" data-tab="create" onclick="switchTab('create')">Create a Skill</button>
-      <button class="tab-btn" data-tab="permit" onclick="switchTab('permit')">Florida Permit Checker</button>
+      <button class="tab-btn" data-tab="permit" onclick="switchTab('permit')">Permit Checker</button>
+      <button class="tab-btn" data-tab="trader" onclick="switchTab('trader')">AI Futures Trader</button>
     </div>
 
     <!-- TAB 1: Create a Skill -->
@@ -349,7 +438,7 @@
     <div id="panel-permit" class="tab-panel">
       <div class="card">
         <h2>Florida Permit Checker</h2>
-        <p class="card-sub">Find out exactly which permits you need for your renovation in Central Florida. Built for investors flipping houses in Lakeland, Orlando &amp; surrounding counties.</p>
+        <p class="card-sub">Find out exactly which permits you need for your renovation in Central Florida.</p>
         <form id="permit-form">
           <label for="renovationType">Renovation Type</label>
           <select id="renovationType" required>
@@ -363,7 +452,6 @@
             <option value="plumbing">Plumbing Upgrade</option>
             <option value="other">Other</option>
           </select>
-
           <label for="propertyType">Property Type</label>
           <select id="propertyType" required>
             <option value="">Select property type...</option>
@@ -371,7 +459,6 @@
             <option value="multifamily">Multifamily</option>
             <option value="commercial">Commercial</option>
           </select>
-
           <label for="county">County</label>
           <select id="county" required>
             <option value="">Select county...</option>
@@ -381,16 +468,80 @@
             <option value="pasco">Pasco County</option>
             <option value="other">Other Florida County</option>
           </select>
-
           <label for="details">Additional Details (optional)</label>
-          <textarea id="details" placeholder="e.g. Moving gas line, adding a second story, polybutylene re-pipe..."></textarea>
-
+          <textarea id="details" placeholder="e.g. Moving gas line, adding a second story..."></textarea>
           <button type="submit" class="btn btn-create">Check Required Permits</button>
         </form>
       </div>
-
       <div id="permit-results" class="permit-results">
         <div class="card" id="permit-output"></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: AI Futures Trader -->
+    <div id="panel-trader" class="tab-panel">
+      <div class="trader-card">
+        <h2>AI Futures Trader</h2>
+        <p class="card-sub">Autonomous pattern-based futures trading engine. Simulated execution on ES Mini &amp; Micro.</p>
+
+        <div id="trader-status-badge" class="trading-status closed">
+          <span class="status-dot"></span>
+          <span id="trader-status-text">Checking market hours...</span>
+        </div>
+
+        <label>Markets</label>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" name="market" value="ES" checked /><span class="check-dot"></span><span>ES Mini (ES)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="MES" /><span class="check-dot"></span><span>ES Micro (MES)</span></label>
+        </div>
+
+        <label>Timeframes</label>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" name="tf" value="2min" checked /><span class="check-dot"></span><span>2 min</span></label>
+          <label class="check-label"><input type="checkbox" name="tf" value="5min" checked /><span class="check-dot"></span><span>5 min</span></label>
+          <label class="check-label"><input type="checkbox" name="tf" value="15min" /><span class="check-dot"></span><span>15 min</span></label>
+          <label class="check-label"><input type="checkbox" name="tf" value="1hour" /><span class="check-dot"></span><span>1 hour</span></label>
+        </div>
+
+        <label>Trading Hours</label>
+        <div style="font-size:0.85rem; color:#6b7280; margin-bottom:1rem; padding:0.5rem 0.75rem; background:#181b27; border-radius:8px; border:1px solid #2a2e3d;">
+          9:30 AM &ndash; 4:00 PM EST (Regular Trading Hours)
+        </div>
+
+        <label for="riskPct">Risk Per Trade (% of Account)</label>
+        <input id="riskPct" type="number" value="0.5" min="0.1" max="5" step="0.1" style="max-width:160px;" />
+
+        <label>Core Patterns</label>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" name="pattern" value="3bar" checked /><span class="check-dot"></span><span>3 Bar Play</span></label>
+          <label class="check-label"><input type="checkbox" name="pattern" value="buysetup" checked /><span class="check-dot"></span><span>Buy Setup</span></label>
+        </div>
+
+        <label for="customCondition">Custom Buy Condition (optional)</label>
+        <textarea id="customCondition" placeholder="e.g. Only enter if price is above VWAP and volume spike > 1.5x avg..."></textarea>
+
+        <div class="trader-actions">
+          <button id="btn-start-trader" class="btn-start" onclick="startTrader()">Start Autonomous Trader</button>
+          <button id="btn-stop-trader" class="btn-stop" onclick="stopTrader()" disabled>Stop Trading</button>
+        </div>
+      </div>
+
+      <div id="trader-dashboard" style="display:none;">
+        <div class="trader-stats" id="trader-stats">
+          <div class="t-stat"><div class="t-stat-label">Trades</div><div class="t-stat-value" id="stat-trades">0</div></div>
+          <div class="t-stat"><div class="t-stat-label">Open</div><div class="t-stat-value" id="stat-open">0</div></div>
+          <div class="t-stat"><div class="t-stat-label">Simulated P&amp;L</div><div class="t-stat-value" id="stat-pnl">$0.00</div></div>
+        </div>
+
+        <div class="trade-log-wrap">
+          <div class="trade-log-header">
+            <h3>Live Trading Log</h3>
+            <div class="log-live-dot" id="log-live-dot"></div>
+          </div>
+          <div class="trade-log" id="trade-log">
+            <div class="log-empty">Waiting for first signal...</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -404,152 +555,190 @@
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
     }
 
-    /* --- Toast --- */
     const toast = document.getElementById('toast');
-    function showToast(msg) {
-      toast.textContent = msg;
-      toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 2500);
-    }
+    function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
 
-    /* --- Skills Tab --- */
+    function esc(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
+    /* ========== Skills Tab ========== */
     const form = document.getElementById('skill-form');
     const list = document.getElementById('skill-list');
 
     function timeAgo(date) {
       const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-      if (s < 5) return 'just now';
-      if (s < 60) return s + 's ago';
-      const m = Math.floor(s / 60);
-      if (m < 60) return m + 'm ago';
+      if (s < 5) return 'just now'; if (s < 60) return s + 's ago';
+      const m = Math.floor(s / 60); if (m < 60) return m + 'm ago';
       return Math.floor(m / 60) + 'h ago';
     }
 
-    function esc(str) {
-      const d = document.createElement('div');
-      d.textContent = str;
-      return d.innerHTML;
-    }
-
     function renderSkills(skills) {
-      if (!skills.length) {
-        list.innerHTML = '<li class="empty">No skills yet. Create your first one above.</li>';
-        return;
-      }
+      if (!skills.length) { list.innerHTML = '<li class="empty">No skills yet. Create your first one above.</li>'; return; }
       list.innerHTML = skills.map((s, i) =>
-        `<li class="skill-item">
-          <span class="skill-number">${i + 1}</span>
-          <div class="skill-info">
-            <div class="skill-name">${esc(s.name)}</div>
-            ${s.description ? `<div class="skill-desc">${esc(s.description)}</div>` : ''}
-            <div class="skill-time">${timeAgo(s.createdAt)}</div>
-          </div>
-        </li>`
+        `<li class="skill-item"><span class="skill-number">${i + 1}</span><div class="skill-info"><div class="skill-name">${esc(s.name)}</div>${s.description ? `<div class="skill-desc">${esc(s.description)}</div>` : ''}<div class="skill-time">${timeAgo(s.createdAt)}</div></div></li>`
       ).join('');
     }
 
-    async function loadSkills() {
-      try {
-        const res = await fetch('/api/skills');
-        renderSkills(await res.json());
-      } catch (e) { console.error(e); }
-    }
-
+    async function loadSkills() { try { renderSkills(await (await fetch('/api/skills')).json()); } catch {} }
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('name').value.trim();
-      const description = document.getElementById('description').value.trim();
+      const name = document.getElementById('name').value.trim(), description = document.getElementById('description').value.trim();
       if (!name) return;
-      try {
-        const res = await fetch('/api/create-skill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, description })
-        });
-        const data = await res.json();
-        if (data.success) { showToast('Skill created!'); form.reset(); loadSkills(); }
-        else showToast('Error: ' + (data.error || 'Failed'));
-      } catch { showToast('Network error'); }
+      try { const d = await (await fetch('/api/create-skill', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,description}) })).json(); if (d.success) { showToast('Skill created!'); form.reset(); loadSkills(); } else showToast('Error: '+(d.error||'Failed')); } catch { showToast('Network error'); }
     });
+    loadSkills(); setInterval(loadSkills, 5000);
 
-    loadSkills();
-    setInterval(loadSkills, 5000);
-
-    /* --- Permit Checker Tab --- */
+    /* ========== Permit Checker Tab ========== */
     const permitForm = document.getElementById('permit-form');
     const permitResults = document.getElementById('permit-results');
     const permitOutput = document.getElementById('permit-output');
 
     permitForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const btn = permitForm.querySelector('button');
-      btn.disabled = true;
-      btn.textContent = 'Checking...';
+      const btn = permitForm.querySelector('button'); btn.disabled = true; btn.textContent = 'Checking...';
+      const body = { renovationType: document.getElementById('renovationType').value, propertyType: document.getElementById('propertyType').value, county: document.getElementById('county').value, details: document.getElementById('details').value };
+      try {
+        const data = await (await fetch('/api/florida-permit-checker', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })).json();
+        if (!data.success) { showToast('Error: '+(data.error||'Failed')); btn.disabled=false; btn.textContent='Check Required Permits'; return; }
+        let h = `<h2>Permit Report</h2><div class="permit-meta"><div class="meta-badge"><div class="meta-label">Estimated Fees</div><div class="meta-value">${esc(data.estimatedFees)}</div></div><div class="meta-badge"><div class="meta-label">Approval Time</div><div class="meta-value">${esc(data.approvalTime)}</div></div></div>`;
+        h += `<div class="permit-section"><h3>Required Permits</h3><ul>${data.permits.map(p=>`<li>${esc(p)}</li>`).join('')}</ul></div><hr class="divider">`;
+        h += `<div class="permit-section"><h3>Important Notes</h3><ul class="notes-list">${data.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div><hr class="divider">`;
+        h += `<div class="permit-section"><h3>Next Steps</h3><ul class="steps-list">${data.nextSteps.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div><hr class="divider">`;
+        h += `<div class="permit-section"><h3>Official Resources</h3><ul class="links-list">${data.officialLinks.map(l=>`<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a></li>`).join('')}</ul></div>`;
+        permitOutput.innerHTML = h; permitResults.classList.add('visible'); showToast('Permit report ready!');
+        permitResults.scrollIntoView({ behavior:'smooth', block:'start' });
+      } catch { showToast('Network error'); }
+      btn.disabled = false; btn.textContent = 'Check Required Permits';
+    });
 
-      const body = {
-        renovationType: document.getElementById('renovationType').value,
-        propertyType: document.getElementById('propertyType').value,
-        county: document.getElementById('county').value,
-        details: document.getElementById('details').value,
-      };
+    /* ========== AI Futures Trader Tab ========== */
+    let traderSessionId = null;
+    let traderPollInterval = null;
+    let lastLogId = 0;
+
+    async function checkTradingStatus() {
+      try {
+        const d = await (await fetch('/api/trader/status')).json();
+        const badge = document.getElementById('trader-status-badge');
+        const text = document.getElementById('trader-status-text');
+        if (d.tradingOpen) {
+          badge.className = 'trading-status open';
+          text.textContent = 'Trading window OPEN (9:30 AM - 4:00 PM EST)';
+        } else {
+          badge.className = 'trading-status closed';
+          text.textContent = 'Trading window CLOSED (opens 9:30 AM EST)';
+        }
+      } catch {}
+    }
+
+    checkTradingStatus();
+    setInterval(checkTradingStatus, 30000);
+
+    function getChecked(name) {
+      return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(c => c.value);
+    }
+
+    async function startTrader() {
+      const markets = getChecked('market');
+      const timeframes = getChecked('tf');
+      const patterns = getChecked('pattern');
+      const riskPct = parseFloat(document.getElementById('riskPct').value) || 0.5;
+      const customCondition = document.getElementById('customCondition').value;
+
+      if (!markets.length) { showToast('Select at least one market'); return; }
+      if (!timeframes.length) { showToast('Select at least one timeframe'); return; }
+      if (!patterns.length) { showToast('Select at least one pattern'); return; }
+
+      document.getElementById('btn-start-trader').disabled = true;
+      document.getElementById('btn-stop-trader').disabled = false;
 
       try {
-        const res = await fetch('/api/florida-permit-checker', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
+        const d = await (await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskPct,patterns,customCondition}) })).json();
+        if (d.success) {
+          traderSessionId = d.sessionId;
+          lastLogId = 0;
+          document.getElementById('trade-log').innerHTML = '<div class="log-empty">Waiting for first signal...</div>';
+          document.getElementById('trader-dashboard').style.display = 'block';
+          document.getElementById('log-live-dot').className = 'log-live-dot';
+          showToast('Autonomous trader started!');
+          traderPollInterval = setInterval(pollTraderLogs, 2000);
+        } else { showToast('Failed to start'); document.getElementById('btn-start-trader').disabled = false; }
+      } catch { showToast('Network error'); document.getElementById('btn-start-trader').disabled = false; }
+    }
 
-        if (!data.success) {
-          showToast('Error: ' + (data.error || 'Check failed'));
-          btn.disabled = false;
-          btn.textContent = 'Check Required Permits';
-          return;
+    async function stopTrader() {
+      if (!traderSessionId) return;
+      try {
+        await fetch('/api/trader/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sessionId:traderSessionId}) });
+        showToast('Trader stopped');
+      } catch {}
+      document.getElementById('btn-start-trader').disabled = false;
+      document.getElementById('btn-stop-trader').disabled = true;
+      document.getElementById('log-live-dot').className = 'log-live-dot stopped';
+      if (traderPollInterval) clearInterval(traderPollInterval);
+      traderPollInterval = null;
+      pollTraderLogs();
+    }
+
+    function actionClass(action) {
+      if (action === 'LONG ENTERED') return 'long';
+      if (action === 'STOPPED OUT') return 'stopped';
+      if (action === 'TARGET HIT') return 'target';
+      if (action.startsWith('SIGNAL')) return 'signal';
+      return 'system';
+    }
+
+    function formatPnl(pnl) {
+      if (pnl === null || pnl === undefined) return '';
+      const cls = pnl >= 0 ? 'pos' : 'neg';
+      return `<span class="log-pnl ${cls}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span>`;
+    }
+
+    function buildLogDetail(log) {
+      const parts = [];
+      if (log.entry !== null) parts.push(`E:${log.entry.toFixed(2)}`);
+      if (log.stop !== null) parts.push(`SL:${log.stop.toFixed(2)}`);
+      if (log.target !== null) parts.push(`TP:${log.target.toFixed(2)}`);
+      if (log.pnl !== null) parts.push(formatPnl(log.pnl));
+      return parts.join(' ');
+    }
+
+    async function pollTraderLogs() {
+      if (!traderSessionId) return;
+      try {
+        const url = `/api/trader/logs/${traderSessionId}${lastLogId ? '?after=' + lastLogId : ''}`;
+        const d = await (await fetch(url)).json();
+
+        if (d.status) {
+          document.getElementById('stat-trades').textContent = d.status.tradeCount;
+          document.getElementById('stat-open').textContent = d.status.openPositions;
+          const pnlEl = document.getElementById('stat-pnl');
+          pnlEl.textContent = (d.status.cumPnl >= 0 ? '+' : '') + '$' + d.status.cumPnl.toFixed(2);
+          pnlEl.className = 't-stat-value ' + (d.status.cumPnl >= 0 ? 'positive' : 'negative');
         }
 
-        let html = '';
+        if (d.logs && d.logs.length > 0) {
+          const logEl = document.getElementById('trade-log');
+          if (lastLogId === 0) logEl.innerHTML = '';
 
-        html += `<h2>Permit Report</h2>`;
-        html += `<div class="permit-meta">
-          <div class="meta-badge"><div class="meta-label">Estimated Fees</div><div class="meta-value">${esc(data.estimatedFees)}</div></div>
-          <div class="meta-badge"><div class="meta-label">Approval Time</div><div class="meta-value">${esc(data.approvalTime)}</div></div>
-        </div>`;
+          d.logs.forEach(log => {
+            const row = document.createElement('div');
+            row.className = 'log-row';
+            row.innerHTML = `
+              <span class="log-cell log-time">${esc(log.timestamp)}</span>
+              <span class="log-cell log-market">${esc(log.market)}</span>
+              <span class="log-cell log-tf">${esc(log.timeframe)}</span>
+              <span class="log-cell log-pattern">${esc(log.pattern)}</span>
+              <span class="log-cell log-action ${actionClass(log.action)}">${esc(log.action)}</span>
+              <span class="log-cell log-detail">${buildLogDetail(log)}</span>
+            `;
+            logEl.appendChild(row);
+            lastLogId = Math.max(lastLogId, log.id);
+          });
 
-        html += `<div class="permit-section"><h3>Required Permits</h3><ul>`;
-        data.permits.forEach(p => { html += `<li>${esc(p)}</li>`; });
-        html += `</ul></div>`;
-
-        html += `<hr class="divider">`;
-
-        html += `<div class="permit-section"><h3>Important Notes</h3><ul class="notes-list">`;
-        data.notes.forEach(n => { html += `<li>${esc(n)}</li>`; });
-        html += `</ul></div>`;
-
-        html += `<hr class="divider">`;
-
-        html += `<div class="permit-section"><h3>Next Steps</h3><ul class="steps-list">`;
-        data.nextSteps.forEach(s => { html += `<li>${esc(s)}</li>`; });
-        html += `</ul></div>`;
-
-        html += `<hr class="divider">`;
-
-        html += `<div class="permit-section"><h3>Official Resources</h3><ul class="links-list">`;
-        data.officialLinks.forEach(l => { html += `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a></li>`; });
-        html += `</ul></div>`;
-
-        permitOutput.innerHTML = html;
-        permitResults.classList.add('visible');
-        showToast('Permit report ready!');
-        permitResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-      } catch {
-        showToast('Network error');
-      }
-
-      btn.disabled = false;
-      btn.textContent = 'Check Required Permits';
-    });
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+      } catch {}
+    }
   </script>
 </body>
 </html>
