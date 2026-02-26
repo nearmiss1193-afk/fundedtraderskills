@@ -20,14 +20,28 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
     source: "trader-engine",
   });
 
+  const dir = direction === "LONG" ? "Long" : "Short";
+  console.log(`[trader] Signal sent to bridge: ${dir} ${symbol} @ ${entry} | SL: ${stop} TP: ${target} | ${pattern} (confluence: ${confluence}) | R:R 1:${rewardRatio}`);
+
   const req = http.request({
     hostname: "127.0.0.1",
     port: SIGNAL_PORT,
     path: "/api/trade-signal",
     method: "POST",
     headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) },
+  }, (res) => {
+    res.on("data", () => {});
+    res.on("end", () => {
+      if (res.statusCode === 200) {
+        console.log(`[trader] Bridge confirmed signal received for ${symbol}`);
+      } else {
+        console.log(`[trader] Bridge returned status ${res.statusCode} for ${symbol}`);
+      }
+    });
   });
-  req.on("error", () => {});
+  req.on("error", (err) => {
+    console.log(`[trader] Bridge connection error: ${err.message}`);
+  });
   req.write(payload);
   req.end();
 }
