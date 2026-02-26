@@ -5,56 +5,294 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sovereign Skill Hub</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
-    h1 { margin-bottom: 1.5rem; }
-    form { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 2rem; }
-    input, textarea { padding: .5rem; border: 1px solid #ccc; border-radius: 4px; font: inherit; }
-    button { padding: .5rem 1rem; background: #111; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
-    ul { list-style: none; }
-    li { padding: .75rem 0; border-bottom: 1px solid #eee; }
-    li strong { display: block; }
-    li span { color: #555; font-size: .9rem; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #f4f4f7;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #7c3aed, #a855f7, #7c3aed);
+      padding: 3rem 1.5rem;
+      text-align: center;
+      color: #fff;
+    }
+
+    header h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      font-size: 1.05rem;
+      opacity: 0.85;
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 620px;
+      margin: -2rem auto 3rem;
+      padding: 0 1rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      color: #1a1a2e;
+    }
+
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 0.7rem 0.85rem;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 0.95rem;
+      color: #1a1a2e;
+      background: #fafafa;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      margin-bottom: 1rem;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.12);
+      background: #fff;
+    }
+
+    textarea { resize: vertical; min-height: 80px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 0.75rem 1.25rem;
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-create {
+      background: #16a34a;
+      color: #fff;
+    }
+
+    .btn-create:hover { background: #15803d; }
+    .btn-create:active { transform: scale(0.98); }
+
+    .skill-list { list-style: none; }
+
+    .skill-item {
+      padding: 1rem 0;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .skill-item:last-child { border-bottom: none; }
+
+    .skill-number {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #ede9fe;
+      color: #7c3aed;
+      font-size: 0.78rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 2px;
+    }
+
+    .skill-info { flex: 1; min-width: 0; }
+
+    .skill-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #1a1a2e;
+    }
+
+    .skill-desc {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 0.15rem;
+      line-height: 1.4;
+    }
+
+    .skill-time {
+      font-size: 0.72rem;
+      color: #aaa;
+      margin-top: 0.25rem;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 2rem 0;
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0.7rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      opacity: 0;
+      transition: transform 0.3s, opacity 0.3s;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
-  <h1>Sovereign Skill Hub</h1>
+  <header>
+    <h1>Sovereign Skill Hub</h1>
+    <p>Build powerful AI agents &amp; skills in minutes. Earn while others use them.</p>
+  </header>
 
-  <form id="skill-form">
-    <input id="name" placeholder="Skill name" required />
-    <textarea id="description" placeholder="Description" required></textarea>
-    <button type="submit">Add Skill</button>
-  </form>
+  <div class="container">
+    <div class="card">
+      <h2>Create a Skill</h2>
+      <form id="skill-form">
+        <label for="name">Skill Name</label>
+        <input id="name" type="text" placeholder="e.g. Blog Post Writer" required />
+        <label for="description">Description</label>
+        <textarea id="description" placeholder="What does this skill do?"></textarea>
+        <button type="submit" class="btn btn-create">Create Skill &amp; Test</button>
+      </form>
+    </div>
 
-  <h2>Skills</h2>
-  <ul id="skill-list"></ul>
+    <div class="card">
+      <h2>Skills Created</h2>
+      <ul id="skill-list" class="skill-list">
+        <li class="empty">No skills yet. Create your first one above.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
 
   <script>
     const form = document.getElementById('skill-form');
     const list = document.getElementById('skill-list');
+    const toast = document.getElementById('toast');
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function timeAgo(date) {
+      const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+      if (s < 5) return 'just now';
+      if (s < 60) return s + 's ago';
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + 'm ago';
+      const h = Math.floor(m / 60);
+      return h + 'h ago';
+    }
+
+    function renderSkills(skills) {
+      if (!skills.length) {
+        list.innerHTML = '<li class="empty">No skills yet. Create your first one above.</li>';
+        return;
+      }
+      list.innerHTML = skills.map((s, i) =>
+        `<li class="skill-item">
+          <span class="skill-number">${i + 1}</span>
+          <div class="skill-info">
+            <div class="skill-name">${s.name}</div>
+            ${s.description ? `<div class="skill-desc">${s.description}</div>` : ''}
+            <div class="skill-time">${timeAgo(s.createdAt)}</div>
+          </div>
+        </li>`
+      ).join('');
+    }
 
     async function loadSkills() {
-      const res = await fetch('/api/skills');
-      const skills = await res.json();
-      list.innerHTML = skills.map(s =>
-        `<li><strong>${s.name}</strong><span>${s.description}</span></li>`
-      ).join('');
+      try {
+        const res = await fetch('/api/skills');
+        const skills = await res.json();
+        renderSkills(skills);
+      } catch (e) {
+        console.error('Failed to load skills', e);
+      }
     }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('name').value;
-      const description = document.getElementById('description').value;
-      await fetch('/api/create-skill', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description })
-      });
-      form.reset();
-      loadSkills();
+      const name = document.getElementById('name').value.trim();
+      const description = document.getElementById('description').value.trim();
+      if (!name) return;
+
+      try {
+        const res = await fetch('/api/create-skill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Skill created!');
+          form.reset();
+          loadSkills();
+        } else {
+          showToast('Error: ' + (data.error || 'Failed'));
+        }
+      } catch (err) {
+        showToast('Network error');
+      }
     });
 
     loadSkills();
+    setInterval(loadSkills, 5000);
   </script>
 </body>
 </html>

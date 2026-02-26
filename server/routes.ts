@@ -1,5 +1,7 @@
 import type { Express } from "express";
 import { type Server } from "http";
+import path from "path";
+import express from "express";
 
 let skills: any[] = [];
 
@@ -7,6 +9,12 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.get("/", (_req, res) => {
+    res.sendFile(path.resolve(process.cwd(), "public", "index.html"));
+  });
+
+  app.use("/public", express.static(path.resolve(process.cwd(), "public")));
+
   app.get("/health", (_req, res) => res.send("OK"));
 
   app.post("/api/create-skill", (req, res) => {
