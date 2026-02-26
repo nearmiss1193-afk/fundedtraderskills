@@ -13,6 +13,48 @@ const SPY_TO_ES_RATIO = 7.8;
 let polygonErrorCount = 0;
 let polygonBackoffUntil = 0;
 
+interface FuturesSpec {
+  name: string;
+  basePrice: number;
+  pointValue: number;
+  tickSize: number;
+  volatility: number;
+  avgVolume: number;
+  category: string;
+}
+
+const FUTURES_SPECS: Record<string, FuturesSpec> = {
+  ES:  { name: "E-mini S&P 500",     basePrice: 5400, pointValue: 50,    tickSize: 0.25,  volatility: 1.2, avgVolume: 2000, category: "equity" },
+  MES: { name: "Micro E-mini S&P",   basePrice: 5400, pointValue: 5,     tickSize: 0.25,  volatility: 1.2, avgVolume: 1500, category: "equity" },
+  NQ:  { name: "E-mini Nasdaq 100",  basePrice: 19200,pointValue: 20,    tickSize: 0.25,  volatility: 1.8, avgVolume: 1800, category: "equity" },
+  MNQ: { name: "Micro E-mini Nasdaq",basePrice: 19200,pointValue: 2,     tickSize: 0.25,  volatility: 1.8, avgVolume: 1400, category: "equity" },
+  YM:  { name: "E-mini Dow",         basePrice: 39500,pointValue: 5,     tickSize: 1.0,   volatility: 1.0, avgVolume: 1200, category: "equity" },
+  MYM: { name: "Micro E-mini Dow",   basePrice: 39500,pointValue: 0.50,  tickSize: 1.0,   volatility: 1.0, avgVolume: 1000, category: "equity" },
+  RTY: { name: "E-mini Russell 2000",basePrice: 2050, pointValue: 50,    tickSize: 0.10,  volatility: 1.5, avgVolume: 1000, category: "equity" },
+  M2K: { name: "Micro Russell 2000", basePrice: 2050, pointValue: 5,     tickSize: 0.10,  volatility: 1.5, avgVolume: 800,  category: "equity" },
+  CL:  { name: "Crude Oil",          basePrice: 72,   pointValue: 1000,  tickSize: 0.01,  volatility: 0.8, avgVolume: 2500, category: "energy" },
+  MCL: { name: "Micro Crude Oil",    basePrice: 72,   pointValue: 100,   tickSize: 0.01,  volatility: 0.8, avgVolume: 1500, category: "energy" },
+  GC:  { name: "Gold",               basePrice: 2650, pointValue: 100,   tickSize: 0.10,  volatility: 1.0, avgVolume: 2000, category: "metals" },
+  MGC: { name: "Micro Gold",         basePrice: 2650, pointValue: 10,    tickSize: 0.10,  volatility: 1.0, avgVolume: 1500, category: "metals" },
+  SI:  { name: "Silver",             basePrice: 31,   pointValue: 5000,  tickSize: 0.005, volatility: 1.5, avgVolume: 1200, category: "metals" },
+  HG:  { name: "Copper",             basePrice: 4.2,  pointValue: 25000, tickSize: 0.0005,volatility: 1.0, avgVolume: 1000, category: "metals" },
+  PL:  { name: "Platinum",           basePrice: 980,  pointValue: 50,    tickSize: 0.10,  volatility: 1.2, avgVolume: 600,  category: "metals" },
+  PA:  { name: "Palladium",          basePrice: 1050, pointValue: 100,   tickSize: 0.05,  volatility: 2.0, avgVolume: 400,  category: "metals" },
+  BTC: { name: "Bitcoin Futures",    basePrice: 97000,pointValue: 5,     tickSize: 5.0,   volatility: 3.0, avgVolume: 800,  category: "crypto" },
+  ETH: { name: "Ether Futures",      basePrice: 3400, pointValue: 50,    tickSize: 0.25,  volatility: 3.5, avgVolume: 600,  category: "crypto" },
+  ZB:  { name: "30-Year T-Bond",     basePrice: 118,  pointValue: 1000,  tickSize: 0.03125,volatility:0.4,avgVolume: 1500, category: "bonds" },
+  ZN:  { name: "10-Year T-Note",     basePrice: 110,  pointValue: 1000,  tickSize: 0.015625,volatility:0.3,avgVolume:2000, category: "bonds" },
+  ZT:  { name: "2-Year T-Note",      basePrice: 103,  pointValue: 2000,  tickSize: 0.0078125,volatility:0.15,avgVolume:1500,category: "bonds" },
+  ZF:  { name: "5-Year T-Note",      basePrice: 107,  pointValue: 1000,  tickSize: 0.0078125,volatility:0.2,avgVolume:1800, category: "bonds" },
+  ZC:  { name: "Corn",               basePrice: 450,  pointValue: 50,    tickSize: 0.25,  volatility: 0.8, avgVolume: 1500, category: "ags" },
+  ZS:  { name: "Soybeans",           basePrice: 1020, pointValue: 50,    tickSize: 0.25,  volatility: 1.0, avgVolume: 1200, category: "ags" },
+  ZW:  { name: "Wheat",              basePrice: 560,  pointValue: 50,    tickSize: 0.25,  volatility: 1.2, avgVolume: 1000, category: "ags" },
+};
+
+function getSpec(market: string): FuturesSpec {
+  return FUTURES_SPECS[market] || FUTURES_SPECS["ES"];
+}
+
 function fetchWithTimeout(url: string, timeoutMs = 5000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -182,7 +224,7 @@ interface TraderSession {
 const sessions: Record<string, TraderSession> = {};
 let logIdCounter = 1;
 
-const TF_TICKS: Record<string, number> = { "2min": 1, "5min": 2, "15min": 4, "1hour": 8 };
+const TF_TICKS: Record<string, number> = { "2min": 1, "5min": 2, "15min": 4, "1hour": 8, "4hour": 24, "daily": 60 };
 
 setInterval(() => {
   const now = Date.now();
@@ -193,8 +235,13 @@ setInterval(() => {
 
 function isTradingHours(): boolean {
   const est = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const day = est.getDay();
   const t = est.getHours() * 60 + est.getMinutes();
-  return t >= 570 && t < 960;
+  if (day === 6) return false;
+  if (day === 0 && t < 1080) return false;
+  if (day === 5 && t >= 1020) return false;
+  if (t >= 1020 && t < 1080) return false;
+  return true;
 }
 
 function getESTTime(): string {
@@ -209,10 +256,11 @@ function rand(min: number, max: number): number {
 
 function r2(v: number): number { return Math.round(v * 100) / 100; }
 
-function makeBar(open: number, close: number, vol: number): Bar {
+function makeBar(open: number, close: number, vol: number, priceScale: number = 1): Bar {
   const spread = Math.abs(close - open);
-  const high = r2(Math.max(open, close) + rand(0.25, spread * 0.5 + 1));
-  const low = r2(Math.min(open, close) - rand(0.25, spread * 0.5 + 1));
+  const wickNoise = Math.max(0.01, spread * 0.5 + priceScale * 0.001);
+  const high = r2(Math.max(open, close) + rand(priceScale * 0.0001, wickNoise));
+  const low = r2(Math.min(open, close) - rand(priceScale * 0.0001, wickNoise));
   const bullish = close >= open;
   const body = Math.abs(close - open);
   const tail = bullish ? (open - low) : (close - low);
@@ -222,18 +270,22 @@ function makeBar(open: number, close: number, vol: number): Bar {
 }
 
 function initMarketState(market: string): MarketState {
-  const base = market === "MES" ? 5400 + rand(-40, 40) : 5400 + rand(-50, 50);
+  const spec = getSpec(market);
+  const pctRange = spec.basePrice * 0.01;
+  const base = r2(spec.basePrice + rand(-pctRange, pctRange));
+  const pivotRange = spec.basePrice * 0.003;
+  const swingRange = spec.basePrice * 0.002;
   const biases: Array<"UPTREND" | "DOWNTREND" | "SIDEWAYS"> = ["UPTREND", "DOWNTREND", "SIDEWAYS"];
   return {
-    price: r2(base), bias: biases[Math.floor(Math.random() * 3)],
-    biasStrength: rand(0.3, 0.8), ema9: base, ema21: base, sma200: base - rand(-8, 8),
-    pivotHigh: r2(base + rand(5, 15)), pivotLow: r2(base - rand(5, 15)),
+    price: base, bias: biases[Math.floor(Math.random() * 3)],
+    biasStrength: rand(0.3, 0.8), ema9: base, ema21: base, sma200: r2(base - rand(-pctRange * 0.5, pctRange * 0.5)),
+    pivotHigh: r2(base + rand(pivotRange * 0.5, pivotRange * 1.5)), pivotLow: r2(base - rand(pivotRange * 0.5, pivotRange * 1.5)),
     pivotHighAge: 0, pivotLowAge: 0,
-    priorPivotHigh: r2(base + rand(10, 25)), priorPivotLow: r2(base - rand(10, 25)),
-    volatility: rand(0.5, 2.0), trendDuration: 0,
+    priorPivotHigh: r2(base + rand(pivotRange, pivotRange * 2.5)), priorPivotLow: r2(base - rand(pivotRange, pivotRange * 2.5)),
+    volatility: rand(0.3, 1.5) * spec.volatility, trendDuration: 0,
     consecutiveBars: 0, lastBarDirection: true,
-    avgVolume: 1800, sentiment: "NEUTRAL",
-    recentSwingHigh: r2(base + rand(3, 8)), recentSwingLow: r2(base - rand(3, 8)),
+    avgVolume: spec.avgVolume, sentiment: "NEUTRAL",
+    recentSwingHigh: r2(base + rand(swingRange * 0.5, swingRange * 1.5)), recentSwingLow: r2(base - rand(swingRange * 0.5, swingRange * 1.5)),
     higherPivotHighs: 0, higherPivotLows: 0,
     lowerPivotHighs: 0, lowerPivotLows: 0,
   };
@@ -252,26 +304,27 @@ function updateTrendFromPivots(state: MarketState) {
   }
 }
 
-function generateBar(state: MarketState, livePrice?: PolygonPrice | null): Bar {
+function generateBar(state: MarketState, market: string = "ES", livePrice?: PolygonPrice | null): Bar {
+  const spec = getSpec(market);
+  const scale = spec.basePrice / 5400;
   state.trendDuration++;
   state.pivotHighAge++;
   state.pivotLowAge++;
 
-  if (livePrice) {
+  if (livePrice && (market === "ES" || market === "MES")) {
     const basePrice = livePrice.price;
     const open = state.price;
-    const greedBias = state.sentiment === "BUYERS_CONTROL" ? rand(0.3, 1.0) : state.sentiment === "SELLERS_CONTROL" ? -rand(0.3, 1.0) : 0;
-    const tickNoise = rand(-2.5, 2.5) * (state.volatility || 1.0) + greedBias;
+    const greedBias = state.sentiment === "BUYERS_CONTROL" ? rand(0.3, 1.0) * scale : state.sentiment === "SELLERS_CONTROL" ? -rand(0.3, 1.0) * scale : 0;
+    const tickNoise = rand(-2.5, 2.5) * scale * (state.volatility || 1.0) + greedBias;
     const close = r2(basePrice + tickNoise);
     const volume = Math.round(livePrice.volume / 500) || Math.round(rand(800, 3000));
-    const move = close - open;
 
     if (state.trendDuration > rand(12, 35)) {
-      state.volatility = rand(0.5, 2.0);
+      state.volatility = rand(0.3, 1.5) * spec.volatility;
       state.trendDuration = 0;
     }
 
-    const bar = makeBar(open, close, volume);
+    const bar = makeBar(open, close, volume, spec.basePrice);
     updateMarketState(state, bar, close, volume);
     return bar;
   }
@@ -281,23 +334,23 @@ function generateBar(state: MarketState, livePrice?: PolygonPrice | null): Bar {
     state.bias = biases[Math.floor(Math.random() * 3)];
     state.biasStrength = rand(0.3, 0.8);
     state.trendDuration = 0;
-    state.volatility = rand(0.5, 2.0);
+    state.volatility = rand(0.3, 1.5) * spec.volatility;
   }
 
   let drift = 0;
-  if (state.bias === "UPTREND") drift = rand(0.1, 1.5) * state.biasStrength;
-  else if (state.bias === "DOWNTREND") drift = -rand(0.1, 1.5) * state.biasStrength;
-  else drift = rand(-0.5, 0.5) * 0.3;
+  if (state.bias === "UPTREND") drift = rand(0.1, 1.5) * scale * state.biasStrength;
+  else if (state.bias === "DOWNTREND") drift = -rand(0.1, 1.5) * scale * state.biasStrength;
+  else drift = rand(-0.5, 0.5) * scale * 0.3;
 
   const meanRev = (state.ema21 - state.price) * 0.025;
   drift += meanRev;
 
   if (state.consecutiveBars >= 7) {
-    drift += state.lastBarDirection ? -rand(1, 3) : rand(1, 3);
+    drift += state.lastBarDirection ? -rand(1, 3) * scale : rand(1, 3) * scale;
   }
 
-  const greedBiasSim = state.sentiment === "BUYERS_CONTROL" ? rand(0.3, 1.2) : state.sentiment === "SELLERS_CONTROL" ? -rand(0.3, 1.2) : 0;
-  const noise = rand(-2.5, 2.5) * state.volatility + greedBiasSim;
+  const greedBiasSim = state.sentiment === "BUYERS_CONTROL" ? rand(0.3, 1.2) * scale : state.sentiment === "SELLERS_CONTROL" ? -rand(0.3, 1.2) * scale : 0;
+  const noise = rand(-2.5, 2.5) * scale * state.volatility + greedBiasSim;
   let move = drift + noise;
 
   const isClimax = Math.random() < 0.04;
@@ -306,16 +359,18 @@ function generateBar(state: MarketState, livePrice?: PolygonPrice | null): Bar {
   const open = state.price;
   const close = r2(open + move);
 
-  let volume = Math.round(rand(800, 3000));
+  const avgVol = spec.avgVolume;
+  let volume = Math.round(rand(avgVol * 0.5, avgVol * 1.5));
   if (isClimax) volume = Math.round(volume * rand(3, 6));
-  if (Math.abs(move) > 3) volume = Math.round(volume * rand(1.5, 2.5));
+  if (Math.abs(move) > 3 * scale) volume = Math.round(volume * rand(1.5, 2.5));
   if (state.bias === "UPTREND" && close > open) volume = Math.round(volume * 1.3);
   if (state.bias === "DOWNTREND" && close < open) volume = Math.round(volume * 1.3);
-  if (Math.abs(state.price - state.pivotHigh) < 2 || Math.abs(state.price - state.pivotLow) < 2) {
+  const pivotProximity = spec.basePrice * 0.0004;
+  if (Math.abs(state.price - state.pivotHigh) < pivotProximity || Math.abs(state.price - state.pivotLow) < pivotProximity) {
     volume = Math.round(volume * rand(1.3, 1.8));
   }
 
-  const bar = makeBar(open, close, volume);
+  const bar = makeBar(open, close, volume, spec.basePrice);
   updateMarketState(state, bar, close, volume);
   return bar;
 }
@@ -769,11 +824,11 @@ async function simulateTick(session: TraderSession) {
     return;
   }
 
-  for (const market of session.markets) {
-    const mk = market === "MES" ? "MES" : "ES";
-    const pointValue = mk === "ES" ? 50 : 5;
+  for (const mk of session.markets) {
+    const spec = getSpec(mk);
+    const pointValue = spec.pointValue;
 
-    const livePrice = await fetchPolygonPrice(mk);
+    const livePrice = (mk === "ES" || mk === "MES") ? await fetchPolygonPrice(mk) : null;
     const dataSource = livePrice ? "POLYGON" : "SIM";
 
     if (!session.marketState[mk]) {
@@ -783,10 +838,12 @@ async function simulateTick(session: TraderSession) {
         s.ema9 = s.price;
         s.ema21 = s.price;
         s.sma200 = s.price;
-        s.pivotHigh = r2(s.price + rand(3, 10));
-        s.pivotLow = r2(s.price - rand(3, 10));
-        s.recentSwingHigh = r2(s.price + rand(2, 6));
-        s.recentSwingLow = r2(s.price - rand(2, 6));
+        const pivotR = s.price * 0.003;
+        const swingR = s.price * 0.002;
+        s.pivotHigh = r2(s.price + rand(pivotR * 0.5, pivotR));
+        s.pivotLow = r2(s.price - rand(pivotR * 0.5, pivotR));
+        s.recentSwingHigh = r2(s.price + rand(swingR * 0.5, swingR));
+        s.recentSwingLow = r2(s.price - rand(swingR * 0.5, swingR));
         session.marketState[mk] = s;
       } else {
         session.marketState[mk] = initMarketState(mk);
@@ -797,7 +854,7 @@ async function simulateTick(session: TraderSession) {
 
     if (session.openTrades[tradeKey]) {
       const t = session.openTrades[tradeKey];
-      const bar = generateBar(state, livePrice);
+      const bar = generateBar(state, mk, livePrice);
 
       manageTrailingStop(t, bar, state);
 
@@ -886,7 +943,7 @@ async function simulateTick(session: TraderSession) {
       session.tickCount[barKey]++;
       if (session.tickCount[barKey] % (TF_TICKS[tf] || 1) !== 0) continue;
 
-      const bar = generateBar(state, livePrice);
+      const bar = generateBar(state, mk, livePrice);
       session.bars[barKey].push(bar);
       if (session.bars[barKey].length > 30) session.bars[barKey].shift();
 
@@ -955,16 +1012,19 @@ async function simulateTick(session: TraderSession) {
           const recentBars = bars.slice(-5);
           let stopLevel: number;
 
+          const stopPad = spec.basePrice * 0.0005;
           if (direction === "LONG") {
             const swingLow = Math.min(...recentBars.map(b => b.low));
-            stopLevel = swingLow - rand(0.25, 1.0);
+            stopLevel = swingLow - rand(stopPad * 0.5, stopPad * 2);
           } else {
             const swingHigh = Math.max(...recentBars.map(b => b.high));
-            stopLevel = swingHigh + rand(0.25, 1.0);
+            stopLevel = swingHigh + rand(stopPad * 0.5, stopPad * 2);
           }
 
           const riskPoints = r2(Math.abs(entry - stopLevel));
-          const clampedRisk = Math.max(1.5, Math.min(riskPoints, 6));
+          const minRisk = spec.basePrice * 0.0003;
+          const maxRisk = spec.basePrice * 0.0012;
+          const clampedRisk = Math.max(minRisk, Math.min(riskPoints, maxRisk));
           const rewardRatio = confluence >= 5 ? rand(2.5, 4.0) : confluence >= 4 ? rand(2.0, 3.5) : rand(1.5, 2.5);
           let stop: number, target: number;
 
@@ -1009,7 +1069,8 @@ async function simulateTick(session: TraderSession) {
     }
 
     const lastScan = session.logs[session.logs.length - 1];
-    const priceChanged = lastScan?.entry ? Math.abs(state.price - lastScan.entry) > 0.5 : true;
+    const scanThreshold = spec.basePrice * 0.0001;
+    const priceChanged = lastScan?.entry ? Math.abs(state.price - lastScan.entry) > scanThreshold : true;
     const isScanDue = !lastScan || lastScan.action === "TRADER STARTED" || lastScan.market !== mk || lastScan.action !== "SCANNING" || priceChanged;
     if (isScanDue && !session.openTrades[tradeKey]) {
       session.logs.push(makeLog({

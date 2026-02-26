@@ -28,17 +28,34 @@ shared/schema.ts    - Stub
 - **Create a Skill** - Simple skill CRUD (in-memory)
 - **Florida Permit Checker** - County-specific permit logic for Polk/Orange/Hillsborough/Pasco
 - **AI Futures Trader** - Based on Jared Wesley's "Trading With An Edge" (Live Traders):
-  - **Real Price Data**: Polygon.io API (SPY x 7.8 as ES proxy, free tier compatible)
-  - **Force Trading Mode**: Checkbox to ignore 9:30-4PM EST time window
+  - **25 Futures Symbols**: ES, MES, NQ, MNQ, YM, MYM, RTY, M2K, CL, MCL, GC, MGC, SI, HG, PL, PA, BTC, ETH, ZB, ZN, ZT, ZF, ZC, ZS, ZW
+  - **6 Timeframes**: 2min, 5min, 15min, 1hr, 4hr, Daily
+  - **Futures Session Hours**: Sunday 6PM – Friday 5PM EST with daily 5-6PM maintenance break
+  - **Per-Symbol Specs**: Base price, point value, tick size, volatility profile, avg volume (FUTURES_SPECS map)
+  - **Real Price Data**: Polygon.io API (SPY x 7.8 as ES/MES proxy, free tier compatible)
+  - **Force Trading Mode**: Checkbox to override time window during development
   - **Moving Averages**: 9 EMA + 21 EMA + 200 SMA for trend confirmation and entry filtering
   - **5 Core Patterns**: 3 Bar Play (3 consecutive + reversal + volume), Buy/Sell Setup (10-factor confluence), Pivot Breakout (prior pivot levels), Climax Reversal (7+ bars extended + ending volume), MA Bounce (9/21 EMA touch + reversal)
+  - **Short Selling**: All patterns support both LONG and SHORT entries
   - **Confluence Scoring**: Multi-factor scoring with descriptive labels (A+ Setup, High Probability, Moderate, etc.)
   - **Volume Classification**: Igniting (starts move), Ending (exhaustion), Resting (consolidation) per manual
   - **Trailing Stops**: Activates after 1R move, trails at 0.6R from high/low, breakeven management
   - **Trend Detection**: HPH/HPL counting for uptrend, LPH/LPL for downtrend, with pivot decay
   - **Fear/Greed Dynamics**: Sentiment-biased price movement (BUYERS_CONTROL amplifies upward, SELLERS_CONTROL amplifies downward)
   - **Trade Management**: Entry from recent swing, SL/TP/Trail shown in log, TRAILED OUT vs STOPPED OUT
+  - **Price Scaling**: All noise, drift, stops, and risk calculations scale proportionally to each symbol's base price
   - **Log Fields**: trail, confluenceLabel, volumeType, dataSource badges, color-coded actions
+
+## Symbol Categories (UI)
+
+| Category | Symbols |
+|----------|---------|
+| Equity Index | ES, MES, NQ, MNQ, YM, MYM, RTY, M2K |
+| Energy | CL, MCL |
+| Metals | GC, MGC, SI, HG, PL, PA |
+| Crypto | BTC, ETH |
+| Treasury | ZB, ZN, ZF, ZT |
+| Agriculture | ZC, ZS, ZW |
 
 ## Log TradeLog Fields
 

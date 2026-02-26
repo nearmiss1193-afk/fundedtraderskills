@@ -1,0 +1,47 @@
+Re-read the entire uploaded PDF "trading manuel.pdf" (Trading With An Edge by Jared Wesley, Live Traders).
+
+Deeply integrate EVERY key teaching from the manual into the AI Futures Trader skill. Do not summarize — apply them fully and practically.
+
+Core concepts to extract and implement:
+
+- Technical analysis foundation (candlesticks, volume, moving averages)
+- Trend identification (uptrend, downtrend, sideways)
+- Support & resistance, prior pivots, breakouts, climactic moves
+- Multiple bar patterns and reversals
+- Human emotion: Fear (sellers in control) vs Greed (buyers in control)
+- Volume confirmation on entries and reversals
+- Consistency and proper trade/risk management
+- The chart tells you what to do — let price action + volume guide decisions
+- Psychology of trading (avoid overcomplication, stay organized)
+
+Specific upgrades to the trader:
+
+1. Pattern detection must now use full confluence from the book:
+   - 3 Bar Play (stronger version with volume spike)
+   - Buy Setup / Sell Setup with MA respect + volume
+   - Breakout from prior pivot
+   - Climactic exhaustion moves
+
+2. Add 9 & 21 EMA (as referenced in manual) for trend filter and dynamic support/resistance
+
+3. Advanced trade management:
+   - Initial stop based on recent swing / structure
+   - Trailing stop logic based on manual principles
+   - Clear SL, TP, and trail levels shown in log
+   - Risk per trade respected with proper position sizing for ES/MES
+
+4. Better price action simulation:
+   - Respect overall trend bias
+   - Stronger moves on high volume
+   - Fear/greed dynamics in bar generation
+
+5. Log improvements:
+   - Show confluence score (e.g. "Confluence: 4/5 - High probability")
+   - Color-coded based on buyers/sellers in control
+   - Show Entry, SL, TP, Trail, and reason for entry
+
+Keep the premium dark UI, Force Trading Mode, multi-symbol support, and live log.
+
+After full integration, run the server and show me the updated trader tab with examples of book-based logic in the log.
+
+Start now.
