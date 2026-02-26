@@ -1157,7 +1157,7 @@ async function simulateTick(session: TraderSession) {
       let confluenceLabel = "";
       let entryReason = "";
 
-      if (session.patterns.includes("3bar")) {
+      if (session.patterns.includes("3bar_long")) {
         const buyResult = detect3BarPlayBuy(bars, state);
         if (buyResult.detected) {
           detectedPattern = "3 Bar Play";
@@ -1165,44 +1165,53 @@ async function simulateTick(session: TraderSession) {
           confluence = buyResult.confluence;
           confluenceLabel = buyResult.confluenceLabel;
           entryReason = buyResult.reason;
-        } else {
-          const sellResult = detect3BarPlaySell(bars, state);
-          if (sellResult.detected) {
-            detectedPattern = "3 Bar Play";
-            direction = "SHORT";
-            confluence = sellResult.confluence;
-            confluenceLabel = sellResult.confluenceLabel;
-            entryReason = sellResult.reason;
-          }
+        }
+      }
+      if (!detectedPattern && session.patterns.includes("3bar_short")) {
+        const sellResult = detect3BarPlaySell(bars, state);
+        if (sellResult.detected) {
+          detectedPattern = "3 Bar Play";
+          direction = "SHORT";
+          confluence = sellResult.confluence;
+          confluenceLabel = sellResult.confluenceLabel;
+          entryReason = sellResult.reason;
         }
       }
 
       if (!detectedPattern && session.patterns.includes("buysetup")) {
         const buy = detectBuySetup(bars, state);
         if (buy.detected) { detectedPattern = "Buy Setup"; direction = "LONG"; confluence = buy.confluence; confluenceLabel = buy.confluenceLabel; entryReason = buy.reason; }
-        else {
-          const sell = detectSellSetup(bars, state);
-          if (sell.detected) { detectedPattern = "Sell Setup"; direction = "SHORT"; confluence = sell.confluence; confluenceLabel = sell.confluenceLabel; entryReason = sell.reason; }
-        }
+      }
+      if (!detectedPattern && session.patterns.includes("sellsetup")) {
+        const sell = detectSellSetup(bars, state);
+        if (sell.detected) { detectedPattern = "Sell Setup"; direction = "SHORT"; confluence = sell.confluence; confluenceLabel = sell.confluenceLabel; entryReason = sell.reason; }
       }
 
-      if (!detectedPattern && session.patterns.includes("breakout")) {
+      if (!detectedPattern && session.patterns.includes("breakout_long")) {
         const bl = detectBreakoutLong(bars, state);
         if (bl.detected) { detectedPattern = "Pivot Breakout"; direction = "LONG"; confluence = bl.confluence; confluenceLabel = bl.confluenceLabel; entryReason = bl.reason; }
-        else {
-          const bs = detectBreakoutShort(bars, state);
-          if (bs.detected) { detectedPattern = "Pivot Breakout"; direction = "SHORT"; confluence = bs.confluence; confluenceLabel = bs.confluenceLabel; entryReason = bs.reason; }
-        }
+      }
+      if (!detectedPattern && session.patterns.includes("breakout_short")) {
+        const bs = detectBreakoutShort(bars, state);
+        if (bs.detected) { detectedPattern = "Pivot Breakout"; direction = "SHORT"; confluence = bs.confluence; confluenceLabel = bs.confluenceLabel; entryReason = bs.reason; }
       }
 
-      if (!detectedPattern && session.patterns.includes("climax")) {
+      if (!detectedPattern && session.patterns.includes("climax_long")) {
         const c = detectClimaxReversal(bars, state);
-        if (c.detected) { detectedPattern = "Climax Reversal"; direction = c.direction; confluence = c.confluence; confluenceLabel = c.confluenceLabel; entryReason = c.reason; }
+        if (c.detected && c.direction === "LONG") { detectedPattern = "Climax Reversal"; direction = "LONG"; confluence = c.confluence; confluenceLabel = c.confluenceLabel; entryReason = c.reason; }
+      }
+      if (!detectedPattern && session.patterns.includes("climax_short")) {
+        const c = detectClimaxReversal(bars, state);
+        if (c.detected && c.direction === "SHORT") { detectedPattern = "Climax Reversal"; direction = "SHORT"; confluence = c.confluence; confluenceLabel = c.confluenceLabel; entryReason = c.reason; }
       }
 
-      if (!detectedPattern && session.patterns.includes("mabounce")) {
+      if (!detectedPattern && session.patterns.includes("mabounce_long")) {
         const m = detectMABounce(bars, state);
-        if (m.detected) { detectedPattern = "MA Bounce"; direction = m.direction; confluence = m.confluence; confluenceLabel = m.confluenceLabel; entryReason = m.reason; }
+        if (m.detected && m.direction === "LONG") { detectedPattern = "MA Bounce"; direction = "LONG"; confluence = m.confluence; confluenceLabel = m.confluenceLabel; entryReason = m.reason; }
+      }
+      if (!detectedPattern && session.patterns.includes("mabounce_short")) {
+        const m = detectMABounce(bars, state);
+        if (m.detected && m.direction === "SHORT") { detectedPattern = "MA Bounce"; direction = "SHORT"; confluence = m.confluence; confluenceLabel = m.confluenceLabel; entryReason = m.reason; }
       }
 
       if (detectedPattern && !session.openTrades[tradeKey]) {
@@ -1353,6 +1362,21 @@ export function startTrader(config: {
     id: logIdCounter++, timestamp: getESTTime(),
     action: "TRADER STARTED", cumPnl: 0,
     dataSource: POLYGON_API_KEY ? "POLYGON" : "SIM",
+  }));
+
+  const patternNames: Record<string, string> = {
+    "3bar_long": "3Bar Long", "3bar_short": "3Bar Short",
+    "buysetup": "Buy Setup", "sellsetup": "Sell Setup",
+    "breakout_long": "Breakout Long", "breakout_short": "Breakout Short",
+    "climax_long": "Climax Long", "climax_short": "Climax Short",
+    "mabounce_long": "MA Bounce Long", "mabounce_short": "MA Bounce Short",
+  };
+  const enabledNames = config.patterns.map(p => patternNames[p] || p).join(", ");
+  const enabledTFs = config.timeframes.join(", ");
+  session.logs.push(makeLog({
+    id: logIdCounter++, timestamp: getESTTime(),
+    action: "SCANNING",
+    reason: `Enabled patterns: ${enabledNames} | Timeframes: ${enabledTFs}`,
   }));
 
   const delay = () => Math.floor(rand(8000, 15000));

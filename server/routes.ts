@@ -266,8 +266,33 @@ export async function registerRoutes(
     res.send([header, ...rows].join("\n"));
   });
 
-  app.get("/api/journal/analytics", (_req, res) => {
-    const entries = loadJournal();
+  app.get("/api/journal/analytics", (req, res) => {
+    let entries = loadJournal();
+    const patterns = req.query.patterns ? String(req.query.patterns).split(",") : null;
+    const timeframes = req.query.timeframes ? String(req.query.timeframes).split(",") : null;
+    if (patterns) {
+      const allowedCombos = new Set<string>();
+      const keyMap: Record<string, {pattern: string; direction: string}> = {
+        "3bar_long": {pattern: "3 Bar Play", direction: "LONG"},
+        "3bar_short": {pattern: "3 Bar Play", direction: "SHORT"},
+        "buysetup": {pattern: "Buy Setup", direction: "LONG"},
+        "sellsetup": {pattern: "Sell Setup", direction: "SHORT"},
+        "breakout_long": {pattern: "Pivot Breakout", direction: "LONG"},
+        "breakout_short": {pattern: "Pivot Breakout", direction: "SHORT"},
+        "climax_long": {pattern: "Climax Reversal", direction: "LONG"},
+        "climax_short": {pattern: "Climax Reversal", direction: "SHORT"},
+        "mabounce_long": {pattern: "MA Bounce", direction: "LONG"},
+        "mabounce_short": {pattern: "MA Bounce", direction: "SHORT"},
+      };
+      for (const p of patterns) {
+        const m = keyMap[p];
+        if (m) allowedCombos.add(`${m.pattern}|${m.direction}`);
+      }
+      entries = entries.filter(e => allowedCombos.has(`${e.pattern}|${e.direction}`));
+    }
+    if (timeframes) {
+      entries = entries.filter(e => timeframes.includes(e.timeframe));
+    }
     const analytics = getAdvancedAnalytics(entries);
     res.json(analytics);
   });

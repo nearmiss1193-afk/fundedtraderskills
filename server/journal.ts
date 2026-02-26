@@ -45,12 +45,14 @@ export interface TraderSettings {
   riskPct: number;
   rewardRatio: number;
   enabledPatterns: string[];
+  enabledTimeframes: string[];
 }
 
 const DEFAULT_SETTINGS: TraderSettings = {
   riskPct: 0.5,
   rewardRatio: 2,
-  enabledPatterns: ["3bar", "buysetup", "breakout", "climax", "mabounce"],
+  enabledPatterns: ["3bar_long", "3bar_short", "buysetup", "sellsetup", "breakout_long", "breakout_short", "climax_long", "climax_short", "mabounce_long", "mabounce_short"],
+  enabledTimeframes: ["2min", "5min", "15min", "1hour", "4hour", "daily"],
 };
 
 export function loadJournal(): JournalEntry[] {
@@ -118,11 +120,37 @@ export function clearJournal(): void {
   }
 }
 
+function migratePatternKeys(patterns: string[]): string[] {
+  const migrationMap: Record<string, string[]> = {
+    "3bar": ["3bar_long", "3bar_short"],
+    "buysetup": ["buysetup", "sellsetup"],
+    "breakout": ["breakout_long", "breakout_short"],
+    "climax": ["climax_long", "climax_short"],
+    "mabounce": ["mabounce_long", "mabounce_short"],
+  };
+  const newKeys = new Set<string>();
+  for (const p of patterns) {
+    if (migrationMap[p]) {
+      migrationMap[p].forEach(k => newKeys.add(k));
+    } else {
+      newKeys.add(p);
+    }
+  }
+  return [...newKeys];
+}
+
 export function loadSettings(): TraderSettings {
   ensureDataDir();
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8")) };
+      const raw = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
+      const legacyKeys = ["3bar", "breakout", "climax", "mabounce"];
+      const needsMigration = raw.enabledPatterns && raw.enabledPatterns.some((p: string) => legacyKeys.includes(p));
+      const missingNewKeys = raw.enabledPatterns && !raw.enabledPatterns.some((p: string) => p.includes("_long") || p.includes("_short") || p === "sellsetup");
+      if (needsMigration || missingNewKeys) {
+        raw.enabledPatterns = migratePatternKeys(raw.enabledPatterns);
+      }
+      return { ...DEFAULT_SETTINGS, ...raw };
     }
   } catch {}
   return { ...DEFAULT_SETTINGS };

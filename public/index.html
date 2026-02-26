@@ -839,12 +839,27 @@
         </select>
 
         <label>Core Patterns (Jared Wesley / Live Traders)</label>
-        <div class="check-group">
-          <label class="check-label"><input type="checkbox" name="pattern" value="3bar" checked /><span class="check-dot"></span><span>3 Bar Play (Long &amp; Short)</span></label>
-          <label class="check-label"><input type="checkbox" name="pattern" value="buysetup" checked /><span class="check-dot"></span><span>Buy / Sell Setup</span></label>
-          <label class="check-label"><input type="checkbox" name="pattern" value="breakout" checked /><span class="check-dot"></span><span>Pivot Breakout</span></label>
-          <label class="check-label"><input type="checkbox" name="pattern" value="climax" /><span class="check-dot"></span><span>Climax Reversal</span></label>
-          <label class="check-label"><input type="checkbox" name="pattern" value="mabounce" /><span class="check-dot"></span><span>MA Bounce</span></label>
+        <div class="check-group" style="flex-direction:column;gap:0.3rem;">
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="3bar_long" checked /><span class="check-dot"></span><span>3 Bar Play Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="3bar_short" checked /><span class="check-dot"></span><span>3 Bar Play Short</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="buysetup" checked /><span class="check-dot"></span><span>Buy Setup</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="sellsetup" checked /><span class="check-dot"></span><span>Sell Setup</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="breakout_long" checked /><span class="check-dot"></span><span>Breakout Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="breakout_short" checked /><span class="check-dot"></span><span>Breakout Short</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="climax_long" checked /><span class="check-dot"></span><span>Climax Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="climax_short" checked /><span class="check-dot"></span><span>Climax Short</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="mabounce_long" checked /><span class="check-dot"></span><span>MA Bounce Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="mabounce_short" checked /><span class="check-dot"></span><span>MA Bounce Short</span></label>
+          </div>
         </div>
 
         <label for="customCondition">Custom Buy Condition (optional)</label>
@@ -958,12 +973,37 @@
             </div>
           </div>
           <label style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:0.4rem;display:block;">Enabled Patterns</label>
+          <div class="check-group" style="margin-bottom:0.6rem;flex-direction:column;gap:0.25rem;">
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="3bar_long" checked /><span class="check-dot"></span><span>3 Bar Play Long</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="3bar_short" checked /><span class="check-dot"></span><span>3 Bar Play Short</span></label>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="buysetup" checked /><span class="check-dot"></span><span>Buy Setup</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="sellsetup" checked /><span class="check-dot"></span><span>Sell Setup</span></label>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="breakout_long" checked /><span class="check-dot"></span><span>Breakout Long</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="breakout_short" checked /><span class="check-dot"></span><span>Breakout Short</span></label>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="climax_long" checked /><span class="check-dot"></span><span>Climax Long</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="climax_short" checked /><span class="check-dot"></span><span>Climax Short</span></label>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="mabounce_long" checked /><span class="check-dot"></span><span>MA Bounce Long</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="mabounce_short" checked /><span class="check-dot"></span><span>MA Bounce Short</span></label>
+            </div>
+          </div>
+
+          <label style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:0.4rem;display:block;">Enabled Timeframes</label>
           <div class="check-group" style="margin-bottom:1rem;">
-            <label class="check-label"><input type="checkbox" name="set-pattern" value="3bar" checked /><span class="check-dot"></span><span>3 Bar Play</span></label>
-            <label class="check-label"><input type="checkbox" name="set-pattern" value="buysetup" checked /><span class="check-dot"></span><span>Buy/Sell Setup</span></label>
-            <label class="check-label"><input type="checkbox" name="set-pattern" value="breakout" checked /><span class="check-dot"></span><span>Pivot Breakout</span></label>
-            <label class="check-label"><input type="checkbox" name="set-pattern" value="climax" /><span class="check-dot"></span><span>Climax Reversal</span></label>
-            <label class="check-label"><input type="checkbox" name="set-pattern" value="mabounce" /><span class="check-dot"></span><span>MA Bounce</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="2min" checked /><span class="check-dot"></span><span>2 min</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="5min" checked /><span class="check-dot"></span><span>5 min</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="15min" checked /><span class="check-dot"></span><span>15 min</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="1hour" checked /><span class="check-dot"></span><span>1 hour</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="4hour" checked /><span class="check-dot"></span><span>4 hour</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="daily" checked /><span class="check-dot"></span><span>Daily</span></label>
           </div>
           <button class="btn-save-settings" onclick="saveTraderSettings()" data-testid="button-save-settings">Save Settings</button>
         </div>
@@ -1556,6 +1596,14 @@
             cb.checked = s.enabledPatterns.includes(cb.value);
           });
         }
+        if (s.enabledTimeframes) {
+          document.querySelectorAll('input[name="set-tf"]').forEach(cb => {
+            cb.checked = s.enabledTimeframes.includes(cb.value);
+          });
+          document.querySelectorAll('input[name="tf"]').forEach(cb => {
+            cb.checked = s.enabledTimeframes.includes(cb.value);
+          });
+        }
       } catch {}
     }
 
@@ -1563,15 +1611,21 @@
       const riskPct = parseFloat(document.getElementById('set-risk').value) || 0.5;
       const rewardRatio = parseFloat(document.getElementById('set-rr').value) || 2;
       const enabledPatterns = [...document.querySelectorAll('input[name="set-pattern"]:checked')].map(c => c.value);
+      const enabledTimeframes = [...document.querySelectorAll('input[name="set-tf"]:checked')].map(c => c.value);
+      if (!enabledPatterns.length) { showToast('Select at least one pattern'); return; }
+      if (!enabledTimeframes.length) { showToast('Select at least one timeframe'); return; }
       try {
         await fetch('/api/settings', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ riskPct, rewardRatio, enabledPatterns })
+          body: JSON.stringify({ riskPct, rewardRatio, enabledPatterns, enabledTimeframes })
         });
         document.getElementById('riskPct').value = riskPct;
         document.getElementById('rewardRatio').value = rewardRatio;
         document.querySelectorAll('input[name="pattern"]').forEach(cb => {
           cb.checked = enabledPatterns.includes(cb.value);
+        });
+        document.querySelectorAll('input[name="tf"]').forEach(cb => {
+          cb.checked = enabledTimeframes.includes(cb.value);
         });
         showToast('Settings saved');
       } catch { showToast('Failed to save settings'); }
@@ -1596,7 +1650,10 @@
     /* ========== Edge Builder ========== */
     async function loadEdgeBuilder() {
       try {
-        const d = await (await fetch('/api/journal/analytics')).json();
+        const ep = [...document.querySelectorAll('input[name="set-pattern"]:checked')].map(c => c.value).join(',');
+        const et = [...document.querySelectorAll('input[name="set-tf"]:checked')].map(c => c.value).join(',');
+        const qs = ep || et ? `?patterns=${encodeURIComponent(ep)}&timeframes=${encodeURIComponent(et)}` : '';
+        const d = await (await fetch('/api/journal/analytics' + qs)).json();
         renderEdgeOverall(d.overall);
         renderEdgeGroupTable('edge-pattern-body', d.byPattern);
         renderEdgeGroupTable('edge-symbol-body', d.bySymbol);
