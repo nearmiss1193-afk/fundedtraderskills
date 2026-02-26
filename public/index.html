@@ -37,11 +37,44 @@
     }
 
     .container {
-      max-width: 620px;
+      max-width: 660px;
       margin: -2rem auto 3rem;
       padding: 0 1rem;
     }
 
+    /* --- Tabs --- */
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 0.7rem 0.5rem;
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 700;
+      border: 2px solid #e0dce8;
+      border-radius: 10px;
+      background: #fff;
+      color: #555;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+
+    .tab-btn.active {
+      border-color: #7c3aed;
+      color: #7c3aed;
+      background: #f5f0ff;
+    }
+
+    .tab-btn:hover:not(.active) { border-color: #bbb; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* --- Card --- */
     .card {
       background: #fff;
       border-radius: 12px;
@@ -53,13 +86,21 @@
     .card h2 {
       font-size: 1.15rem;
       font-weight: 700;
-      margin-bottom: 1.25rem;
+      margin-bottom: 0.25rem;
       color: #1a1a2e;
     }
 
+    .card .card-sub {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 1.25rem;
+      line-height: 1.4;
+    }
+
+    /* --- Form Controls --- */
     label {
       display: block;
-      font-size: 0.82rem;
+      font-size: 0.78rem;
       font-weight: 600;
       color: #555;
       margin-bottom: 0.3rem;
@@ -67,7 +108,7 @@
       letter-spacing: 0.04em;
     }
 
-    input, textarea {
+    input, textarea, select {
       width: 100%;
       padding: 0.7rem 0.85rem;
       border: 1.5px solid #ddd;
@@ -78,9 +119,15 @@
       background: #fafafa;
       transition: border-color 0.15s, box-shadow 0.15s;
       margin-bottom: 1rem;
+      -webkit-appearance: none;
     }
 
-    input:focus, textarea:focus {
+    select {
+      background: #fafafa url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.85rem center;
+      padding-right: 2.5rem;
+    }
+
+    input:focus, textarea:focus, select:focus {
       outline: none;
       border-color: #7c3aed;
       box-shadow: 0 0 0 3px rgba(124,58,237,0.12);
@@ -104,14 +151,12 @@
       transition: background 0.15s, transform 0.1s;
     }
 
-    .btn-create {
-      background: #16a34a;
-      color: #fff;
-    }
-
+    .btn-create { background: #16a34a; color: #fff; }
     .btn-create:hover { background: #15803d; }
     .btn-create:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
+    /* --- Skills List --- */
     .skill-list { list-style: none; }
 
     .skill-item {
@@ -126,8 +171,7 @@
 
     .skill-number {
       flex-shrink: 0;
-      width: 28px;
-      height: 28px;
+      width: 28px; height: 28px;
       border-radius: 50%;
       background: #ede9fe;
       color: #7c3aed;
@@ -140,25 +184,9 @@
     }
 
     .skill-info { flex: 1; min-width: 0; }
-
-    .skill-name {
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: #1a1a2e;
-    }
-
-    .skill-desc {
-      font-size: 0.85rem;
-      color: #666;
-      margin-top: 0.15rem;
-      line-height: 1.4;
-    }
-
-    .skill-time {
-      font-size: 0.72rem;
-      color: #aaa;
-      margin-top: 0.25rem;
-    }
+    .skill-name { font-weight: 700; font-size: 0.95rem; color: #1a1a2e; }
+    .skill-desc { font-size: 0.85rem; color: #666; margin-top: 0.15rem; line-height: 1.4; }
+    .skill-time { font-size: 0.72rem; color: #aaa; margin-top: 0.25rem; }
 
     .empty {
       text-align: center;
@@ -167,6 +195,101 @@
       font-size: 0.9rem;
     }
 
+    /* --- Permit Results --- */
+    .permit-results { display: none; }
+    .permit-results.visible { display: block; }
+
+    .permit-section {
+      margin-bottom: 1.25rem;
+    }
+
+    .permit-section:last-child { margin-bottom: 0; }
+
+    .permit-section h3 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #7c3aed;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .permit-section ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .permit-section ul li {
+      padding: 0.4rem 0 0.4rem 1.25rem;
+      position: relative;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #333;
+    }
+
+    .permit-section ul li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0.65rem;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #7c3aed;
+    }
+
+    .permit-section ul.notes-list li::before { background: #f59e0b; }
+    .permit-section ul.steps-list li::before { background: #16a34a; }
+
+    .permit-meta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+
+    .meta-badge {
+      flex: 1;
+      min-width: 140px;
+      background: #f5f0ff;
+      border: 1px solid #e8e0f5;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      text-align: center;
+    }
+
+    .meta-badge .meta-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #888;
+      margin-bottom: 0.2rem;
+    }
+
+    .meta-badge .meta-value {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #1a1a2e;
+    }
+
+    .links-list a {
+      color: #7c3aed;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .links-list a:hover { text-decoration: underline; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #eee;
+      margin: 1.25rem 0;
+    }
+
+    /* --- Toast --- */
     .toast {
       position: fixed;
       bottom: 1.5rem;
@@ -197,37 +320,101 @@
   </header>
 
   <div class="container">
-    <div class="card">
-      <h2>Create a Skill</h2>
-      <form id="skill-form">
-        <label for="name">Skill Name</label>
-        <input id="name" type="text" placeholder="e.g. Blog Post Writer" required />
-        <label for="description">Description</label>
-        <textarea id="description" placeholder="What does this skill do?"></textarea>
-        <button type="submit" class="btn btn-create">Create Skill &amp; Test</button>
-      </form>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="create" onclick="switchTab('create')">Create a Skill</button>
+      <button class="tab-btn" data-tab="permit" onclick="switchTab('permit')">Florida Permit Checker</button>
     </div>
 
-    <div class="card">
-      <h2>Skills Created</h2>
-      <ul id="skill-list" class="skill-list">
-        <li class="empty">No skills yet. Create your first one above.</li>
-      </ul>
+    <!-- TAB 1: Create a Skill -->
+    <div id="panel-create" class="tab-panel active">
+      <div class="card">
+        <h2>Create a Skill</h2>
+        <form id="skill-form">
+          <label for="name">Skill Name</label>
+          <input id="name" type="text" placeholder="e.g. Blog Post Writer" required />
+          <label for="description">Description</label>
+          <textarea id="description" placeholder="What does this skill do?"></textarea>
+          <button type="submit" class="btn btn-create">Create Skill &amp; Test</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Skills Created</h2>
+        <ul id="skill-list" class="skill-list">
+          <li class="empty">No skills yet. Create your first one above.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- TAB 2: Florida Permit Checker -->
+    <div id="panel-permit" class="tab-panel">
+      <div class="card">
+        <h2>Florida Permit Checker</h2>
+        <p class="card-sub">Find out exactly which permits you need for your renovation in Central Florida. Built for investors flipping houses in Lakeland, Orlando &amp; surrounding counties.</p>
+        <form id="permit-form">
+          <label for="renovationType">Renovation Type</label>
+          <select id="renovationType" required>
+            <option value="">Select renovation...</option>
+            <option value="kitchen">Kitchen Remodel</option>
+            <option value="bathroom">Bathroom Remodel</option>
+            <option value="roof">Roof Replacement</option>
+            <option value="addition">Room Addition</option>
+            <option value="pool">Pool Installation</option>
+            <option value="electrical">Electrical Upgrade</option>
+            <option value="plumbing">Plumbing Upgrade</option>
+            <option value="other">Other</option>
+          </select>
+
+          <label for="propertyType">Property Type</label>
+          <select id="propertyType" required>
+            <option value="">Select property type...</option>
+            <option value="single_family">Single Family</option>
+            <option value="multifamily">Multifamily</option>
+            <option value="commercial">Commercial</option>
+          </select>
+
+          <label for="county">County</label>
+          <select id="county" required>
+            <option value="">Select county...</option>
+            <option value="polk">Polk County / Lakeland</option>
+            <option value="orange">Orange County / Orlando</option>
+            <option value="hillsborough">Hillsborough County</option>
+            <option value="pasco">Pasco County</option>
+            <option value="other">Other Florida County</option>
+          </select>
+
+          <label for="details">Additional Details (optional)</label>
+          <textarea id="details" placeholder="e.g. Moving gas line, adding a second story, polybutylene re-pipe..."></textarea>
+
+          <button type="submit" class="btn btn-create">Check Required Permits</button>
+        </form>
+      </div>
+
+      <div id="permit-results" class="permit-results">
+        <div class="card" id="permit-output"></div>
+      </div>
     </div>
   </div>
 
   <div id="toast" class="toast"></div>
 
   <script>
-    const form = document.getElementById('skill-form');
-    const list = document.getElementById('skill-list');
-    const toast = document.getElementById('toast');
+    /* --- Tabs --- */
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+    }
 
+    /* --- Toast --- */
+    const toast = document.getElementById('toast');
     function showToast(msg) {
       toast.textContent = msg;
       toast.classList.add('show');
       setTimeout(() => toast.classList.remove('show'), 2500);
     }
+
+    /* --- Skills Tab --- */
+    const form = document.getElementById('skill-form');
+    const list = document.getElementById('skill-list');
 
     function timeAgo(date) {
       const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
@@ -235,8 +422,13 @@
       if (s < 60) return s + 's ago';
       const m = Math.floor(s / 60);
       if (m < 60) return m + 'm ago';
-      const h = Math.floor(m / 60);
-      return h + 'h ago';
+      return Math.floor(m / 60) + 'h ago';
+    }
+
+    function esc(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
     }
 
     function renderSkills(skills) {
@@ -248,8 +440,8 @@
         `<li class="skill-item">
           <span class="skill-number">${i + 1}</span>
           <div class="skill-info">
-            <div class="skill-name">${s.name}</div>
-            ${s.description ? `<div class="skill-desc">${s.description}</div>` : ''}
+            <div class="skill-name">${esc(s.name)}</div>
+            ${s.description ? `<div class="skill-desc">${esc(s.description)}</div>` : ''}
             <div class="skill-time">${timeAgo(s.createdAt)}</div>
           </div>
         </li>`
@@ -259,11 +451,8 @@
     async function loadSkills() {
       try {
         const res = await fetch('/api/skills');
-        const skills = await res.json();
-        renderSkills(skills);
-      } catch (e) {
-        console.error('Failed to load skills', e);
-      }
+        renderSkills(await res.json());
+      } catch (e) { console.error(e); }
     }
 
     form.addEventListener('submit', async (e) => {
@@ -271,7 +460,6 @@
       const name = document.getElementById('name').value.trim();
       const description = document.getElementById('description').value.trim();
       if (!name) return;
-
       try {
         const res = await fetch('/api/create-skill', {
           method: 'POST',
@@ -279,20 +467,89 @@
           body: JSON.stringify({ name, description })
         });
         const data = await res.json();
-        if (data.success) {
-          showToast('Skill created!');
-          form.reset();
-          loadSkills();
-        } else {
-          showToast('Error: ' + (data.error || 'Failed'));
-        }
-      } catch (err) {
-        showToast('Network error');
-      }
+        if (data.success) { showToast('Skill created!'); form.reset(); loadSkills(); }
+        else showToast('Error: ' + (data.error || 'Failed'));
+      } catch { showToast('Network error'); }
     });
 
     loadSkills();
     setInterval(loadSkills, 5000);
+
+    /* --- Permit Checker Tab --- */
+    const permitForm = document.getElementById('permit-form');
+    const permitResults = document.getElementById('permit-results');
+    const permitOutput = document.getElementById('permit-output');
+
+    permitForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = permitForm.querySelector('button');
+      btn.disabled = true;
+      btn.textContent = 'Checking...';
+
+      const body = {
+        renovationType: document.getElementById('renovationType').value,
+        propertyType: document.getElementById('propertyType').value,
+        county: document.getElementById('county').value,
+        details: document.getElementById('details').value,
+      };
+
+      try {
+        const res = await fetch('/api/florida-permit-checker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+          showToast('Error: ' + (data.error || 'Check failed'));
+          btn.disabled = false;
+          btn.textContent = 'Check Required Permits';
+          return;
+        }
+
+        let html = '';
+
+        html += `<h2>Permit Report</h2>`;
+        html += `<div class="permit-meta">
+          <div class="meta-badge"><div class="meta-label">Estimated Fees</div><div class="meta-value">${esc(data.estimatedFees)}</div></div>
+          <div class="meta-badge"><div class="meta-label">Approval Time</div><div class="meta-value">${esc(data.approvalTime)}</div></div>
+        </div>`;
+
+        html += `<div class="permit-section"><h3>Required Permits</h3><ul>`;
+        data.permits.forEach(p => { html += `<li>${esc(p)}</li>`; });
+        html += `</ul></div>`;
+
+        html += `<hr class="divider">`;
+
+        html += `<div class="permit-section"><h3>Important Notes</h3><ul class="notes-list">`;
+        data.notes.forEach(n => { html += `<li>${esc(n)}</li>`; });
+        html += `</ul></div>`;
+
+        html += `<hr class="divider">`;
+
+        html += `<div class="permit-section"><h3>Next Steps</h3><ul class="steps-list">`;
+        data.nextSteps.forEach(s => { html += `<li>${esc(s)}</li>`; });
+        html += `</ul></div>`;
+
+        html += `<hr class="divider">`;
+
+        html += `<div class="permit-section"><h3>Official Resources</h3><ul class="links-list">`;
+        data.officialLinks.forEach(l => { html += `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a></li>`; });
+        html += `</ul></div>`;
+
+        permitOutput.innerHTML = html;
+        permitResults.classList.add('visible');
+        showToast('Permit report ready!');
+        permitResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      } catch {
+        showToast('Network error');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Check Required Permits';
+    });
   </script>
 </body>
 </html>
