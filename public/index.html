@@ -379,6 +379,7 @@
     .log-action.stopped { color: #ef4444; }
     .log-action.target { color: #22c55e; }
     .log-action.signal { color: #6366f1; }
+    .log-action.scanning { color: #4b5563; font-weight: 500; }
     .log-action.system { color: #6b7280; }
 
     .log-detail { color: #8b92a5; font-size: 0.68rem; }
@@ -404,6 +405,9 @@
     .log-sent.greed { background: rgba(34,197,94,0.1); color: #4ade80; }
     .log-sent.fear { background: rgba(239,68,68,0.1); color: #f87171; }
     .log-sent.neutral { background: rgba(107,114,128,0.08); color: #6b7280; }
+    .log-src { font-size: 0.58rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; display: inline-block; margin-left: 2px; }
+    .log-src.polygon { background: rgba(99,102,241,0.15); color: #818cf8; }
+    .log-src.sim { background: rgba(107,114,128,0.1); color: #6b7280; }
 
     .log-empty { padding: 2.5rem; text-align: center; color: #3a3e4d; font-size: 0.82rem; }
 
@@ -524,8 +528,15 @@
         </div>
 
         <label>Trading Hours</label>
-        <div style="font-size:0.85rem; color:#6b7280; margin-bottom:1rem; padding:0.5rem 0.75rem; background:#181b27; border-radius:8px; border:1px solid #2a2e3d;">
+        <div style="font-size:0.85rem; color:#6b7280; margin-bottom:0.5rem; padding:0.5rem 0.75rem; background:#181b27; border-radius:8px; border:1px solid #2a2e3d;">
           9:30 AM &ndash; 4:00 PM EST (Regular Trading Hours)
+        </div>
+        <div class="check-group" style="margin-bottom:1rem;">
+          <label class="check-label" style="border-color:#f59e0b33;">
+            <input type="checkbox" id="forceTrading" data-testid="checkbox-force-trading" />
+            <span class="check-dot"></span>
+            <span style="color:#f59e0b;">Force Trading (ignore time window)</span>
+          </label>
         </div>
 
         <label for="riskPct">Risk Per Trade (% of Account)</label>
@@ -645,7 +656,10 @@
         const d = await (await fetch('/api/trader/status')).json();
         const badge = document.getElementById('trader-status-badge');
         const text = document.getElementById('trader-status-text');
-        if (d.tradingOpen) {
+        if (d.forceActive) {
+          badge.className = 'trading-status open';
+          text.textContent = 'FORCE TRADING ACTIVE (time window bypassed)';
+        } else if (d.tradingOpen) {
           badge.className = 'trading-status open';
           text.textContent = 'Trading window OPEN (9:30 AM - 4:00 PM EST)';
         } else {
@@ -668,6 +682,7 @@
       const patterns = getChecked('pattern');
       const riskPct = parseFloat(document.getElementById('riskPct').value) || 0.5;
       const customCondition = document.getElementById('customCondition').value;
+      const forceTrading = document.getElementById('forceTrading').checked;
 
       if (!markets.length) { showToast('Select at least one market'); return; }
       if (!timeframes.length) { showToast('Select at least one timeframe'); return; }
@@ -677,7 +692,7 @@
       document.getElementById('btn-stop-trader').disabled = false;
 
       try {
-        const d = await (await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskPct,patterns,customCondition}) })).json();
+        const d = await (await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskPct,patterns,customCondition,forceTrading}) })).json();
         if (d.success) {
           traderSessionId = d.sessionId;
           lastLogId = 0;
@@ -710,6 +725,7 @@
       if (action === 'STOPPED OUT') return 'stopped';
       if (action === 'TARGET HIT') return 'target';
       if (action.startsWith('SIGNAL')) return 'signal';
+      if (action === 'SCANNING') return 'scanning';
       return 'system';
     }
 
@@ -738,6 +754,12 @@
       return `<span class="log-sent ${cls}">${s}</span>`;
     }
 
+    function srcTag(s) {
+      if (!s) return '';
+      const cls = s === 'POLYGON' ? 'polygon' : 'sim';
+      return `<span class="log-src ${cls}">${s}</span>`;
+    }
+
     function buildLogDetail(log) {
       let html = '';
       if (log.entry !== null) {
@@ -755,6 +777,7 @@
       html += biasTag(log.bias);
       html += confTag(log.confluence);
       html += sentTag(log.sentiment);
+      html += srcTag(log.dataSource);
       return html;
     }
 

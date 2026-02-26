@@ -1,3 +1,83 @@
+const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
+const POLYGON_BASE = "https://api.polygon.io";
+
+interface PolygonPrice {
+  price: number;
+  volume: number;
+  timestamp: number;
+}
+
+const lastPolygonFetch: Record<string, { price: PolygonPrice; fetchedAt: number }> = {};
+
+const SPY_TO_ES_RATIO = 7.8;
+let polygonErrorCount = 0;
+let polygonBackoffUntil = 0;
+
+function fetchWithTimeout(url: string, timeoutMs = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
+}
+
+async function fetchPolygonPrice(market: string): Promise<PolygonPrice | null> {
+  if (!POLYGON_API_KEY) return null;
+
+  const now = Date.now();
+  if (now < polygonBackoffUntil) return null;
+
+  const cacheKey = "SPY_BASE";
+  const cached = lastPolygonFetch[cacheKey];
+  if (cached && now - cached.fetchedAt < 6000) {
+    const esPrice = r2(cached.price.price * SPY_TO_ES_RATIO);
+    return { price: esPrice, volume: cached.price.volume, timestamp: now };
+  }
+
+  try {
+    const tradeUrl = `${POLYGON_BASE}/v2/last/trade/SPY?apiKey=${POLYGON_API_KEY}`;
+    const resp = await fetchWithTimeout(tradeUrl);
+    if (resp.status === 429) {
+      polygonErrorCount++;
+      polygonBackoffUntil = now + Math.min(60000, polygonErrorCount * 15000);
+      return null;
+    }
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data?.results?.p) {
+        polygonErrorCount = 0;
+        const spyPrice = data.results.p;
+        const volume = 5000;
+        lastPolygonFetch[cacheKey] = { price: { price: spyPrice, volume, timestamp: now }, fetchedAt: now };
+        const esPrice = r2(spyPrice * SPY_TO_ES_RATIO);
+        return { price: esPrice, volume, timestamp: now };
+      }
+    }
+  } catch {}
+
+  try {
+    const aggUrl = `${POLYGON_BASE}/v2/aggs/ticker/SPY/prev?adjusted=true&apiKey=${POLYGON_API_KEY}`;
+    const resp = await fetchWithTimeout(aggUrl);
+    if (resp.status === 429) {
+      polygonErrorCount++;
+      polygonBackoffUntil = now + Math.min(60000, polygonErrorCount * 15000);
+      return null;
+    }
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data?.results?.length > 0) {
+        polygonErrorCount = 0;
+        const r = data.results[0];
+        const spyPrice = r.c;
+        const volume = Math.round((r.v || 50000) / 100);
+        lastPolygonFetch[cacheKey] = { price: { price: spyPrice, volume, timestamp: now }, fetchedAt: now };
+        const esPrice = r2(spyPrice * SPY_TO_ES_RATIO);
+        return { price: esPrice, volume, timestamp: now };
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
 interface TradeLog {
   id: number;
   timestamp: string;
@@ -15,6 +95,7 @@ interface TradeLog {
   bias: string | null;
   confluence: number | null;
   sentiment: string | null;
+  dataSource: string | null;
 }
 
 interface Bar {
@@ -66,6 +147,7 @@ interface TraderSession {
   riskPct: number;
   patterns: string[];
   customCondition: string;
+  forceTrading: boolean;
   logs: TradeLog[];
   cumPnl: number;
   timeout: ReturnType<typeof setTimeout> | null;
@@ -133,10 +215,50 @@ function initMarketState(market: string): MarketState {
   };
 }
 
-function generateBar(state: MarketState): Bar {
+function generateBar(state: MarketState, livePrice?: PolygonPrice | null): Bar {
   state.trendDuration++;
   state.pivotHighAge++;
   state.pivotLowAge++;
+
+  if (livePrice) {
+    const basePrice = livePrice.price;
+    const open = state.price;
+    const tickNoise = rand(-2.5, 2.5) * (state.volatility || 1.0);
+    const close = r2(basePrice + tickNoise);
+    const volume = Math.round(livePrice.volume / 500) || Math.round(rand(800, 3000));
+    const move = close - open;
+
+    if (state.trendDuration > rand(12, 35)) {
+      state.volatility = rand(0.5, 2.0);
+      state.trendDuration = 0;
+    }
+
+    if (move > 0.5) state.bias = "UPTREND";
+    else if (move < -0.5) state.bias = "DOWNTREND";
+    else state.bias = "SIDEWAYS";
+    state.biasStrength = Math.min(1.0, Math.abs(move) / 5);
+
+    const bar = makeBar(open, close, volume);
+
+    state.price = close;
+    state.ema21 = r2((state.ema21 * 20 + close) / 21);
+    state.sma200 = r2((state.sma200 * 199 + close) / 200);
+    state.avgVolume = Math.round((state.avgVolume * 14 + volume) / 15);
+
+    if (bar.high > state.pivotHigh) { state.pivotHigh = bar.high; state.pivotHighAge = 0; }
+    if (bar.low < state.pivotLow) { state.pivotLow = bar.low; state.pivotLowAge = 0; }
+    if (Math.random() < 0.06) { state.pivotHigh = bar.high; state.pivotHighAge = 0; }
+    if (Math.random() < 0.06) { state.pivotLow = bar.low; state.pivotLowAge = 0; }
+
+    if (bar.bullish === state.lastBarDirection) { state.consecutiveBars++; }
+    else { state.consecutiveBars = 1; state.lastBarDirection = bar.bullish; }
+
+    if (state.consecutiveBars >= 3 && bar.bullish) state.sentiment = "BUYERS_CONTROL";
+    else if (state.consecutiveBars >= 3 && !bar.bullish) state.sentiment = "SELLERS_CONTROL";
+    else if (state.consecutiveBars < 2) state.sentiment = "NEUTRAL";
+
+    return bar;
+  }
 
   if (state.trendDuration > rand(12, 35)) {
     const biases: Array<"UPTREND" | "DOWNTREND" | "SIDEWAYS"> = ["UPTREND", "DOWNTREND", "SIDEWAYS"];
@@ -402,9 +524,9 @@ function sentimentLabel(s: MarketState): string {
   return "NEUTRAL";
 }
 
-function simulateTick(session: TraderSession) {
+async function simulateTick(session: TraderSession) {
   const ts = getESTTime();
-  if (!isTradingHours()) {
+  if (!isTradingHours() && !session.forceTrading) {
     if (session.logs.length === 0 || session.logs[session.logs.length - 1].action !== "MARKET CLOSED") {
       session.logs.push({
         id: logIdCounter++, timestamp: ts,
@@ -412,7 +534,7 @@ function simulateTick(session: TraderSession) {
         action: "MARKET CLOSED", direction: "--",
         entry: null, stop: null, target: null, pnl: null,
         cumPnl: session.cumPnl, volume: null, bias: null,
-        confluence: null, sentiment: null,
+        confluence: null, sentiment: null, dataSource: null,
       });
     }
     return;
@@ -422,13 +544,28 @@ function simulateTick(session: TraderSession) {
     const mk = market === "MES" ? "MES" : "ES";
     const pointValue = mk === "ES" ? 50 : 5;
 
-    if (!session.marketState[mk]) session.marketState[mk] = initMarketState(mk);
+    const livePrice = await fetchPolygonPrice(mk);
+    const dataSource = livePrice ? "POLYGON" : "SIM";
+
+    if (!session.marketState[mk]) {
+      if (livePrice) {
+        const s = initMarketState(mk);
+        s.price = r2(livePrice.price);
+        s.ema21 = s.price;
+        s.sma200 = s.price;
+        s.pivotHigh = r2(s.price + rand(3, 10));
+        s.pivotLow = r2(s.price - rand(3, 10));
+        session.marketState[mk] = s;
+      } else {
+        session.marketState[mk] = initMarketState(mk);
+      }
+    }
     const state = session.marketState[mk];
     const tradeKey = mk;
 
     if (session.openTrades[tradeKey]) {
       const t = session.openTrades[tradeKey];
-      const bar = generateBar(state);
+      const bar = generateBar(state, livePrice);
 
       let hit = false;
       if (t.direction === "LONG") {
@@ -436,13 +573,13 @@ function simulateTick(session: TraderSession) {
           const pnl = r2((t.stop - t.entry) * pointValue);
           session.cumPnl = r2(session.cumPnl + pnl);
           session.losses++;
-          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "STOPPED OUT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state) });
+          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "STOPPED OUT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state), dataSource });
           delete session.openTrades[tradeKey]; hit = true;
         } else if (bar.high >= t.target) {
           const pnl = r2((t.target - t.entry) * pointValue);
           session.cumPnl = r2(session.cumPnl + pnl);
           session.wins++;
-          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "TARGET HIT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state) });
+          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "TARGET HIT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state), dataSource });
           delete session.openTrades[tradeKey]; hit = true;
         }
       } else {
@@ -450,13 +587,13 @@ function simulateTick(session: TraderSession) {
           const pnl = r2((t.entry - t.stop) * pointValue);
           session.cumPnl = r2(session.cumPnl + pnl);
           session.losses++;
-          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "STOPPED OUT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state) });
+          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "STOPPED OUT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state), dataSource });
           delete session.openTrades[tradeKey]; hit = true;
         } else if (bar.low <= t.target) {
           const pnl = r2((t.entry - t.target) * pointValue);
           session.cumPnl = r2(session.cumPnl + pnl);
           session.wins++;
-          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "TARGET HIT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state) });
+          session.logs.push({ id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe, pattern: t.pattern, action: "TARGET HIT", direction: t.direction, entry: t.entry, stop: t.stop, target: t.target, pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias, confluence: null, sentiment: sentimentLabel(state), dataSource });
           delete session.openTrades[tradeKey]; hit = true;
         }
       }
@@ -470,7 +607,7 @@ function simulateTick(session: TraderSession) {
       session.tickCount[barKey]++;
       if (session.tickCount[barKey] % (TF_TICKS[tf] || 1) !== 0) continue;
 
-      const bar = generateBar(state);
+      const bar = generateBar(state, livePrice);
       session.bars[barKey].push(bar);
       if (session.bars[barKey].length > 30) session.bars[barKey].shift();
 
@@ -558,7 +695,7 @@ function simulateTick(session: TraderSession) {
             id: logIdCounter++, timestamp: ts, market: mk, timeframe: tf, pattern: detectedPattern,
             action: direction === "LONG" ? "LONG ENTERED" : "SHORT ENTERED", direction,
             entry, stop, target, pnl: null, cumPnl: session.cumPnl,
-            volume: bar.volume, bias: state.bias, confluence, sentiment: sentimentLabel(state),
+            volume: bar.volume, bias: state.bias, confluence, sentiment: sentimentLabel(state), dataSource,
           });
           break;
         }
@@ -569,10 +706,22 @@ function simulateTick(session: TraderSession) {
             action: "SIGNAL (no entry)", direction,
             entry: state.price, stop: null, target: null,
             pnl: null, cumPnl: session.cumPnl,
-            volume: bar.volume, bias: state.bias, confluence, sentiment: sentimentLabel(state),
+            volume: bar.volume, bias: state.bias, confluence, sentiment: sentimentLabel(state), dataSource,
           });
         }
       }
+    }
+
+    const lastScan = session.logs[session.logs.length - 1];
+    const isScanDue = !lastScan || lastScan.action === "TRADER STARTED" || lastScan.market !== mk || lastScan.action !== "SCANNING";
+    if (isScanDue && !session.openTrades[tradeKey]) {
+      session.logs.push({
+        id: logIdCounter++, timestamp: ts, market: mk, timeframe: "--", pattern: "--",
+        action: "SCANNING", direction: "--",
+        entry: state.price, stop: null, target: null,
+        pnl: null, cumPnl: session.cumPnl,
+        volume: null, bias: state.bias, confluence: null, sentiment: sentimentLabel(state), dataSource,
+      });
     }
   }
 
@@ -585,6 +734,7 @@ export function startTrader(config: {
   riskPct: number;
   patterns: string[];
   customCondition: string;
+  forceTrading: boolean;
 }): string {
   const id = "session_" + Date.now();
   const session: TraderSession = {
@@ -592,6 +742,7 @@ export function startTrader(config: {
     markets: config.markets, timeframes: config.timeframes,
     riskPct: config.riskPct, patterns: config.patterns,
     customCondition: config.customCondition,
+    forceTrading: config.forceTrading || false,
     logs: [], cumPnl: 0, timeout: null,
     marketState: {}, bars: {}, tickCount: {},
     openTrades: {}, createdAt: Date.now(),
@@ -604,13 +755,17 @@ export function startTrader(config: {
     action: "TRADER STARTED", direction: "--",
     entry: null, stop: null, target: null, pnl: null, cumPnl: 0,
     volume: null, bias: null, confluence: null, sentiment: null,
+    dataSource: POLYGON_API_KEY ? "POLYGON" : "SIM",
   });
 
   const delay = () => Math.floor(rand(8000, 15000));
   function loop() {
     if (!session.running) return;
-    simulateTick(session);
-    session.timeout = setTimeout(loop, delay());
+    simulateTick(session).then(() => {
+      if (session.running) session.timeout = setTimeout(loop, delay());
+    }).catch(() => {
+      if (session.running) session.timeout = setTimeout(loop, delay());
+    });
   }
   session.timeout = setTimeout(loop, 2000);
   sessions[id] = session;
@@ -628,6 +783,7 @@ export function stopTrader(id: string): boolean {
     action: "TRADER STOPPED", direction: "--",
     entry: null, stop: null, target: null, pnl: null, cumPnl: s.cumPnl,
     volume: null, bias: null, confluence: null, sentiment: null,
+    dataSource: null,
   });
   return true;
 }
@@ -651,3 +807,7 @@ export function getTraderStatus(id: string): { running: boolean; cumPnl: number;
 }
 
 export function isTradingOpen(): boolean { return isTradingHours(); }
+
+export function isForceTradeActive(): boolean {
+  return Object.values(sessions).some(s => s.running && s.forceTrading);
+}

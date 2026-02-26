@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { type Server } from "http";
 import path from "path";
 import express from "express";
-import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen } from "./trader";
+import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive } from "./trader";
 
 let skills: any[] = [];
 
@@ -191,15 +191,15 @@ export async function registerRoutes(
   });
 
   app.get("/api/trader/status", (_req, res) => {
-    res.json({ tradingOpen: isTradingOpen() });
+    res.json({ tradingOpen: isTradingOpen(), forceActive: isForceTradeActive() });
   });
 
   app.post("/api/trader/start", (req, res) => {
-    const { markets, timeframes, riskPct, patterns, customCondition } = req.body;
+    const { markets, timeframes, riskPct, patterns, customCondition, forceTrading } = req.body;
     if (!markets?.length || !timeframes?.length || !patterns?.length) {
       return res.status(400).json({ error: "markets, timeframes, and patterns are required." });
     }
-    const sessionId = startTrader({ markets, timeframes, riskPct: riskPct || 0.5, patterns, customCondition: customCondition || "" });
+    const sessionId = startTrader({ markets, timeframes, riskPct: riskPct || 0.5, patterns, customCondition: customCondition || "", forceTrading: !!forceTrading });
     res.json({ success: true, sessionId });
   });
 
