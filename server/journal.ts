@@ -215,27 +215,60 @@ export function getAdvancedAnalytics(entries: JournalEntry[]) {
   const totalPnl = Math.round(entries.reduce((s, e) => s + e.pnlDollars, 0) * 100) / 100;
 
   const recommendations: string[] = [];
+
+  const ptCross: Record<string, JournalEntry[]> = {};
+  entries.forEach(e => {
+    const key = `${e.timeframe} ${e.pattern}`;
+    (ptCross[key] = ptCross[key] || []).push(e);
+  });
+  const ptStats = Object.entries(ptCross).map(([key, trades]) => {
+    const wins = trades.filter(t => t.outcome === "WIN").length;
+    const wr = Math.round((wins / trades.length) * 1000) / 10;
+    const pnl = Math.round(trades.reduce((s, t) => s + t.pnlDollars, 0) * 100) / 100;
+    return { name: key, trades: trades.length, winRate: wr, totalPnl: pnl };
+  });
+  ptStats.filter(s => s.trades >= 5 && s.winRate >= 60).sort((a, b) => b.winRate - a.winRate).slice(0, 3).forEach(s => {
+    recommendations.push(`Increase size on ${s.name} \u2014 ${s.winRate}% win rate over ${s.trades} trades (+$${s.totalPnl})`);
+  });
+  ptStats.filter(s => s.trades >= 5 && s.winRate < 30).sort((a, b) => a.winRate - b.winRate).slice(0, 2).forEach(s => {
+    recommendations.push(`Stop trading ${s.name} \u2014 only ${s.winRate}% win rate over ${s.trades} trades ($${s.totalPnl})`);
+  });
+
   byPattern.forEach(p => {
     if (p.trades >= 3 && p.winRate >= 65) {
-      recommendations.push(`Increase size on ${p.name} - ${p.winRate}% win rate over ${p.trades} trades`);
+      recommendations.push(`${p.name} is a strong edge \u2014 ${p.winRate}% win rate over ${p.trades} trades`);
     }
-    if (p.trades >= 3 && p.winRate < 35) {
-      recommendations.push(`Reduce or eliminate ${p.name} - only ${p.winRate}% win rate over ${p.trades} trades`);
+    if (p.trades >= 5 && p.winRate < 35) {
+      recommendations.push(`Reduce or eliminate ${p.name} \u2014 only ${p.winRate}% win rate over ${p.trades} trades`);
     }
   });
   byTimeframe.forEach(tf => {
     if (tf.trades >= 3 && tf.winRate >= 65) {
-      recommendations.push(`${tf.name} timeframe is your sweet spot - ${tf.winRate}% win rate`);
+      recommendations.push(`${tf.name} timeframe is your sweet spot \u2014 ${tf.winRate}% win rate`);
     }
   });
   byConfluence.forEach(c => {
     if (c.name.includes("A+") && c.trades >= 2 && c.winRate >= 60) {
-      recommendations.push(`High confluence setups are paying off - ${c.winRate}% win rate. Be patient for A+ entries.`);
+      recommendations.push(`High confluence setups are paying off \u2014 ${c.winRate}% win rate. Be patient for A+ entries.`);
     }
   });
   if (bySymbol.length > 0 && bySymbol[0].trades >= 3) {
     recommendations.push(`${bySymbol[0].name} is your best symbol (+$${bySymbol[0].totalPnl}). Focus your edge there.`);
   }
+
+  const psDirCross: Record<string, JournalEntry[]> = {};
+  entries.forEach(e => {
+    const key = `${e.pattern} ${e.direction}`;
+    (psDirCross[key] = psDirCross[key] || []).push(e);
+  });
+  Object.entries(psDirCross).forEach(([key, trades]) => {
+    const wins = trades.filter(t => t.outcome === "WIN").length;
+    const wr = Math.round((wins / trades.length) * 1000) / 10;
+    if (trades.length >= 5 && wr >= 55 && wr < 65) {
+      recommendations.push(`${key} is developing an edge \u2014 ${wr}% over ${trades.length} trades. Keep building data.`);
+    }
+  });
+
   if (recommendations.length === 0) {
     recommendations.push("Keep trading and building data. At least 10 trades needed for meaningful edge analysis.");
   }
