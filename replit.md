@@ -55,6 +55,16 @@ shared/schema.ts    - Stub
   - **Trade Management**: Entry from recent swing, SL/TP/Trail shown in log, TRAILED OUT vs STOPPED OUT
   - **Price Scaling**: All thresholds (isNearMA, isNearPivot, hasBottomingTail, classifyVolume) use relative % not hardcoded points
   - **Log Fields**: trail, confluenceLabel, volumeType, reason, dataSource badges, color-coded actions
+  - **Trade Journal**: Persistent JSON-backed trade history with sortable/filterable spreadsheet UI
+    - Every completed trade auto-saved to `data/trade_journal.json`
+    - Columns: Timestamp, Symbol, TF, Pattern, Direction, Entry, SL, TP, Exit, P&L, Confluence, Outcome, R:R, Notes
+    - Summary stats: Total Trades, Win Rate, Profit Factor, Total P&L, Best Symbol, Best Pattern, Avg R:R
+    - Toolbar: Search, filter by symbol/pattern/outcome, CSV export, clear all
+    - Sortable columns (click headers), color-coded outcomes (green=WIN, red=LOSS)
+    - Editable notes per trade (click to add)
+    - Settings panel: Risk %, R:R ratio, enabled patterns — persisted to `data/trader_settings.json`
+    - Settings sync to main trader form on save
+    - API: GET/DELETE `/api/journal`, GET `/api/journal/csv`, PATCH `/api/journal/:id/notes`, GET/POST `/api/settings`
 
 ## Symbol Categories (UI)
 

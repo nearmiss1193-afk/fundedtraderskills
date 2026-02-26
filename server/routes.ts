@@ -3,6 +3,7 @@ import { type Server } from "http";
 import path from "path";
 import express from "express";
 import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive } from "./trader";
+import { loadJournal, getJournalStats, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
 
 let skills: any[] = [];
 
@@ -215,6 +216,53 @@ export async function registerRoutes(
     const logs = getTraderLogs(req.params.sessionId, after);
     const status = getTraderStatus(req.params.sessionId);
     res.json({ logs, status });
+  });
+
+  app.get("/api/journal", (_req, res) => {
+    const entries = loadJournal();
+    const stats = getJournalStats(entries);
+    res.json({ entries, stats });
+  });
+
+  app.patch("/api/journal/:id/notes", (req, res) => {
+    const { notes } = req.body;
+    const ok = updateJournalNotes(req.params.id, notes || "");
+    res.json({ success: ok });
+  });
+
+  app.delete("/api/journal/:id", (req, res) => {
+    const ok = deleteJournalEntry(req.params.id);
+    res.json({ success: ok });
+  });
+
+  app.delete("/api/journal", (_req, res) => {
+    clearJournal();
+    res.json({ success: true });
+  });
+
+  app.get("/api/journal/csv", (_req, res) => {
+    const entries = loadJournal();
+    const header = "Timestamp,Symbol,Timeframe,Pattern,Direction,Entry,Stop,Target,Exit,P&L Points,P&L $,Confluence,Outcome,R:R Achieved,Reason,Notes";
+    const rows = entries.map(e =>
+      [e.timestamp, e.symbol, e.timeframe, e.pattern, e.direction,
+       e.entry, e.stop, e.target, e.exit, e.pnlPoints, e.pnlDollars,
+       e.confluence, e.outcome, e.achievedRR,
+       `"${(e.reason || "").replace(/"/g, '""')}"`,
+       `"${(e.notes || "").replace(/"/g, '""')}"`
+      ].join(",")
+    );
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=trade_journal.csv");
+    res.send([header, ...rows].join("\n"));
+  });
+
+  app.get("/api/settings", (_req, res) => {
+    res.json(loadSettings());
+  });
+
+  app.post("/api/settings", (req, res) => {
+    const saved = saveSettings(req.body);
+    res.json({ success: true, settings: saved });
   });
 
   return httpServer;

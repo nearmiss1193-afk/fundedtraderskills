@@ -1,0 +1,9 @@
+{
+  "riskPct": 1,
+  "rewardRatio": 3,
+  "enabledPatterns": [
+    "3bar",
+    "buysetup",
+    "breakout"
+  ]
+}

@@ -432,6 +432,103 @@
     }
 
     .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    /* --- Journal --- */
+    .journal-section { margin-top: 1.5rem; }
+    .journal-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      padding: 1.5rem; margin-bottom: 1.5rem;
+    }
+    .journal-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.3rem; color: #1a1a2e; }
+    .journal-card .journal-sub { font-size: 0.82rem; color: #6b7280; margin-bottom: 1rem; font-style: italic; }
+
+    .journal-stats {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 0.6rem; margin-bottom: 1.2rem;
+    }
+    .j-stat {
+      background: #f8f7fc; border: 1px solid #e8e5f0; border-radius: 8px;
+      padding: 0.7rem 0.6rem; text-align: center;
+    }
+    .j-stat-label { font-size: 0.65rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; }
+    .j-stat-value { font-size: 1.1rem; font-weight: 800; color: #1a1a2e; margin-top: 2px; }
+    .j-stat-value.positive { color: #22c55e; }
+    .j-stat-value.negative { color: #ef4444; }
+
+    .journal-toolbar {
+      display: flex; gap: 0.5rem; margin-bottom: 0.8rem; flex-wrap: wrap; align-items: center;
+    }
+    .journal-toolbar input[type="text"],
+    .journal-toolbar select {
+      padding: 0.4rem 0.6rem; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 0.78rem; background: #fff; color: #1a1a2e;
+    }
+    .journal-toolbar input[type="text"] { flex: 1; min-width: 140px; }
+    .journal-toolbar select { min-width: 100px; }
+    .journal-toolbar .btn-sm {
+      padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer;
+      font-size: 0.75rem; font-weight: 700;
+    }
+    .btn-csv { background: #7c3aed; color: #fff; }
+    .btn-csv:hover { background: #6d28d9; }
+    .btn-clear { background: #ef4444; color: #fff; }
+    .btn-clear:hover { background: #dc2626; }
+
+    .journal-table-wrap {
+      overflow-x: auto; border: 1px solid #e8e5f0; border-radius: 8px;
+      max-height: 420px; overflow-y: auto;
+    }
+    .journal-table {
+      width: 100%; border-collapse: collapse; font-size: 0.72rem;
+      white-space: nowrap;
+    }
+    .journal-table th {
+      position: sticky; top: 0; background: #f3f0fa; color: #6b7280;
+      padding: 0.5rem 0.6rem; text-align: left; font-weight: 700;
+      border-bottom: 2px solid #e8e5f0; cursor: pointer; user-select: none;
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .journal-table th:hover { color: #7c3aed; }
+    .journal-table th .sort-arrow { margin-left: 3px; font-size: 0.6rem; }
+    .journal-table td {
+      padding: 0.45rem 0.6rem; border-bottom: 1px solid #f0eef5; color: #374151;
+    }
+    .journal-table tr:hover td { background: #faf8ff; }
+    .journal-table .win { color: #16a34a; font-weight: 700; }
+    .journal-table .loss { color: #ef4444; font-weight: 700; }
+    .journal-table .breakeven { color: #9ca3af; font-weight: 600; }
+    .journal-table .pnl-pos { color: #16a34a; font-weight: 600; }
+    .journal-table .pnl-neg { color: #ef4444; font-weight: 600; }
+    .journal-table .dir-long { color: #3b82f6; font-weight: 600; }
+    .journal-table .dir-short { color: #f97316; font-weight: 600; }
+    .journal-table .notes-cell {
+      max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: pointer; color: #7c3aed;
+    }
+    .journal-table .notes-cell:hover { text-decoration: underline; }
+    .journal-empty { padding: 2rem; text-align: center; color: #9ca3af; font-size: 0.85rem; }
+
+    .settings-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      padding: 1.5rem; margin-bottom: 1.5rem;
+    }
+    .settings-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.8rem; color: #1a1a2e; }
+    .settings-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;
+      margin-bottom: 1rem;
+    }
+    .settings-grid label { font-size: 0.78rem; font-weight: 600; color: #374151; margin-bottom: 0.2rem; display: block; }
+    .settings-grid input, .settings-grid select {
+      width: 100%; padding: 0.4rem 0.6rem; border: 1px solid #d1d5db;
+      border-radius: 6px; font-size: 0.82rem;
+    }
+    .btn-save-settings {
+      padding: 0.5rem 1.2rem; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 0.82rem; font-weight: 700; background: #7c3aed; color: #fff;
+    }
+    .btn-save-settings:hover { background: #6d28d9; }
   </style>
 </head>
 <body>
@@ -645,6 +742,99 @@
           </div>
         </div>
       </div>
+
+      <!-- Trade Journal -->
+      <div class="journal-section" id="journal-section">
+        <div class="journal-card">
+          <h3>Trade Journal</h3>
+          <p class="journal-sub">Review your trades like a pro. Adjust settings to find what works best for you.</p>
+
+          <div class="journal-stats" id="journal-stats" data-testid="journal-stats">
+            <div class="j-stat"><div class="j-stat-label">Total Trades</div><div class="j-stat-value" id="j-total" data-testid="text-j-total">0</div></div>
+            <div class="j-stat"><div class="j-stat-label">Win Rate</div><div class="j-stat-value" id="j-winrate" data-testid="text-j-winrate">0%</div></div>
+            <div class="j-stat"><div class="j-stat-label">Profit Factor</div><div class="j-stat-value" id="j-pf" data-testid="text-j-pf">0</div></div>
+            <div class="j-stat"><div class="j-stat-label">Total P&amp;L</div><div class="j-stat-value" id="j-pnl" data-testid="text-j-pnl">$0.00</div></div>
+            <div class="j-stat"><div class="j-stat-label">Best Symbol</div><div class="j-stat-value" id="j-symbol" data-testid="text-j-symbol">--</div></div>
+            <div class="j-stat"><div class="j-stat-label">Best Pattern</div><div class="j-stat-value" id="j-pattern" data-testid="text-j-pattern">--</div></div>
+            <div class="j-stat"><div class="j-stat-label">Avg R:R</div><div class="j-stat-value" id="j-rr" data-testid="text-j-rr">0</div></div>
+          </div>
+
+          <div class="journal-toolbar">
+            <input type="text" id="j-search" placeholder="Search trades..." data-testid="input-j-search" oninput="renderJournal()" />
+            <select id="j-filter-symbol" data-testid="select-j-symbol" onchange="renderJournal()">
+              <option value="">All Symbols</option>
+            </select>
+            <select id="j-filter-pattern" data-testid="select-j-pattern" onchange="renderJournal()">
+              <option value="">All Patterns</option>
+            </select>
+            <select id="j-filter-outcome" data-testid="select-j-outcome" onchange="renderJournal()">
+              <option value="">All Outcomes</option>
+              <option value="WIN">Wins</option>
+              <option value="LOSS">Losses</option>
+              <option value="BREAKEVEN">Breakeven</option>
+            </select>
+            <button class="btn-sm btn-csv" onclick="exportCSV()" data-testid="button-export-csv">Export CSV</button>
+            <button class="btn-sm btn-clear" onclick="clearAllJournal()" data-testid="button-clear-journal">Clear All</button>
+          </div>
+
+          <div class="journal-table-wrap">
+            <table class="journal-table" id="journal-table" data-testid="journal-table">
+              <thead>
+                <tr>
+                  <th data-col="timestamp" onclick="sortJournal('timestamp')">Time <span class="sort-arrow"></span></th>
+                  <th data-col="symbol" onclick="sortJournal('symbol')">Symbol <span class="sort-arrow"></span></th>
+                  <th data-col="timeframe" onclick="sortJournal('timeframe')">TF <span class="sort-arrow"></span></th>
+                  <th data-col="pattern" onclick="sortJournal('pattern')">Pattern <span class="sort-arrow"></span></th>
+                  <th data-col="direction" onclick="sortJournal('direction')">Dir <span class="sort-arrow"></span></th>
+                  <th data-col="entry" onclick="sortJournal('entry')">Entry <span class="sort-arrow"></span></th>
+                  <th data-col="stop" onclick="sortJournal('stop')">SL <span class="sort-arrow"></span></th>
+                  <th data-col="target" onclick="sortJournal('target')">TP <span class="sort-arrow"></span></th>
+                  <th data-col="exit" onclick="sortJournal('exit')">Exit <span class="sort-arrow"></span></th>
+                  <th data-col="pnlDollars" onclick="sortJournal('pnlDollars')">P&amp;L <span class="sort-arrow"></span></th>
+                  <th data-col="confluence" onclick="sortJournal('confluence')">Conf <span class="sort-arrow"></span></th>
+                  <th data-col="outcome" onclick="sortJournal('outcome')">Result <span class="sort-arrow"></span></th>
+                  <th data-col="achievedRR" onclick="sortJournal('achievedRR')">R:R <span class="sort-arrow"></span></th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="journal-tbody" data-testid="journal-tbody"></tbody>
+            </table>
+            <div class="journal-empty" id="journal-empty" data-testid="journal-empty">No trades recorded yet. Start trading to build your journal.</div>
+          </div>
+        </div>
+
+        <div class="settings-card" id="settings-card">
+          <h3>Trader Settings</h3>
+          <div class="settings-grid">
+            <div>
+              <label for="set-risk">Risk Per Trade (%)</label>
+              <input id="set-risk" type="number" value="0.5" min="0.1" max="5" step="0.1" data-testid="input-set-risk" />
+            </div>
+            <div>
+              <label for="set-rr">Risk : Reward Ratio</label>
+              <select id="set-rr" data-testid="select-set-rr">
+                <option value="1">1:1</option>
+                <option value="1.5">1:1.5</option>
+                <option value="2" selected>1:2</option>
+                <option value="2.5">1:2.5</option>
+                <option value="3">1:3</option>
+                <option value="4">1:4</option>
+                <option value="5">1:5</option>
+              </select>
+            </div>
+          </div>
+          <label style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:0.4rem;display:block;">Enabled Patterns</label>
+          <div class="check-group" style="margin-bottom:1rem;">
+            <label class="check-label"><input type="checkbox" name="set-pattern" value="3bar" checked /><span class="check-dot"></span><span>3 Bar Play</span></label>
+            <label class="check-label"><input type="checkbox" name="set-pattern" value="buysetup" checked /><span class="check-dot"></span><span>Buy/Sell Setup</span></label>
+            <label class="check-label"><input type="checkbox" name="set-pattern" value="breakout" checked /><span class="check-dot"></span><span>Pivot Breakout</span></label>
+            <label class="check-label"><input type="checkbox" name="set-pattern" value="climax" /><span class="check-dot"></span><span>Climax Reversal</span></label>
+            <label class="check-label"><input type="checkbox" name="set-pattern" value="mabounce" /><span class="check-dot"></span><span>MA Bounce</span></label>
+          </div>
+          <button class="btn-save-settings" onclick="saveTraderSettings()" data-testid="button-save-settings">Save Settings</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -914,6 +1104,185 @@
         }
       } catch {}
     }
+
+    /* --- Journal --- */
+    let journalData = [];
+    let journalSortCol = 'timestamp';
+    let journalSortAsc = false;
+
+    async function loadJournalData() {
+      try {
+        const d = await (await fetch('/api/journal')).json();
+        journalData = d.entries || [];
+        updateJournalStats(d.stats);
+        populateJournalFilters();
+        renderJournal();
+      } catch {}
+    }
+
+    function updateJournalStats(s) {
+      if (!s) return;
+      document.getElementById('j-total').textContent = s.totalTrades;
+      const wrEl = document.getElementById('j-winrate');
+      wrEl.textContent = s.winRate + '%';
+      wrEl.className = 'j-stat-value' + (s.winRate >= 50 ? ' positive' : s.winRate > 0 ? ' negative' : '');
+      document.getElementById('j-pf').textContent = s.profitFactor === Infinity ? '∞' : s.profitFactor;
+      const pnlEl = document.getElementById('j-pnl');
+      pnlEl.textContent = (s.totalPnl >= 0 ? '+' : '') + '$' + s.totalPnl.toFixed(2);
+      pnlEl.className = 'j-stat-value' + (s.totalPnl >= 0 ? ' positive' : ' negative');
+      document.getElementById('j-symbol').textContent = s.bestSymbol;
+      document.getElementById('j-pattern').textContent = s.bestPattern;
+      document.getElementById('j-rr').textContent = s.avgRR;
+    }
+
+    function populateJournalFilters() {
+      const symbols = [...new Set(journalData.map(e => e.symbol))].sort();
+      const patterns = [...new Set(journalData.map(e => e.pattern))].sort();
+      const symSel = document.getElementById('j-filter-symbol');
+      const patSel = document.getElementById('j-filter-pattern');
+      const curSym = symSel.value;
+      const curPat = patSel.value;
+      symSel.innerHTML = '<option value="">All Symbols</option>' + symbols.map(s => `<option value="${s}">${s}</option>`).join('');
+      patSel.innerHTML = '<option value="">All Patterns</option>' + patterns.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+      symSel.value = curSym;
+      patSel.value = curPat;
+    }
+
+    function getFilteredJournal() {
+      const search = (document.getElementById('j-search').value || '').toLowerCase();
+      const sym = document.getElementById('j-filter-symbol').value;
+      const pat = document.getElementById('j-filter-pattern').value;
+      const out = document.getElementById('j-filter-outcome').value;
+
+      let data = journalData;
+      if (sym) data = data.filter(e => e.symbol === sym);
+      if (pat) data = data.filter(e => e.pattern === pat);
+      if (out) data = data.filter(e => e.outcome === out);
+      if (search) data = data.filter(e =>
+        (e.symbol + ' ' + e.pattern + ' ' + e.direction + ' ' + e.reason + ' ' + e.notes + ' ' + e.timestamp).toLowerCase().includes(search)
+      );
+
+      data = [...data].sort((a, b) => {
+        let va = a[journalSortCol], vb = b[journalSortCol];
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+        if (va < vb) return journalSortAsc ? -1 : 1;
+        if (va > vb) return journalSortAsc ? 1 : -1;
+        return 0;
+      });
+      return data;
+    }
+
+    function sortJournal(col) {
+      if (journalSortCol === col) journalSortAsc = !journalSortAsc;
+      else { journalSortCol = col; journalSortAsc = true; }
+
+      document.querySelectorAll('.journal-table th .sort-arrow').forEach(el => el.textContent = '');
+      const th = document.querySelector(`.journal-table th[data-col="${col}"] .sort-arrow`);
+      if (th) th.textContent = journalSortAsc ? ' ▲' : ' ▼';
+      renderJournal();
+    }
+
+    function renderJournal() {
+      const data = getFilteredJournal();
+      const tbody = document.getElementById('journal-tbody');
+      const empty = document.getElementById('journal-empty');
+
+      if (data.length === 0) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      tbody.innerHTML = data.map(e => {
+        const ocls = e.outcome === 'WIN' ? 'win' : e.outcome === 'LOSS' ? 'loss' : 'breakeven';
+        const dcls = e.direction === 'LONG' ? 'dir-long' : 'dir-short';
+        const pcls = e.pnlDollars >= 0 ? 'pnl-pos' : 'pnl-neg';
+        const notesTxt = e.notes ? esc(e.notes) : '<i style="color:#ccc">click to add</i>';
+        return `<tr data-testid="row-trade-${e.id}">
+          <td>${esc(e.timestamp)}</td>
+          <td><b>${esc(e.symbol)}</b></td>
+          <td>${esc(e.timeframe)}</td>
+          <td>${esc(e.pattern)}</td>
+          <td class="${dcls}">${e.direction}</td>
+          <td>${fmtPrice(e.entry)}</td>
+          <td>${fmtPrice(e.stop)}</td>
+          <td>${fmtPrice(e.target)}</td>
+          <td>${fmtPrice(e.exit)}</td>
+          <td class="${pcls}">${e.pnlDollars >= 0 ? '+' : ''}$${e.pnlDollars.toFixed(2)}</td>
+          <td>${e.confluence}</td>
+          <td class="${ocls}">${e.outcome}</td>
+          <td>${e.achievedRR}</td>
+          <td class="notes-cell" onclick="editNote('${e.id}')" title="${esc(e.notes || 'Click to add notes')}">${notesTxt}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function editNote(id) {
+      const entry = journalData.find(e => e.id === id);
+      const note = prompt('Trade notes:', entry?.notes || '');
+      if (note === null) return;
+      fetch('/api/journal/' + id + '/notes', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ notes: note })
+      }).then(() => { if (entry) entry.notes = note; renderJournal(); });
+    }
+
+    function exportCSV() {
+      window.open('/api/journal/csv', '_blank');
+    }
+
+    function clearAllJournal() {
+      if (!confirm('Clear all trade history? This cannot be undone.')) return;
+      fetch('/api/journal', { method: 'DELETE' }).then(() => {
+        journalData = [];
+        updateJournalStats({ totalTrades:0, wins:0, losses:0, breakevens:0, winRate:0, profitFactor:0, totalPnl:0, bestSymbol:'--', bestPattern:'--', avgRR:0 });
+        renderJournal();
+        showToast('Journal cleared');
+      });
+    }
+
+    /* --- Settings --- */
+    async function loadTraderSettings() {
+      try {
+        const s = await (await fetch('/api/settings')).json();
+        document.getElementById('set-risk').value = s.riskPct || 0.5;
+        document.getElementById('set-rr').value = s.rewardRatio || 2;
+        document.getElementById('riskPct').value = s.riskPct || 0.5;
+        document.getElementById('rewardRatio').value = s.rewardRatio || 2;
+        if (s.enabledPatterns) {
+          document.querySelectorAll('input[name="set-pattern"]').forEach(cb => {
+            cb.checked = s.enabledPatterns.includes(cb.value);
+          });
+          document.querySelectorAll('input[name="pattern"]').forEach(cb => {
+            cb.checked = s.enabledPatterns.includes(cb.value);
+          });
+        }
+      } catch {}
+    }
+
+    async function saveTraderSettings() {
+      const riskPct = parseFloat(document.getElementById('set-risk').value) || 0.5;
+      const rewardRatio = parseFloat(document.getElementById('set-rr').value) || 2;
+      const enabledPatterns = [...document.querySelectorAll('input[name="set-pattern"]:checked')].map(c => c.value);
+      try {
+        await fetch('/api/settings', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ riskPct, rewardRatio, enabledPatterns })
+        });
+        document.getElementById('riskPct').value = riskPct;
+        document.getElementById('rewardRatio').value = rewardRatio;
+        document.querySelectorAll('input[name="pattern"]').forEach(cb => {
+          cb.checked = enabledPatterns.includes(cb.value);
+        });
+        showToast('Settings saved');
+      } catch { showToast('Failed to save settings'); }
+    }
+
+    loadJournalData();
+    loadTraderSettings();
+    setInterval(loadJournalData, 10000);
   </script>
 </body>
 </html>

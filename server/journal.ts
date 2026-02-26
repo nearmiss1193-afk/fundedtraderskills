@@ -55,36 +55,58 @@ export function loadJournal(): JournalEntry[] {
 }
 
 export function saveJournal(entries: JournalEntry[]): void {
-  ensureDataDir();
-  fs.writeFileSync(JOURNAL_FILE, JSON.stringify(entries, null, 2));
+  try {
+    ensureDataDir();
+    fs.writeFileSync(JOURNAL_FILE, JSON.stringify(entries, null, 2));
+  } catch (err) {
+    console.error("[journal] Failed to save journal:", err);
+  }
 }
 
 export function addJournalEntry(entry: JournalEntry): void {
-  const entries = loadJournal();
-  entries.push(entry);
-  saveJournal(entries);
+  try {
+    const entries = loadJournal();
+    entries.push(entry);
+    saveJournal(entries);
+  } catch (err) {
+    console.error("[journal] Failed to add entry:", err);
+  }
 }
 
 export function updateJournalNotes(id: string, notes: string): boolean {
-  const entries = loadJournal();
-  const entry = entries.find(e => e.id === id);
-  if (!entry) return false;
-  entry.notes = notes;
-  saveJournal(entries);
-  return true;
+  try {
+    const entries = loadJournal();
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return false;
+    entry.notes = notes;
+    saveJournal(entries);
+    return true;
+  } catch (err) {
+    console.error("[journal] Failed to update notes:", err);
+    return false;
+  }
 }
 
 export function deleteJournalEntry(id: string): boolean {
-  const entries = loadJournal();
-  const idx = entries.findIndex(e => e.id === id);
-  if (idx === -1) return false;
-  entries.splice(idx, 1);
-  saveJournal(entries);
-  return true;
+  try {
+    const entries = loadJournal();
+    const idx = entries.findIndex(e => e.id === id);
+    if (idx === -1) return false;
+    entries.splice(idx, 1);
+    saveJournal(entries);
+    return true;
+  } catch (err) {
+    console.error("[journal] Failed to delete entry:", err);
+    return false;
+  }
 }
 
 export function clearJournal(): void {
-  saveJournal([]);
+  try {
+    saveJournal([]);
+  } catch (err) {
+    console.error("[journal] Failed to clear journal:", err);
+  }
 }
 
 export function loadSettings(): TraderSettings {
@@ -98,11 +120,16 @@ export function loadSettings(): TraderSettings {
 }
 
 export function saveSettings(settings: Partial<TraderSettings>): TraderSettings {
-  ensureDataDir();
-  const current = loadSettings();
-  const merged = { ...current, ...settings };
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2));
-  return merged;
+  try {
+    ensureDataDir();
+    const current = loadSettings();
+    const merged = { ...current, ...settings };
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2));
+    return merged;
+  } catch (err) {
+    console.error("[journal] Failed to save settings:", err);
+    return loadSettings();
+  }
 }
 
 export function getJournalStats(entries: JournalEntry[]) {
