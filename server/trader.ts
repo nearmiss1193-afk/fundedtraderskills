@@ -21,7 +21,7 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
   });
 
   const dir = direction === "LONG" ? "Long" : "Short";
-  console.log(`[trader] Signal sent to bridge: ${dir} ${symbol} @ ${entry} | SL: ${stop} TP: ${target} | ${pattern} (confluence: ${confluence}) | R:R 1:${rewardRatio}`);
+  console.log(`[trader] Signal sent to bridge successfully: ${dir} ${symbol} @ ${entry} | SL: ${stop} TP: ${target} | ${pattern} (confluence: ${confluence}) | R:R 1:${rewardRatio}`);
 
   const req = http.request({
     hostname: "127.0.0.1",
