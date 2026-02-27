@@ -78,17 +78,10 @@ app.use((req, res, next) => {
     return res.status(status).json({ message });
   });
 
-  app.get("/", (_req, res) => {
+  app.get("/{*path}", (req, res) => {
+    if (req.path.startsWith("/api")) return;
     res.sendFile(path.resolve(process.cwd(), "public", "index.html"));
   });
-
-  if (process.env.NODE_ENV === "production") {
-    const { serveStatic } = await import("./static");
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
-  }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
