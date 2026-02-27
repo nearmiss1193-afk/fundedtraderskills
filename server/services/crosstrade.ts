@@ -4,10 +4,7 @@ const CROSSTRADE_WEBHOOK_URL = process.env.CROSSTRADE_WEBHOOK_URL || "";
 const CROSSTRADE_KEY = process.env.CROSSTRADE_KEY || "";
 const CROSSTRADE_ACCOUNT_DEFAULT = process.env.CROSSTRADE_ACCOUNT || "SIM101";
 const MAX_CONTRACTS = parseInt(process.env.MAX_CONTRACTS || "1", 10);
-const MAX_TRADES_PER_DAY = parseInt(process.env.MAX_TRADES_PER_DAY || "3", 10);
-
 let dailyTradeCount = 0;
-let lastTradeDate = new Date().toDateString();
 
 interface CrossTradeSignal {
     symbol: string;
@@ -18,19 +15,7 @@ interface CrossTradeSignal {
 }
 
 export async function sendToCrossTrade(signal: CrossTradeSignal): Promise<{ success: boolean; message: string; payload?: string }> {
-    const today = new Date().toDateString();
-    if (today !== lastTradeDate) {
-        dailyTradeCount = 0;
-        lastTradeDate = today;
-    }
-
     const targetAccount = signal.account || CROSSTRADE_ACCOUNT_DEFAULT;
-
-    if (dailyTradeCount >= MAX_TRADES_PER_DAY) {
-        const error = `Safety Block: Daily trade limit (${MAX_TRADES_PER_DAY}) reached.`;
-        console.error(`[crosstrade] ${error}`);
-        return { success: false, message: error };
-    }
 
     if (!CROSSTRADE_WEBHOOK_URL || !CROSSTRADE_KEY) {
         const error = "Missing CROSSTRADE_WEBHOOK_URL or CROSSTRADE_KEY in environment.";
