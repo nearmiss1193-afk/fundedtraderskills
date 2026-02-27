@@ -1,68 +1,121 @@
 import { addJournalEntry, type JournalEntry } from "./journal";
 import { connectTradovate, isTradovateConnected, getTradovateStatus, placeBracketOrder } from "./tradovate";
 import https from "https";
+import http from "http";
+import { randomBytes } from "crypto";
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
 
-const NGROK_BRIDGE_URL = "https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal";
+const TRADE_BRIDGE_URL = process.env.TRADE_BRIDGE_URL || "https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal";
 
-export function forwardSignalToNgrok(payload: { symbol: string; direction: string; entryPrice: number; stopLoss: number; takeProfit: number; riskReward: string; confluence: number; pattern: string }) {
-  console.log(`[trader] Sending signal to: ${NGROK_BRIDGE_URL}`);
-  const body = JSON.stringify(payload);
-  const ngrokReq = https.request(NGROK_BRIDGE_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
-  }, (res) => {
-    res.on("data", () => {});
-    res.on("end", () => {
-      if (res.statusCode === 200 || res.statusCode === 201) {
-        console.log(`[trader] Signal sent to ngrok bridge successfully: ${payload.direction} ${payload.symbol} @ ${payload.entryPrice} | SL: ${payload.stopLoss} TP: ${payload.takeProfit} | ${payload.pattern} (confluence: ${payload.confluence}) | R:R ${payload.riskReward}`);
-      } else {
-        console.log(`[trader] Ngrok bridge returned status ${res.statusCode} for ${payload.symbol}`);
-      }
+function generateSignalId(): string {
+  return `sig-${Date.now()}-${randomBytes(3).toString("hex")}`;
+}
+
+export interface BridgeSignal {
+  signalId: string;
+  symbol: string;
+  direction: string;
+  qty: number;
+  orderType: string;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit: number;
+  pattern: string;
+  confluence: number;
+  riskReward: string;
+  timestamp: string;
+}
+
+export interface BridgeAck {
+  status: "accepted" | "rejected";
+  signalId: string;
+  orderId?: string;
+  reason?: string;
+  message?: string;
+}
+
+function sendToBridge(signal: BridgeSignal): Promise<BridgeAck> {
+  return new Promise((resolve) => {
+    const body = JSON.stringify(signal);
+    const url = new URL(TRADE_BRIDGE_URL);
+    const isHttps = url.protocol === "https:";
+    const mod = isHttps ? https : http;
+
+    console.log(`[trader] Sending signal ${signal.signalId} to: ${TRADE_BRIDGE_URL}`);
+    console.log(`[trader] Payload: ${signal.direction} ${signal.symbol} qty=${signal.qty} @ ${signal.entryPrice} | SL: ${signal.stopLoss} TP: ${signal.takeProfit} | ${signal.pattern} (confluence: ${signal.confluence}) | R:R ${signal.riskReward}`);
+
+    const req = mod.request(TRADE_BRIDGE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
+    }, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        if (res.statusCode === 200 || res.statusCode === 201) {
+          console.log(`[trader] Signal sent to bridge successfully: ${signal.direction} ${signal.symbol} @ ${signal.entryPrice} | signalId: ${signal.signalId}`);
+          try {
+            const ack: BridgeAck = JSON.parse(data);
+            console.log(`[trader] Bridge ACK: status=${ack.status} signalId=${ack.signalId} orderId=${ack.orderId || "N/A"} message=${ack.message || ack.reason || ""}`);
+            resolve(ack);
+          } catch {
+            console.log(`[trader] Bridge response (non-JSON): ${data.slice(0, 200)}`);
+            resolve({ status: "accepted", signalId: signal.signalId, message: "Signal received (no structured ACK)" });
+          }
+        } else {
+          console.log(`[trader] Bridge returned status ${res.statusCode} for ${signal.symbol} (signalId: ${signal.signalId})`);
+          resolve({ status: "rejected", signalId: signal.signalId, reason: `HTTP ${res.statusCode}` });
+        }
+      });
     });
+    req.on("error", (err) => {
+      console.log(`[trader] Bridge connection error for ${signal.symbol} (signalId: ${signal.signalId}): ${err.message}`);
+      resolve({ status: "rejected", signalId: signal.signalId, reason: err.message });
+    });
+    req.write(body);
+    req.end();
   });
-  ngrokReq.on("error", (err) => {
-    console.log(`[trader] Ngrok bridge error for ${payload.symbol}: ${err.message}`);
-  });
-  ngrokReq.write(body);
-  ngrokReq.end();
+}
+
+export function forwardSignalToBridge(payload: { symbol: string; direction: string; entryPrice: number; stopLoss: number; takeProfit: number; riskReward: string; confluence: number; pattern: string; qty?: number; source?: string }): Promise<BridgeAck> {
+  const signalId = generateSignalId();
+  const now = new Date();
+  const signal: BridgeSignal = {
+    signalId,
+    symbol: payload.symbol,
+    direction: (payload.direction === "Long" || payload.direction === "LONG") ? "BUY" : "SELL",
+    qty: payload.qty || 1,
+    orderType: "MARKET",
+    entryPrice: payload.entryPrice,
+    stopLoss: payload.stopLoss,
+    takeProfit: payload.takeProfit,
+    pattern: payload.pattern,
+    confluence: payload.confluence,
+    riskReward: payload.riskReward,
+    timestamp: now.toISOString(),
+  };
+  return sendToBridge(signal);
 }
 
 function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string) {
-  const ngrokPayload = JSON.stringify({
+  const signalId = generateSignalId();
+  const dir = direction === "LONG" ? "BUY" : "SELL";
+  const signal: BridgeSignal = {
+    signalId,
     symbol,
-    direction: direction === "LONG" ? "Long" : "Short",
+    direction: dir,
+    qty: 1,
+    orderType: "MARKET",
     entryPrice: entry,
     stopLoss: stop,
     takeProfit: target,
-    riskReward: `1:${rewardRatio}`,
-    confluence,
     pattern,
-  });
-
-  const dir = direction === "LONG" ? "Long" : "Short";
-
-  console.log(`[trader] Sending signal to: ${NGROK_BRIDGE_URL}`);
-  const ngrokReq = https.request(NGROK_BRIDGE_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(ngrokPayload) },
-  }, (res) => {
-    res.on("data", () => {});
-    res.on("end", () => {
-      if (res.statusCode === 200 || res.statusCode === 201) {
-        console.log(`[trader] Signal sent to ngrok bridge successfully: ${dir} ${symbol} @ ${entry} | SL: ${stop} TP: ${target} | ${pattern} (confluence: ${confluence}) | R:R 1:${rewardRatio}`);
-      } else {
-        console.log(`[trader] Ngrok bridge returned status ${res.statusCode} for ${symbol}`);
-      }
-    });
-  });
-  ngrokReq.on("error", (err) => {
-    console.log(`[trader] Ngrok bridge connection error for ${symbol}: ${err.message}`);
-  });
-  ngrokReq.write(ngrokPayload);
-  ngrokReq.end();
+    confluence,
+    riskReward: `1:${rewardRatio}`,
+    timestamp: new Date().toISOString(),
+  };
+  sendToBridge(signal);
 }
 
 interface PolygonPrice {

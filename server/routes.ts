@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { type Server } from "http";
 import path from "path";
 import express from "express";
-import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToNgrok } from "./trader";
+import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToBridge } from "./trader";
 import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
 
 let skills: any[] = [];
@@ -271,7 +271,7 @@ export async function registerRoutes(
 
     console.log(`[trade-signal] ${signal.source.toUpperCase()} | ${signal.direction} ${signal.symbol} @ ${signal.entryPrice} | SL: ${signal.stopLoss} TP: ${signal.takeProfit} | ${signal.pattern} (${signal.confluence}) | R:R ${signal.riskReward}`);
 
-    forwardSignalToNgrok({
+    forwardSignalToBridge({
       symbol: signal.symbol,
       direction: signal.direction,
       entryPrice: signal.entryPrice,
@@ -280,6 +280,10 @@ export async function registerRoutes(
       riskReward: signal.riskReward,
       confluence: signal.confluence,
       pattern: signal.pattern,
+      qty: req.body.qty || 1,
+      source: signal.source,
+    }).then((ack) => {
+      console.log(`[trade-signal] Bridge ACK for ${signal.symbol}: status=${ack.status} orderId=${ack.orderId || "N/A"} ${ack.reason || ack.message || ""}`);
     });
 
     res.json({ success: true, message: "Signal received", signal });

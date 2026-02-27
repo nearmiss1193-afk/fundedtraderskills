@@ -1,0 +1,136 @@
+Build “Option A” execution: add a local NinjaTrader AddOn listener that places SIM orders and returns order acknowledgements back through the existing pipeline.
+
+Current pipeline (already working)
+
+Replit app receives signals at POST /api/trade-signal
+
+Replit forwards to TRADE_BRIDGE_URL (ngrok URL) → local Python bridge on port 5000
+
+Python bridge currently logs and simulates “paper order placed”
+
+Goal
+
+Replace the simulated paper order with a real NinjaTrader SIM order using a NinjaTrader 8 AddOn that:
+
+Listens locally for JSON order requests (TCP is preferred; file-watch fallback ok)
+
+Places orders in NinjaTrader SIM using NinjaScript APIs
+
+Sends an ACK/RESULT back to the Python bridge (accepted/rejected + reason + orderId)
+
+Supports ES/MES only (for now)
+
+Requirements
+
+Add a unique signalId to each trade request and include it in all logs and responses.
+
+The Python bridge must forward the signal to NinjaTrader and wait for an ACK with a timeout (e.g., 2–3 seconds).
+
+The Python bridge must respond to Replit with:
+
+{ status: "accepted", signalId, orderId } or { status: "rejected", signalId, reason }
+
+Safety:
+
+SIM ONLY (never submit to live accounts)
+
+Reject if symbol not in ["ES","MES"]
+
+Reject if direction not in ["BUY","SELL"]
+
+Reject if required fields missing: entryPrice, stopLoss, takeProfit, qty
+
+Create a small “test order” mode:
+
+Replit “Test Signal” sends a known JSON payload with qty=1 MES
+
+Expect accepted + orderId back when NinjaTrader is running with SIM account selected
+
+Message Schema (JSON)
+
+Replit → bridge:
+
+{
+  "signalId": "uuid-or-short-id",
+  "symbol": "MES",
+  "direction": "BUY",
+  "qty": 1,
+  "orderType": "MARKET",
+  "entryPrice": 0,
+  "stopLoss": 4990.25,
+  "takeProfit": 5002.25,
+  "pattern": "3 Bar Play",
+  "confluence": 4,
+  "riskReward": 2.0,
+  "timestamp": "2026-02-27T12:34:56-05:00"
+}
+
+Bridge → NinjaTrader (same schema), plus:
+
+accountName: must be “Sim101” (or configurable)
+
+tif: “GTC”
+
+NinjaTrader → bridge ACK:
+
+{
+  "status": "accepted",
+  "signalId": "same-id",
+  "orderId": "NT-ORDER-ID",
+  "message": "Order submitted to SIM"
+}
+
+or
+
+{
+  "status": "rejected",
+  "signalId": "same-id",
+  "reason": "Missing qty"
+}
+Implementation Plan
+
+A) Python Bridge Updates (Flask)
+
+Add a function send_to_ninjatrader(order) that opens TCP to 127.0.0.1:7777, sends JSON line-delimited, waits for one JSON response line (ACK), then returns it.
+
+Add timeout handling. On timeout, return rejected with reason “No ACK from NinjaTrader”.
+
+Keep full debug logging: headers, raw body, parsed JSON, signalId.
+
+B) NinjaTrader 8 AddOn (C#)
+
+Create an AddOn that starts a TCP listener on port 7777 when enabled.
+
+When it receives a JSON line:
+
+validate schema
+
+ensure SIM account only
+
+submit order:
+
+Use ATM strategy or managed approach if simpler.
+
+Attach stop loss and profit target using NinjaTrader APIs.
+
+Immediately send ACK with accepted + orderId.
+
+If exception, send rejected with reason.
+
+C) Replit App Updates
+
+Ensure forwarder uses env var TRADE_BRIDGE_URL.
+
+In response logs, print ACK body/status so we know if NinjaTrader accepted/rejected.
+
+Deliverables
+
+Updated Python bridge.py that forwards to NinjaTrader and returns ACKs.
+
+NinjaTrader AddOn C# source code + instructions to install/enable in NinjaTrader 8.
+
+Update Replit server forwarder to log response body and status clearly.
+
+A one-click test path: Replit “Test Signal” → NinjaTrader SIM order appears.
+
+Do not use pyautogui. Prefer NinjaTrader AddOn listener. Keep everything SIM/paper only.

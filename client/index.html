@@ -1386,8 +1386,9 @@
 
     async function sendTestSignal() {
       const testSignal = {
-        symbol: "ES",
+        symbol: "MES",
         direction: "Long",
+        qty: 1,
         entryPrice: 5823.50,
         stopLoss: 5818.00,
         takeProfit: 5838.50,
@@ -1403,7 +1404,7 @@
           body: JSON.stringify(testSignal)
         });
         if (res.ok) {
-          showToast('Test signal sent to ngrok bridge: Long ES @ 5823.50');
+          showToast('Test signal sent to bridge: Long MES qty=1 @ 5823.50');
         } else {
           showToast('Signal failed to send');
         }

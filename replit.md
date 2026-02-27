@@ -19,10 +19,10 @@ Minimal Node.js + Express starter for a skill marketplace with autonomous AI ski
 - `GET /api/journal/analytics` - Advanced analytics (grouped by pattern/symbol/timeframe/confluence + recommendations)
 - `GET /api/settings` - Load trader settings
 - `POST /api/settings` - Save trader settings
-- `POST /api/trade-signal` - NinjaTrader API bridge endpoint `{ symbol, direction, entryPrice, stopLoss, takeProfit, riskReward, confluence, pattern }` — auto-POSTed on every trade entry in Force Trading mode
+- `POST /api/trade-signal` - NinjaTrader API bridge endpoint `{ symbol, direction, entryPrice, stopLoss, takeProfit, riskReward, confluence, pattern, qty }` — auto-POSTed on every trade entry in Force Trading mode
 - `GET /api/trade-signals` - List recent trade signals (up to 200)
-- **Signal Bridge**: `emitTradeSignal()` in trader.ts POSTs to ngrok URL (`https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal`) + local buffer on every trade entry; logs `[trader] Signal sent to ngrok bridge successfully`
-- **Test Signal Button**: UI button sends sample ES Long signal to both ngrok bridge and local buffer for connectivity testing
+- **Signal Bridge (Option A)**: All signals forwarded to `TRADE_BRIDGE_URL` env var (defaults to ngrok URL). Each signal gets a unique `signalId`. Bridge returns structured ACK: `{ status, signalId, orderId, message/reason }`. Pipeline: Replit → ngrok → Python bridge (localhost:5000) → NinjaTrader AddOn (TCP 7777) → SIM order → ACK back
+- **Test Signal Button**: UI button sends MES Long qty=1 test signal through the full pipeline
 - `GET /api/tradovate/status` - Tradovate connection status
 - `POST /api/tradovate/connect` - Attempt Tradovate connection
 
@@ -124,11 +124,19 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
 ## Environment
 
 - `POLYGON_API_KEY` - Polygon.io API key for real futures data (falls back to simulated if missing)
+- `TRADE_BRIDGE_URL` - URL to forward trade signals to (defaults to ngrok URL for NinjaTrader bridge)
 - `TRADOVATE_USERNAME` - Tradovate demo account username
 - `TRADOVATE_PASSWORD` - Tradovate demo account password
 - `TRADOVATE_APP_ID` - Tradovate application ID
 - `TRADOVATE_CID` - Tradovate client ID
 - `TRADOVATE_SECRET` - Tradovate client secret
+
+## Local Components (run on your PC, not Replit)
+
+- `local-bridge/bridge.py` - Python Flask bridge that receives signals via ngrok, validates, forwards to NinjaTrader via TCP port 7777, returns ACK
+- `local-bridge/requirements.txt` - Python dependencies (flask)
+- `ninjatrader-addon/SovereignBridgeAddon.cs` - NinjaTrader 8 AddOn that listens on TCP 7777, places SIM orders, returns ACK with orderId
+- See `local-bridge/README.md` for full setup instructions
 
 ## Running
 
