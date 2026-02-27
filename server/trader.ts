@@ -1,14 +1,27 @@
 import { addJournalEntry, type JournalEntry } from "./journal";
 import { connectTradovate, isTradovateConnected, getTradovateStatus, placeBracketOrder } from "./tradovate";
 import http from "http";
+import https from "https";
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
 
-const SIGNAL_PORT = parseInt(process.env.PORT || "5000", 10);
+const NGROK_BRIDGE_URL = "https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal";
+const LOCAL_SIGNAL_PORT = parseInt(process.env.PORT || "5000", 10);
 
 function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string) {
-  const payload = JSON.stringify({
+  const ngrokPayload = JSON.stringify({
+    symbol,
+    direction: direction === "LONG" ? "Long" : "Short",
+    entryPrice: entry,
+    stopLoss: stop,
+    takeProfit: target,
+    riskReward: `1:${rewardRatio}`,
+    confluence,
+    pattern,
+  });
+
+  const localPayload = JSON.stringify({
     symbol,
     direction: direction === "LONG" ? "Long" : "Short",
     entryPrice: entry,
@@ -21,29 +34,39 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
   });
 
   const dir = direction === "LONG" ? "Long" : "Short";
-  console.log(`[trader] Signal sent to bridge successfully: ${dir} ${symbol} @ ${entry} | SL: ${stop} TP: ${target} | ${pattern} (confluence: ${confluence}) | R:R 1:${rewardRatio}`);
 
-  const req = http.request({
-    hostname: "127.0.0.1",
-    port: SIGNAL_PORT,
-    path: "/api/trade-signal",
+  const ngrokReq = https.request(NGROK_BRIDGE_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) },
+    headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(ngrokPayload) },
   }, (res) => {
     res.on("data", () => {});
     res.on("end", () => {
-      if (res.statusCode === 200) {
-        console.log(`[trader] Bridge confirmed signal received for ${symbol}`);
+      if (res.statusCode === 200 || res.statusCode === 201) {
+        console.log(`[trader] Signal sent to ngrok bridge successfully: ${dir} ${symbol} @ ${entry} | SL: ${stop} TP: ${target} | ${pattern} (confluence: ${confluence}) | R:R 1:${rewardRatio}`);
       } else {
-        console.log(`[trader] Bridge returned status ${res.statusCode} for ${symbol}`);
+        console.log(`[trader] Ngrok bridge returned status ${res.statusCode} for ${symbol}`);
       }
     });
   });
-  req.on("error", (err) => {
-    console.log(`[trader] Bridge connection error: ${err.message}`);
+  ngrokReq.on("error", (err) => {
+    console.log(`[trader] Ngrok bridge connection error for ${symbol}: ${err.message}`);
   });
-  req.write(payload);
-  req.end();
+  ngrokReq.write(ngrokPayload);
+  ngrokReq.end();
+
+  const localReq = http.request({
+    hostname: "127.0.0.1",
+    port: LOCAL_SIGNAL_PORT,
+    path: "/api/trade-signal",
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(localPayload) },
+  }, (res) => {
+    res.on("data", () => {});
+    res.on("end", () => {});
+  });
+  localReq.on("error", () => {});
+  localReq.write(localPayload);
+  localReq.end();
 }
 
 interface PolygonPrice {

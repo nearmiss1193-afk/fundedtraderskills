@@ -143042,5 +143042,63 @@
       "priorPivotSR": true,
       "barFormation": true
     }
+  },
+  {
+    "id": "trade_1772160145599_v5bab",
+    "timestamp": "09:42:25 PM",
+    "symbol": "CL",
+    "timeframe": "2min",
+    "pattern": "Buy Setup",
+    "direction": "LONG",
+    "entry": 72.28,
+    "stop": 72.19,
+    "target": 72.45,
+    "exit": 72.33,
+    "pnlPoints": 0.05,
+    "pnlDollars": 50,
+    "confluence": 5,
+    "confluenceLabel": "5/12 - Low Odds",
+    "outcome": "BREAKEVEN",
+    "reason": "green bar + bottoming tail + at 21 EMA",
+    "notes": "",
+    "rewardRatio": 2,
+    "achievedRR": 0.56,
+    "dataSource": "SIM",
+    "checklist": {
+      "patternMatch": true,
+      "volumeConfirmation": false,
+      "maRespect": true,
+      "priorPivotSR": true,
+      "barFormation": true
+    }
+  },
+  {
+    "id": "trade_1772160159147_i2x1n",
+    "timestamp": "09:42:38 PM",
+    "symbol": "NQ",
+    "timeframe": "2min",
+    "pattern": "Buy Setup",
+    "direction": "LONG",
+    "entry": 19344.11,
+    "stop": 19321.07,
+    "target": 19390.19,
+    "exit": 19321.07,
+    "pnlPoints": -23.04,
+    "pnlDollars": -460.8,
+    "confluence": 9,
+    "confluenceLabel": "9/12 - High Probability",
+    "outcome": "LOSS",
+    "reason": "at pivot support + increased volume + green bar + bottoming tail + at 21 EMA",
+    "notes": "",
+    "rewardRatio": 2,
+    "achievedRR": -1,
+    "dataSource": "SIM",
+    "checklist": {
+      "patternMatch": true,
+      "volumeConfirmation": true,
+      "maRespect": true,
+      "priorPivotSR": true,
+      "barFormation": true
+    }
   }
 ]
