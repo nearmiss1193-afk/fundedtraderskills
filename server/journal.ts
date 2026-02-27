@@ -53,7 +53,7 @@ const DEFAULT_SETTINGS: TraderSettings = {
   riskDollars: 100,
   rewardRatio: 2,
   maxOpenTrades: 3,
-  enabledPatterns: ["3bar_long", "3bar_short", "buysetup", "sellsetup", "breakout_long", "breakout_short", "climax_long", "climax_short", "mabounce_long", "mabounce_short"],
+  enabledPatterns: ["3bar_long", "3bar_short", "buysetup", "sellsetup", "breakout_long", "breakout_short", "climax_long", "climax_short"],
   enabledTimeframes: ["2min", "5min", "15min", "1hour", "4hour", "daily"],
 };
 
@@ -128,7 +128,6 @@ function migratePatternKeys(patterns: string[]): string[] {
     "buysetup": ["buysetup", "sellsetup"],
     "breakout": ["breakout_long", "breakout_short"],
     "climax": ["climax_long", "climax_short"],
-    "mabounce": ["mabounce_long", "mabounce_short"],
   };
   const newKeys = new Set<string>();
   for (const p of patterns) {
@@ -146,7 +145,7 @@ export function loadSettings(): TraderSettings {
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
       const raw = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
-      const legacyKeys = ["3bar", "breakout", "climax", "mabounce"];
+      const legacyKeys = ["3bar", "breakout", "climax"];
       const needsMigration = raw.enabledPatterns && raw.enabledPatterns.some((p: string) => legacyKeys.includes(p));
       const missingNewKeys = raw.enabledPatterns && !raw.enabledPatterns.some((p: string) => p.includes("_long") || p.includes("_short") || p === "sellsetup");
       if (needsMigration || missingNewKeys) {

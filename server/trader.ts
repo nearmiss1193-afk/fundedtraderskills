@@ -50,7 +50,7 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
     timestamp: new Date().toISOString(),
   };
 
-  console.log(`[trader] Sending signal to bridge for account ${account}: ${JSON.stringify(signalPayload)}`);
+  console.log(`[trader] Signal queued to Supabase + CrossTrade for account ${account}: ${JSON.stringify(signalPayload)}`);
 
   enqueueSignal({
     signalId,
@@ -945,64 +945,6 @@ function detectClimaxReversal(bars: Bar[], state: MarketState): { detected: bool
   return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
 }
 
-function detectMABounce(bars: Bar[], state: MarketState): { detected: boolean; direction: "LONG" | "SHORT"; confluence: number; confluenceLabel: string; reason: string } {
-  if (bars.length < 4) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
-  const curr = bars[bars.length - 1];
-  const prev = bars[bars.length - 2];
-  const avgRange = getAvgRange(bars);
-
-  const touchesEma21Long = isNearMA(prev.low, state.ema21);
-  const touchesEma9Long = isNearMA(prev.low, state.ema9);
-
-  if ((touchesEma21Long || touchesEma9Long) && curr.close > prev.high && curr.bullish && state.bias === "UPTREND") {
-    const quality = barFormationQuality(curr, "LONG");
-    const factors = [
-      hasBottomingTail(prev),
-      isIgnitingVolume(bars, state.avgVolume),
-      isWideRangeBar(curr, avgRange),
-      isNearPivot(prev.low, state.pivotLow, state.price),
-      curr.close > state.ema9,
-      curr.close > state.ema21,
-      quality >= 3,
-      curr.volume > state.avgVolume,
-    ];
-    const conf = calcConfluence(factors);
-    const ma = touchesEma21Long ? "21 EMA" : "9 EMA";
-    const reasons: string[] = [`bounce off ${ma}`];
-    if (hasBottomingTail(prev)) reasons.push("bottoming tail");
-    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
-    if (isNearPivot(prev.low, state.pivotLow, state.price)) reasons.push("at pivot support");
-    if (curr.bullish) reasons.push("green bar");
-    return { detected: true, direction: "LONG", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 4).join(" + ") };
-  }
-
-  const touchesEma21Short = isNearMA(prev.high, state.ema21);
-  const touchesEma9Short = isNearMA(prev.high, state.ema9);
-
-  if ((touchesEma21Short || touchesEma9Short) && curr.close < prev.low && !curr.bullish && state.bias === "DOWNTREND") {
-    const quality = barFormationQuality(curr, "SHORT");
-    const factors = [
-      hasToppingTail(prev),
-      isIgnitingVolume(bars, state.avgVolume),
-      isWideRangeBar(curr, avgRange),
-      isNearPivot(prev.high, state.pivotHigh, state.price),
-      curr.close < state.ema9,
-      curr.close < state.ema21,
-      quality >= 3,
-      curr.volume > state.avgVolume,
-    ];
-    const conf = calcConfluence(factors);
-    const ma = touchesEma21Short ? "21 EMA" : "9 EMA";
-    const reasons: string[] = [`rejection at ${ma}`];
-    if (hasToppingTail(prev)) reasons.push("topping tail");
-    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
-    if (isNearPivot(prev.high, state.pivotHigh, state.price)) reasons.push("at pivot resistance");
-    if (!curr.bullish) reasons.push("red bar");
-    return { detected: true, direction: "SHORT", confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 4).join(" + ") };
-  }
-  return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
-}
-
 function sentimentLabel(s: MarketState): string {
   if (s.sentiment === "BUYERS_CONTROL") return "GREED";
   if (s.sentiment === "SELLERS_CONTROL") return "FEAR";
@@ -1292,21 +1234,8 @@ async function simulateTick(session: TraderSession) {
         if (c.detected && c.direction === "SHORT") { detectedPattern = "Climax Reversal"; direction = "SHORT"; confluence = c.confluence; confluenceLabel = c.confluenceLabel; entryReason = c.reason; }
       }
 
-      if (!detectedPattern && session.patterns.includes("mabounce_long")) {
-        const m = detectMABounce(bars, state);
-        if (m.detected && m.direction === "LONG") { detectedPattern = "MA Bounce"; direction = "LONG"; confluence = m.confluence; confluenceLabel = m.confluenceLabel; entryReason = m.reason; }
-      }
-      if (!detectedPattern && session.patterns.includes("mabounce_short")) {
-        const m = detectMABounce(bars, state);
-        if (m.detected && m.direction === "SHORT") { detectedPattern = "MA Bounce"; direction = "SHORT"; confluence = m.confluence; confluenceLabel = m.confluenceLabel; entryReason = m.reason; }
-      }
-
       const openCount = Object.keys(session.openTrades).length;
       if (detectedPattern && !session.openTrades[tradeKey] && openCount < session.maxOpenTrades) {
-        const minConf = 2;
-        const entryGate = confluence >= 5 ? 0.65 : confluence >= 4 ? 0.50 : confluence >= minConf ? 0.30 : 0.10;
-
-        if (confluence >= minConf && Math.random() < entryGate) {
           const entry = state.price;
 
           const riskPointsFromDollars = r2(session.riskDollars / spec.pointValue);
@@ -1323,13 +1252,42 @@ async function simulateTick(session: TraderSession) {
 
           const clampedRisk = riskPointsFromDollars;
 
+          const htfAligned = direction === "LONG"
+            ? (state.ema9 > state.ema21 && state.price > state.sma200)
+            : (state.ema9 < state.ema21 && state.price < state.sma200);
+          const volumeConfirmed = bar.volume > state.avgVolume * 1.5;
+          const maConfluence = isNearMA(state.price, state.ema9) || isNearMA(state.price, state.ema21);
+          const rrValid = rewardRatio >= 2;
+
+          const avgRange = bars.slice(-10).reduce((sum, b) => sum + Math.abs(b.high - b.low), 0) / Math.min(bars.length, 10);
+          const recentRanges = bars.slice(-5).map(b => Math.abs(b.high - b.low));
+          const isChoppy = recentRanges.every(r => r < avgRange * 0.5);
+          const noOverlap = !isChoppy;
+
+          const confluencePass = confluence >= 4;
+
+          const preTradeChecklist = {
+            htfAligned,
+            volumeConfirmed,
+            maConfluence,
+            rrValid,
+            noOverlap,
+            confluencePass,
+          };
+
+          const allPassed = htfAligned && volumeConfirmed && maConfluence && rrValid && noOverlap && confluencePass;
+
+          console.log(`[trader] Checklist result for ${mk} ${direction} ${detectedPattern}: ${JSON.stringify(preTradeChecklist)} | allPassed=${allPassed}`);
+
           const checklist = {
             patternMatch: true,
-            volumeConfirmation: (entryReason || "").toLowerCase().includes("vol") || bar.volume > state.avgVolume * 1.15,
-            maRespect: (entryReason || "").toLowerCase().includes("ema") || (entryReason || "").toLowerCase().includes("ma") || isNearMA(state.price, state.ema21) || isNearMA(state.price, state.ema9),
-            priorPivotSR: (entryReason || "").toLowerCase().includes("pivot") || (entryReason || "").toLowerCase().includes("support") || (entryReason || "").toLowerCase().includes("resist") || isNearPivot(state.price, state.pivotHigh, state.price) || isNearPivot(state.price, state.pivotLow, state.price),
+            volumeConfirmation: volumeConfirmed,
+            maRespect: maConfluence,
+            priorPivotSR: isNearPivot(state.price, state.pivotHigh, state.price) || isNearPivot(state.price, state.pivotLow, state.price),
             barFormation: (entryReason || "").toLowerCase().includes("tail") || (entryReason || "").toLowerCase().includes("bar") || (entryReason || "").toLowerCase().includes("green") || (entryReason || "").toLowerCase().includes("red"),
           };
+
+        if (allPassed) {
 
           session.openTrades[tradeKey] = {
             entry, stop, target, trail: stop, initialStop: stop,
@@ -1452,7 +1410,6 @@ export function startTrader(config: {
     "buysetup": "Buy Setup", "sellsetup": "Sell Setup",
     "breakout_long": "Breakout Long", "breakout_short": "Breakout Short",
     "climax_long": "Climax Long", "climax_short": "Climax Short",
-    "mabounce_long": "MA Bounce Long", "mabounce_short": "MA Bounce Short",
   };
   const enabledNames = config.patterns.map(p => patternNames[p] || p).join(", ");
   const enabledTFs = config.timeframes.join(", ");

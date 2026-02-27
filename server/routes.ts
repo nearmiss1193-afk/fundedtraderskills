@@ -377,8 +377,6 @@ export async function registerRoutes(
         "breakout_short": {pattern: "Pivot Breakout", direction: "SHORT"},
         "climax_long": {pattern: "Climax Reversal", direction: "LONG"},
         "climax_short": {pattern: "Climax Reversal", direction: "SHORT"},
-        "mabounce_long": {pattern: "MA Bounce", direction: "LONG"},
-        "mabounce_short": {pattern: "MA Bounce", direction: "SHORT"},
       };
       for (const p of patterns) {
         const m = keyMap[p];

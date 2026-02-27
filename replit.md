@@ -56,8 +56,9 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
   - **Configurable Risk:Reward**: Dropdown (1:1 through 1:5, default 1:2); TP = risk × R:R ratio; shown in stats panel
   - **Force Trading Mode**: Checkbox to override time window during development
   - **Moving Averages**: 9 EMA + 21 EMA + 200 SMA for trend confirmation and entry filtering
-  - **5 Core Patterns**: 3 Bar Play (10-factor), Buy/Sell Setup (12-factor), Pivot Breakout (10-factor), Climax Reversal (9-factor), MA Bounce (8-factor)
-  - **Granular Pattern Control**: 10 individual toggles for each pattern direction (3Bar Long, 3Bar Short, Buy Setup, Sell Setup, Breakout Long, Breakout Short, Climax Long, Climax Short, MA Bounce Long, MA Bounce Short)
+  - **4 Core Patterns** (manual-approved only): 3 Bar Play (10-factor), Buy/Sell Setup (12-factor), Pivot Breakout (10-factor), Climax/Exhaustion Reversal (9-factor)
+  - **Granular Pattern Control**: 8 individual toggles for each pattern direction (3Bar Long, 3Bar Short, Buy Setup, Sell Setup, Breakout Long, Breakout Short, Climax Long, Climax Short)
+  - **Strict Pre-Trade Checklist** (all 6 must pass before signal fires): HTF alignment (EMA9>EMA21 + price vs SMA200), volume >1.5× avg, MA confluence (near 9 or 21 EMA), R:R ≥ 1:2, no choppy market (bar ranges not all <50% avg), confluence ≥ 4
   - **Timeframe Control**: 6 individually toggleable timeframes (2min, 5min, 15min, 1hr, 4hr, Daily) persisted in settings
   - **Short Selling**: All patterns support both LONG and SHORT entries
   - **Full Manual Integration** (Trading With An Edge):
@@ -86,14 +87,14 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
   - Sortable columns (click headers), color-coded outcomes (green=WIN, red=LOSS)
   - Editable notes per trade (click to add)
   - Confluence checklist dots with hover tooltip (Pattern, Volume, MA, Pivot/SR, Bar Formation)
-  - Settings panel: Risk %, R:R ratio, 10 granular pattern toggles, 6 timeframe toggles — persisted to `data/trader_settings.json`
+  - Settings panel: Risk $, R:R ratio, 8 granular pattern toggles, 6 timeframe toggles — persisted to `data/trader_settings.json`
   - Settings sync to main trader form on save
 - **Edge Builder Dashboard** (Tab 4) - Advanced analytics based on Live Traders philosophy:
   - **Overall Metrics**: Total Trades, Win Rate, Profit Factor, Expectancy, Total P&L
   - **Grouped Statistics**: Performance by Pattern, Symbol, Timeframe, and Confluence Level
   - **Setup Heatmap**: Color-coded cells showing top/bottom performing setups (hot=green, warm=yellow, cold=red)
   - **Optimize My Edge**: AI-generated recommendations (e.g. "Increase size on Buy Setup - 59% win rate")
-  - **Pattern Library**: 10 cards covering all long + short patterns from the manual with entry/stop/target rules and confluence tips
+  - **Pattern Library**: 8 cards covering all long + short patterns from the manual with entry/stop/target rules and confluence tips
   - **Filtered Analytics**: Edge Builder stats reflect only currently enabled patterns/timeframes from settings
   - API: GET `/api/journal/analytics?patterns=...&timeframes=...`
 

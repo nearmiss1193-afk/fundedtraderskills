@@ -10,9 +10,7 @@
     "breakout_long",
     "breakout_short",
     "climax_long",
-    "climax_short",
-    "mabounce_long",
-    "mabounce_short"
+    "climax_short"
   ],
   "enabledTimeframes": [
     "2min",
