@@ -907,6 +907,12 @@
           <option value="10">10</option>
         </select>
 
+        <label for="tradeAccount">NinjaTrader Account</label>
+        <select id="tradeAccount" style="max-width:280px;" data-testid="select-trade-account" onchange="syncAccountFields()">
+          <option value="Sim101" selected>Sim101 (Simulation)</option>
+          <option value="APEX2210630000011">APEX2210630000011 (Live/Paper)</option>
+        </select>
+
         <label for="rewardRatio">Risk : Reward Ratio (Hard Rule)</label>
         <select id="rewardRatio" style="max-width:200px;" data-testid="select-reward-ratio">
           <option value="1">1:1</option>
@@ -952,8 +958,8 @@
         </div>
 
         <div class="crosstrade-row">
-          <label for="ct-account">Account:</label>
-          <input type="text" id="ct-account" value="SIM101" placeholder="SIM101" data-testid="input-ct-account" />
+          <label>Account:</label>
+          <span id="ct-account-display" style="font-weight:700;font-size:0.85rem;color:#1a1a2e;" data-testid="text-ct-account">Sim101</span>
           <label for="ct-symbol">Symbol:</label>
           <select id="ct-symbol" data-testid="select-ct-symbol">
             <option value="MES">MES</option>
@@ -1448,6 +1454,7 @@
       const riskDollars = parseFloat(document.getElementById('riskDollars').value) || 100;
       const rewardRatio = parseFloat(document.getElementById('rewardRatio').value) || 2;
       const maxOpenTrades = parseInt(document.getElementById('maxOpenTrades').value) || 3;
+      const account = document.getElementById('tradeAccount').value;
       const customCondition = document.getElementById('customCondition').value;
       const forceTrading = document.getElementById('forceTrading').checked;
 
@@ -1459,7 +1466,7 @@
       document.getElementById('btn-stop-trader').disabled = false;
 
       try {
-        const d = await (await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskDollars,rewardRatio,maxOpenTrades,patterns,customCondition,forceTrading}) })).json();
+        const d = await (await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskDollars,rewardRatio,maxOpenTrades,account,patterns,customCondition,forceTrading}) })).json();
         if (d.success) {
           traderSessionId = d.sessionId;
           lastLogId = 0;
@@ -1516,14 +1523,17 @@
       } catch { showToast('Failed to send test signal'); }
     }
 
+    function syncAccountFields() {
+      const acct = document.getElementById('tradeAccount').value;
+      document.getElementById('ct-account-display').textContent = acct;
+    }
+
     async function sendCrossTrade() {
-      const account = document.getElementById('ct-account').value.trim();
+      const account = document.getElementById('tradeAccount').value;
       const symbol = document.getElementById('ct-symbol').value;
       const direction = document.getElementById('ct-direction').value;
       const btn = document.getElementById('btn-crosstrade');
       const statusEl = document.getElementById('ct-status');
-
-      if (!account) { showToast('Enter an account name'); return; }
 
       btn.disabled = true;
       statusEl.className = 'crosstrade-status';

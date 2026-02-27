@@ -32,15 +32,29 @@ export function forwardSignalToSupabase(payload: { symbol: string; direction: st
   });
 }
 
-function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string) {
+function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string, account: string) {
   const signalId = generateSignalId();
   const dir = direction === "LONG" ? "BUY" : "SELL";
+  const instrument = getNTInstrument(symbol);
 
-  console.log(`[trader] Queuing signal ${signalId} to Supabase: ${dir} ${symbol} qty=1 @ ${entry} | SL: ${stop} TP: ${target} | ${pattern} (confluence: ${confluence}) | R:R 1:${rewardRatio}`);
+  const signalPayload = {
+    symbol: instrument,
+    direction: dir === "BUY" ? "Long" : "Short",
+    quantity: 1,
+    account,
+    strategy: pattern,
+    entry_price: entry,
+    sl: stop,
+    tp: target,
+    rr: `1:${rewardRatio}`,
+    timestamp: new Date().toISOString(),
+  };
+
+  console.log(`[trader] Sending signal to bridge for account ${account}: ${JSON.stringify(signalPayload)}`);
 
   enqueueSignal({
     signalId,
-    symbol,
+    symbol: instrument,
     direction: dir,
     qty: 1,
     orderType: "MARKET",
@@ -50,14 +64,15 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
     pattern,
     confluence,
     riskReward: `1:${rewardRatio}`,
+    accountHint: account,
   }).catch((err) => {
     console.error(`[trader] Failed to queue signal ${signalId}: ${err.message}`);
   });
 
-  sendToCrossTrade({ symbol, direction: dir, orderType: "MARKET" })
+  sendToCrossTrade({ symbol: instrument, direction: dir, orderType: "MARKET", account })
     .then((res) => {
       if (res.success) {
-        console.log(`[trader] CrossTrade order sent: ${dir} ${symbol} → ${res.message}`);
+        console.log(`[trader] CrossTrade order sent: ${dir} ${instrument} → ${res.message}`);
       } else {
         console.warn(`[trader] CrossTrade skipped: ${res.message}`);
       }
@@ -120,6 +135,25 @@ const FUTURES_SPECS: Record<string, FuturesSpec> = {
 function getSpec(market: string): FuturesSpec {
   return FUTURES_SPECS[market] || FUTURES_SPECS["ES"];
 }
+
+function getNTInstrument(symbol: string): string {
+  const now = new Date();
+  const month = now.getMonth();
+  const year = now.getFullYear() % 100;
+  const contractMonths: Record<string, number[]> = {
+    quarterly: [3, 6, 9, 12],
+    monthly: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+  };
+  const quarterlySymbols = ["ES", "MES", "NQ", "MNQ", "YM", "MYM", "RTY", "M2K", "ZB", "ZN", "ZT", "ZF"];
+  const months = quarterlySymbols.includes(symbol) ? contractMonths.quarterly : contractMonths.monthly;
+  let contractMonth = months.find(m => m > month + 1) || months[0];
+  let contractYear = year;
+  if (contractMonth <= month + 1) contractYear = year + 1;
+  const mm = String(contractMonth).padStart(2, "0");
+  return `${symbol} ${mm}-${contractYear}`;
+}
+
+export { getNTInstrument };
 
 function fetchWithTimeout(url: string, timeoutMs = 5000): Promise<Response> {
   const controller = new AbortController();
@@ -279,6 +313,7 @@ interface TraderSession {
   riskDollars: number;
   rewardRatio: number;
   maxOpenTrades: number;
+  account: string;
   patterns: string[];
   customCondition: string;
   forceTrading: boolean;
@@ -1317,7 +1352,7 @@ async function simulateTick(session: TraderSession) {
             reason: entryReason || null,
           }));
 
-          emitTradeSignal(mk, direction, entry, stop, target, session.rewardRatio, confluence, detectedPattern);
+          emitTradeSignal(mk, direction, entry, stop, target, session.rewardRatio, confluence, detectedPattern, session.account);
 
           if (isTradovateConnected()) {
             placeBracketOrder(mk, direction, entry, stop, target, 1).then(result => {
@@ -1384,6 +1419,7 @@ export function startTrader(config: {
   riskDollars: number;
   rewardRatio: number;
   maxOpenTrades: number;
+  account: string;
   patterns: string[];
   customCondition: string;
   forceTrading: boolean;
@@ -1392,10 +1428,11 @@ export function startTrader(config: {
   const rr = Math.max(1, Math.min(config.rewardRatio || 2, 5));
   const maxOpen = Math.max(1, Math.min(config.maxOpenTrades || 3, 10));
   const riskAmt = Math.max(10, Math.min(config.riskDollars || 100, 10000));
+  const acct = config.account || process.env.CROSSTRADE_ACCOUNT || "SIM101";
   const session: TraderSession = {
     id, running: true,
     markets: config.markets, timeframes: config.timeframes,
-    riskDollars: riskAmt, rewardRatio: rr, maxOpenTrades: maxOpen, patterns: config.patterns,
+    riskDollars: riskAmt, rewardRatio: rr, maxOpenTrades: maxOpen, account: acct, patterns: config.patterns,
     customCondition: config.customCondition,
     forceTrading: config.forceTrading || false,
     logs: [], cumPnl: 0, timeout: null,
