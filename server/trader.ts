@@ -276,8 +276,9 @@ interface TraderSession {
   running: boolean;
   markets: string[];
   timeframes: string[];
-  riskPct: number;
+  riskDollars: number;
   rewardRatio: number;
+  maxOpenTrades: number;
   patterns: string[];
   customCondition: string;
   forceTrading: boolean;
@@ -1114,20 +1115,26 @@ async function simulateTick(session: TraderSession) {
       const t = session.openTrades[tradeKey];
       const bar = generateBar(state, mk, livePrice);
 
-      manageTrailingStop(t, bar, state);
+      t.barsSinceEntry++;
+      if (t.direction === "LONG") {
+        if (bar.high > t.highSinceEntry) t.highSinceEntry = bar.high;
+        if (bar.low < t.lowSinceEntry) t.lowSinceEntry = bar.low;
+      } else {
+        if (bar.low < t.lowSinceEntry) t.lowSinceEntry = bar.low;
+        if (bar.high > t.highSinceEntry) t.highSinceEntry = bar.high;
+      }
 
       let hit = false;
       if (t.direction === "LONG") {
         if (bar.low <= t.stop) {
-          const exitPrice = t.trailActivated ? t.stop : t.stop;
+          const exitPrice = t.stop;
           const pnl = r2((exitPrice - t.entry) * pointValue);
           session.cumPnl = r2(session.cumPnl + pnl);
-          if (pnl >= 0) session.wins++; else session.losses++;
-          const action = t.trailActivated && t.stop > t.initialStop ? "TRAILED OUT" : "STOPPED OUT";
+          session.losses++;
           session.logs.push(makeLog({
             id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
-            pattern: t.pattern, action, direction: t.direction,
-            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
+            pattern: t.pattern, action: "STOPPED OUT", direction: t.direction,
+            entry: t.entry, stop: t.stop, target: t.target,
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
@@ -1140,32 +1147,23 @@ async function simulateTick(session: TraderSession) {
           session.logs.push(makeLog({
             id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
             pattern: t.pattern, action: "TARGET HIT", direction: t.direction,
-            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
+            entry: t.entry, stop: t.stop, target: t.target,
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
           recordTrade(session, t, t.target, pnl, ts, dataSource);
           delete session.openTrades[tradeKey]; hit = true;
-        } else if (t.trailActivated && t.barsSinceEntry % 3 === 0) {
-          session.logs.push(makeLog({
-            id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
-            pattern: t.pattern, action: "TRAIL UPDATED", direction: t.direction,
-            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
-            cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
-            sentiment: sentimentLabel(state), dataSource,
-          }));
         }
       } else {
         if (bar.high >= t.stop) {
-          const exitPrice = t.trailActivated ? t.stop : t.stop;
+          const exitPrice = t.stop;
           const pnl = r2((t.entry - exitPrice) * pointValue);
           session.cumPnl = r2(session.cumPnl + pnl);
-          if (pnl >= 0) session.wins++; else session.losses++;
-          const action = t.trailActivated && t.stop < t.initialStop ? "TRAILED OUT" : "STOPPED OUT";
+          session.losses++;
           session.logs.push(makeLog({
             id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
-            pattern: t.pattern, action, direction: t.direction,
-            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
+            pattern: t.pattern, action: "STOPPED OUT", direction: t.direction,
+            entry: t.entry, stop: t.stop, target: t.target,
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
@@ -1178,23 +1176,14 @@ async function simulateTick(session: TraderSession) {
           session.logs.push(makeLog({
             id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
             pattern: t.pattern, action: "TARGET HIT", direction: t.direction,
-            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
+            entry: t.entry, stop: t.stop, target: t.target,
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
           recordTrade(session, t, t.target, pnl, ts, dataSource);
           delete session.openTrades[tradeKey]; hit = true;
-        } else if (t.trailActivated && t.barsSinceEntry % 3 === 0) {
-          session.logs.push(makeLog({
-            id: logIdCounter++, timestamp: ts, market: mk, timeframe: t.timeframe,
-            pattern: t.pattern, action: "TRAIL UPDATED", direction: t.direction,
-            entry: t.entry, stop: t.stop, target: t.target, trail: t.trail,
-            cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
-            sentiment: sentimentLabel(state), dataSource,
-          }));
         }
       }
-      if (!hit && t.trailActivated) continue;
       if (!hit) continue;
     }
 
@@ -1277,38 +1266,27 @@ async function simulateTick(session: TraderSession) {
         if (m.detected && m.direction === "SHORT") { detectedPattern = "MA Bounce"; direction = "SHORT"; confluence = m.confluence; confluenceLabel = m.confluenceLabel; entryReason = m.reason; }
       }
 
-      if (detectedPattern && !session.openTrades[tradeKey]) {
+      const openCount = Object.keys(session.openTrades).length;
+      if (detectedPattern && !session.openTrades[tradeKey] && openCount < session.maxOpenTrades) {
         const minConf = 2;
         const entryGate = confluence >= 5 ? 0.65 : confluence >= 4 ? 0.50 : confluence >= minConf ? 0.30 : 0.10;
 
         if (confluence >= minConf && Math.random() < entryGate) {
           const entry = state.price;
-          const recentBars = bars.slice(-5);
-          let stopLevel: number;
 
-          const stopPad = spec.basePrice * 0.0005;
-          if (direction === "LONG") {
-            const swingLow = Math.min(...recentBars.map(b => b.low));
-            stopLevel = swingLow - rand(stopPad * 0.5, stopPad * 2);
-          } else {
-            const swingHigh = Math.max(...recentBars.map(b => b.high));
-            stopLevel = swingHigh + rand(stopPad * 0.5, stopPad * 2);
-          }
-
-          const riskPoints = r2(Math.abs(entry - stopLevel));
-          const minRisk = spec.basePrice * 0.0003;
-          const maxRisk = spec.basePrice * 0.0012;
-          const clampedRisk = Math.max(minRisk, Math.min(riskPoints, maxRisk));
+          const riskPointsFromDollars = r2(session.riskDollars / spec.pointValue);
           const rewardRatio = session.rewardRatio;
           let stop: number, target: number;
 
           if (direction === "LONG") {
-            stop = r2(entry - clampedRisk);
-            target = r2(entry + clampedRisk * rewardRatio);
+            stop = r2(entry - riskPointsFromDollars);
+            target = r2(entry + riskPointsFromDollars * rewardRatio);
           } else {
-            stop = r2(entry + clampedRisk);
-            target = r2(entry - clampedRisk * rewardRatio);
+            stop = r2(entry + riskPointsFromDollars);
+            target = r2(entry - riskPointsFromDollars * rewardRatio);
           }
+
+          const clampedRisk = riskPointsFromDollars;
 
           const checklist = {
             patternMatch: true,
@@ -1403,18 +1381,21 @@ async function simulateTick(session: TraderSession) {
 export function startTrader(config: {
   markets: string[];
   timeframes: string[];
-  riskPct: number;
+  riskDollars: number;
   rewardRatio: number;
+  maxOpenTrades: number;
   patterns: string[];
   customCondition: string;
   forceTrading: boolean;
 }): string {
   const id = "session_" + Date.now();
   const rr = Math.max(1, Math.min(config.rewardRatio || 2, 5));
+  const maxOpen = Math.max(1, Math.min(config.maxOpenTrades || 3, 10));
+  const riskAmt = Math.max(10, Math.min(config.riskDollars || 100, 10000));
   const session: TraderSession = {
     id, running: true,
     markets: config.markets, timeframes: config.timeframes,
-    riskPct: config.riskPct, rewardRatio: rr, patterns: config.patterns,
+    riskDollars: riskAmt, rewardRatio: rr, maxOpenTrades: maxOpen, patterns: config.patterns,
     customCondition: config.customCondition,
     forceTrading: config.forceTrading || false,
     logs: [], cumPnl: 0, timeout: null,
@@ -1478,7 +1459,7 @@ export function getTraderLogs(id: string, after?: number): TradeLog[] {
   return s.logs;
 }
 
-export function getTraderStatus(id: string): { running: boolean; cumPnl: number; tradeCount: number; openPositions: number; wins: number; losses: number; rewardRatio: number } | null {
+export function getTraderStatus(id: string): { running: boolean; cumPnl: number; tradeCount: number; openPositions: number; wins: number; losses: number; rewardRatio: number; riskDollars: number; maxOpenTrades: number } | null {
   const s = sessions[id];
   if (!s) return null;
   return {
@@ -1487,6 +1468,8 @@ export function getTraderStatus(id: string): { running: boolean; cumPnl: number;
     openPositions: Object.keys(s.openTrades).length,
     wins: s.wins, losses: s.losses,
     rewardRatio: s.rewardRatio,
+    riskDollars: s.riskDollars,
+    maxOpenTrades: s.maxOpenTrades,
   };
 }
 

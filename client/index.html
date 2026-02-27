@@ -893,10 +893,21 @@
           </label>
         </div>
 
-        <label for="riskPct">Risk Per Trade (% of Account)</label>
-        <input id="riskPct" type="number" value="0.5" min="0.1" max="5" step="0.1" style="max-width:160px;" data-testid="input-risk-pct" />
+        <label for="riskDollars">Risk Per Trade ($)</label>
+        <input id="riskDollars" type="number" value="100" min="10" max="10000" step="10" style="max-width:160px;" data-testid="input-risk-dollars" />
 
-        <label for="rewardRatio">Risk : Reward Ratio</label>
+        <label for="maxOpenTrades">Max Open Trades</label>
+        <select id="maxOpenTrades" style="max-width:160px;" data-testid="select-max-open-trades">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="8">8</option>
+          <option value="10">10</option>
+        </select>
+
+        <label for="rewardRatio">Risk : Reward Ratio (Hard Rule)</label>
         <select id="rewardRatio" style="max-width:200px;" data-testid="select-reward-ratio">
           <option value="1">1:1</option>
           <option value="1.5">1:1.5</option>
@@ -972,6 +983,8 @@
           <div class="t-stat"><div class="t-stat-label">Open</div><div class="t-stat-value" id="stat-open">0</div></div>
           <div class="t-stat"><div class="t-stat-label">Simulated P&amp;L</div><div class="t-stat-value" id="stat-pnl">$0.00</div></div>
           <div class="t-stat"><div class="t-stat-label">R:R</div><div class="t-stat-value" id="stat-rr" data-testid="text-reward-ratio">1:2</div></div>
+          <div class="t-stat"><div class="t-stat-label">Risk</div><div class="t-stat-value" id="stat-risk-amt" data-testid="text-risk-amount">$100</div></div>
+          <div class="t-stat"><div class="t-stat-label">Max Open</div><div class="t-stat-value" id="stat-max-open" data-testid="text-max-open">3</div></div>
         </div>
 
         <div class="trade-log-wrap">
@@ -1049,11 +1062,23 @@
           <h3>Trader Settings</h3>
           <div class="settings-grid">
             <div>
-              <label for="set-risk">Risk Per Trade (%)</label>
-              <input id="set-risk" type="number" value="0.5" min="0.1" max="5" step="0.1" data-testid="input-set-risk" />
+              <label for="set-risk">Risk Per Trade ($)</label>
+              <input id="set-risk" type="number" value="100" min="10" max="10000" step="10" data-testid="input-set-risk" />
             </div>
             <div>
-              <label for="set-rr">Risk : Reward Ratio</label>
+              <label for="set-max-trades">Max Open Trades</label>
+              <select id="set-max-trades" data-testid="select-set-max-trades">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="8">8</option>
+                <option value="10">10</option>
+              </select>
+            </div>
+            <div>
+              <label for="set-rr">Risk : Reward Ratio (Hard Rule)</label>
               <select id="set-rr" data-testid="select-set-rr">
                 <option value="1">1:1</option>
                 <option value="1.5">1:1.5</option>
@@ -1420,8 +1445,9 @@
       const markets = getChecked('market');
       const timeframes = getChecked('tf');
       const patterns = getChecked('pattern');
-      const riskPct = parseFloat(document.getElementById('riskPct').value) || 0.5;
+      const riskDollars = parseFloat(document.getElementById('riskDollars').value) || 100;
       const rewardRatio = parseFloat(document.getElementById('rewardRatio').value) || 2;
+      const maxOpenTrades = parseInt(document.getElementById('maxOpenTrades').value) || 3;
       const customCondition = document.getElementById('customCondition').value;
       const forceTrading = document.getElementById('forceTrading').checked;
 
@@ -1433,7 +1459,7 @@
       document.getElementById('btn-stop-trader').disabled = false;
 
       try {
-        const d = await (await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskPct,rewardRatio,patterns,customCondition,forceTrading}) })).json();
+        const d = await (await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskDollars,rewardRatio,maxOpenTrades,patterns,customCondition,forceTrading}) })).json();
         if (d.success) {
           traderSessionId = d.sessionId;
           lastLogId = 0;
@@ -1441,6 +1467,8 @@
           document.getElementById('trader-dashboard').style.display = 'block';
           document.getElementById('log-live-dot').className = 'log-live-dot';
           document.getElementById('stat-rr').textContent = '1:' + rewardRatio;
+          document.getElementById('stat-risk-amt').textContent = '$' + riskDollars;
+          document.getElementById('stat-max-open').textContent = maxOpenTrades;
           showToast('Autonomous trader started!');
           traderPollInterval = setInterval(pollTraderLogs, 2000);
         } else { showToast('Failed to start'); document.getElementById('btn-start-trader').disabled = false; }
@@ -1797,10 +1825,12 @@
     async function loadTraderSettings() {
       try {
         const s = await (await fetch('/api/settings')).json();
-        document.getElementById('set-risk').value = s.riskPct || 0.5;
+        document.getElementById('set-risk').value = s.riskDollars || 100;
         document.getElementById('set-rr').value = s.rewardRatio || 2;
-        document.getElementById('riskPct').value = s.riskPct || 0.5;
+        document.getElementById('set-max-trades').value = s.maxOpenTrades || 3;
+        document.getElementById('riskDollars').value = s.riskDollars || 100;
         document.getElementById('rewardRatio').value = s.rewardRatio || 2;
+        document.getElementById('maxOpenTrades').value = s.maxOpenTrades || 3;
         if (s.enabledPatterns) {
           document.querySelectorAll('input[name="set-pattern"]').forEach(cb => {
             cb.checked = s.enabledPatterns.includes(cb.value);
@@ -1821,8 +1851,9 @@
     }
 
     async function saveTraderSettings() {
-      const riskPct = parseFloat(document.getElementById('set-risk').value) || 0.5;
+      const riskDollars = parseFloat(document.getElementById('set-risk').value) || 100;
       const rewardRatio = parseFloat(document.getElementById('set-rr').value) || 2;
+      const maxOpenTrades = parseInt(document.getElementById('set-max-trades').value) || 3;
       const enabledPatterns = [...document.querySelectorAll('input[name="set-pattern"]:checked')].map(c => c.value);
       const enabledTimeframes = [...document.querySelectorAll('input[name="set-tf"]:checked')].map(c => c.value);
       if (!enabledPatterns.length) { showToast('Select at least one pattern'); return; }
@@ -1830,10 +1861,11 @@
       try {
         await fetch('/api/settings', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ riskPct, rewardRatio, enabledPatterns, enabledTimeframes })
+          body: JSON.stringify({ riskDollars, rewardRatio, maxOpenTrades, enabledPatterns, enabledTimeframes })
         });
-        document.getElementById('riskPct').value = riskPct;
+        document.getElementById('riskDollars').value = riskDollars;
         document.getElementById('rewardRatio').value = rewardRatio;
+        document.getElementById('maxOpenTrades').value = maxOpenTrades;
         document.querySelectorAll('input[name="pattern"]').forEach(cb => {
           cb.checked = enabledPatterns.includes(cb.value);
         });

@@ -1,11 +1,25 @@
 {
-  "riskPct": 1,
+  "riskDollars": 100,
   "rewardRatio": 2,
+  "maxOpenTrades": 3,
   "enabledPatterns": [
-    "3bar",
+    "3bar_long",
+    "3bar_short",
     "buysetup",
-    "breakout",
-    "climax",
-    "mabounce"
+    "sellsetup",
+    "breakout_long",
+    "breakout_short",
+    "climax_long",
+    "climax_short",
+    "mabounce_long",
+    "mabounce_short"
+  ],
+  "enabledTimeframes": [
+    "2min",
+    "5min",
+    "15min",
+    "1hour",
+    "4hour",
+    "daily"
   ]
 }

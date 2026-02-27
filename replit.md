@@ -130,6 +130,11 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
 - `POLYGON_API_KEY` - Polygon.io API key for real futures data (falls back to simulated if missing)
 - `SUPABASE_URL` - Supabase project URL for trade signal queue
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key for server-side inserts
+
+## Risk Management
+- **Risk Per Trade**: Dollar amount (e.g. $100), not percentage. Stop loss is calculated as risk_dollars / point_value from entry.
+- **R:R Hard Rule**: Trades exit ONLY at exact stop loss or exact target. No trailing stops. If you risk $100 at 1:2 R:R, you either lose $100 or make $200.
+- **Max Open Trades**: Selectable before starting (1-10). New entries are blocked when limit is reached.
 - `TRADOVATE_USERNAME` - Tradovate demo account username
 - `TRADOVATE_PASSWORD` - Tradovate demo account password
 - `TRADOVATE_APP_ID` - Tradovate application ID

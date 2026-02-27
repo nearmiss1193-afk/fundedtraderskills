@@ -42,15 +42,17 @@ export interface JournalEntry {
 }
 
 export interface TraderSettings {
-  riskPct: number;
+  riskDollars: number;
   rewardRatio: number;
+  maxOpenTrades: number;
   enabledPatterns: string[];
   enabledTimeframes: string[];
 }
 
 const DEFAULT_SETTINGS: TraderSettings = {
-  riskPct: 0.5,
+  riskDollars: 100,
   rewardRatio: 2,
+  maxOpenTrades: 3,
   enabledPatterns: ["3bar_long", "3bar_short", "buysetup", "sellsetup", "breakout_long", "breakout_short", "climax_long", "climax_short", "mabounce_long", "mabounce_short"],
   enabledTimeframes: ["2min", "5min", "15min", "1hour", "4hour", "daily"],
 };
