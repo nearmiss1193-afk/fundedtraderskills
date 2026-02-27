@@ -9,6 +9,28 @@ const POLYGON_BASE = "https://api.polygon.io";
 const NGROK_BRIDGE_URL = "https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal";
 const LOCAL_SIGNAL_PORT = parseInt(process.env.PORT || "5000", 10);
 
+export function forwardSignalToNgrok(payload: { symbol: string; direction: string; entryPrice: number; stopLoss: number; takeProfit: number; riskReward: string; confluence: number; pattern: string }) {
+  const body = JSON.stringify(payload);
+  const ngrokReq = https.request(NGROK_BRIDGE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
+  }, (res) => {
+    res.on("data", () => {});
+    res.on("end", () => {
+      if (res.statusCode === 200 || res.statusCode === 201) {
+        console.log(`[trader] Signal sent to ngrok bridge successfully: ${payload.direction} ${payload.symbol} @ ${payload.entryPrice} | SL: ${payload.stopLoss} TP: ${payload.takeProfit} | ${payload.pattern} (confluence: ${payload.confluence}) | R:R ${payload.riskReward}`);
+      } else {
+        console.log(`[trader] Ngrok bridge returned status ${res.statusCode} for ${payload.symbol}`);
+      }
+    });
+  });
+  ngrokReq.on("error", (err) => {
+    console.log(`[trader] Ngrok bridge error for ${payload.symbol}: ${err.message}`);
+  });
+  ngrokReq.write(body);
+  ngrokReq.end();
+}
+
 function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string) {
   const ngrokPayload = JSON.stringify({
     symbol,

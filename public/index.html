@@ -1393,26 +1393,17 @@
         takeProfit: 5838.50,
         riskReward: "1:3",
         confluence: 4,
-        pattern: "3 Bar Play"
+        pattern: "3 Bar Play",
+        source: "test-button"
       };
       try {
-        const ngrokUrl = 'https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal';
-        const [localRes, ngrokRes] = await Promise.allSettled([
-          fetch('/api/trade-signal', {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({...testSignal, source: 'test-button'})
-          }),
-          fetch(ngrokUrl, {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify(testSignal)
-          })
-        ]);
-        const localOk = localRes.status === 'fulfilled' && localRes.value.ok;
-        const ngrokOk = ngrokRes.status === 'fulfilled' && ngrokRes.value.ok;
-        if (ngrokOk) {
+        const res = await fetch('/api/trade-signal', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(testSignal)
+        });
+        if (res.ok) {
           showToast('Test signal sent to ngrok bridge: Long ES @ 5823.50');
-        } else if (localOk) {
-          showToast('Test signal sent locally (ngrok unreachable)');
         } else {
           showToast('Signal failed to send');
         }
