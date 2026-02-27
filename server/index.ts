@@ -6,7 +6,7 @@ import path from "path";
 const app = express();
 const httpServer = createServer(app);
 
-app.use(express.static(path.resolve(import.meta.dirname, "..", "public")));
+app.use(express.static(path.resolve(process.cwd(), "public")));
 
 declare module "http" {
   interface IncomingMessage {
@@ -79,7 +79,7 @@ app.use((req, res, next) => {
   });
 
   app.get("/{*path}", (_req, res) => {
-    res.sendFile(path.resolve(import.meta.dirname, "..", "public", "index.html"));
+    res.sendFile(path.resolve(process.cwd(), "public", "index.html"));
   });
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
