@@ -26,6 +26,7 @@ Minimal Node.js + Express starter for a skill marketplace with autonomous AI ski
 - **Test Signal Button**: UI button sends MES Long qty=1 test signal, queues to Supabase
 - `GET /api/tradovate/status` - Tradovate connection status
 - `POST /api/tradovate/connect` - Attempt Tradovate connection
+- `POST /api/crosstrade/test` - Send order to CrossTrade `{ symbol, direction, account }` — forwards to NinjaTrader via CrossTrade webhook
 
 ## Structure
 
@@ -36,6 +37,7 @@ server/trader.ts    - AI Futures Trader engine (async loop, Polygon.io data, pat
 server/supabase.ts  - Supabase client, enqueueSignal(), getTradeAck()
 server/journal.ts   - Trade journal + settings persistence + advanced analytics
 server/tradovate.ts - Tradovate API integration (auth, bracket orders, position mgmt)
+server/services/crosstrade.ts - CrossTrade webhook integration (sends orders to NinjaTrader via CrossTrade)
 server/storage.ts   - Stub (in-memory storage in routes.ts)
 shared/schema.ts    - Stub
 data/               - Persistent JSON files (trade_journal.json, trader_settings.json)
@@ -133,6 +135,11 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
 - `TRADOVATE_APP_ID` - Tradovate application ID
 - `TRADOVATE_CID` - Tradovate client ID
 - `TRADOVATE_SECRET` - Tradovate client secret
+- `CROSSTRADE_WEBHOOK_URL` - CrossTrade webhook URL for order forwarding
+- `CROSSTRADE_KEY` - CrossTrade API key for authentication
+- `CROSSTRADE_ACCOUNT` - Default CrossTrade account name (default: SIM101)
+- `MAX_CONTRACTS` - Maximum contracts per CrossTrade order (default: 1)
+- `ALLOW_LIVE_TRADES` - Set to "true" to allow non-SIM accounts (safety guard)
 
 ## Local Components (run on your PC, not Replit)
 

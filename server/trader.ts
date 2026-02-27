@@ -1,6 +1,7 @@
 import { addJournalEntry, type JournalEntry } from "./journal";
 import { connectTradovate, isTradovateConnected, getTradovateStatus, placeBracketOrder } from "./tradovate";
 import { enqueueSignal } from "./supabase";
+import { sendToCrossTrade } from "./services/crosstrade";
 import { randomBytes } from "crypto";
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
@@ -52,6 +53,18 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
   }).catch((err) => {
     console.error(`[trader] Failed to queue signal ${signalId}: ${err.message}`);
   });
+
+  sendToCrossTrade({ symbol, direction: dir, orderType: "MARKET" })
+    .then((res) => {
+      if (res.success) {
+        console.log(`[trader] CrossTrade order sent: ${dir} ${symbol} → ${res.message}`);
+      } else {
+        console.warn(`[trader] CrossTrade skipped: ${res.message}`);
+      }
+    })
+    .catch((err) => {
+      console.error(`[trader] CrossTrade error: ${err.message}`);
+    });
 }
 
 interface PolygonPrice {

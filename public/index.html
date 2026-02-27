@@ -301,6 +301,60 @@
     }
     .btn-test-signal:hover { background: #4338ca; }
 
+    .btn-crosstrade {
+      flex: 0 0 auto;
+      background: #f59e0b;
+      color: #1a1a2e;
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding: 0.85rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-crosstrade:hover { background: #d97706; }
+    .btn-crosstrade:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .crosstrade-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 8px;
+    }
+
+    .crosstrade-row label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #92400e;
+      white-space: nowrap;
+    }
+
+    .crosstrade-row input, .crosstrade-row select {
+      padding: 0.5rem 0.65rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      background: #fff;
+    }
+
+    .crosstrade-row select { min-width: 80px; }
+    .crosstrade-row input { width: 120px; }
+
+    .crosstrade-status {
+      font-size: 0.78rem;
+      margin-left: auto;
+      color: #6b7280;
+      white-space: nowrap;
+    }
+    .crosstrade-status.success { color: #16a34a; font-weight: 600; }
+    .crosstrade-status.error { color: #dc2626; font-weight: 600; }
+
     /* Stats row */
     .trader-stats {
       display: flex;
@@ -885,6 +939,29 @@
           <button id="btn-stop-trader" class="btn-stop" onclick="stopTrader()" disabled data-testid="button-stop-trader">Stop Trading</button>
           <button class="btn-test-signal" onclick="sendTestSignal()" data-testid="button-test-signal">&#x1f4e1; Test Signal</button>
         </div>
+
+        <div class="crosstrade-row">
+          <label for="ct-account">Account:</label>
+          <input type="text" id="ct-account" value="SIM101" placeholder="SIM101" data-testid="input-ct-account" />
+          <label for="ct-symbol">Symbol:</label>
+          <select id="ct-symbol" data-testid="select-ct-symbol">
+            <option value="MES">MES</option>
+            <option value="ES">ES</option>
+            <option value="MNQ">MNQ</option>
+            <option value="NQ">NQ</option>
+            <option value="MYM">MYM</option>
+            <option value="YM">YM</option>
+            <option value="MCL">MCL</option>
+            <option value="CL">CL</option>
+          </select>
+          <label for="ct-direction">Side:</label>
+          <select id="ct-direction" data-testid="select-ct-direction">
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+          </select>
+          <button class="btn-crosstrade" id="btn-crosstrade" onclick="sendCrossTrade()" data-testid="button-crosstrade">&#x1f517; CrossTrade</button>
+          <span class="crosstrade-status" id="ct-status" data-testid="text-ct-status"></span>
+        </div>
       </div>
 
       <div id="trader-dashboard" style="display:none;">
@@ -1409,6 +1486,43 @@
           showToast('Signal failed to send');
         }
       } catch { showToast('Failed to send test signal'); }
+    }
+
+    async function sendCrossTrade() {
+      const account = document.getElementById('ct-account').value.trim();
+      const symbol = document.getElementById('ct-symbol').value;
+      const direction = document.getElementById('ct-direction').value;
+      const btn = document.getElementById('btn-crosstrade');
+      const statusEl = document.getElementById('ct-status');
+
+      if (!account) { showToast('Enter an account name'); return; }
+
+      btn.disabled = true;
+      statusEl.className = 'crosstrade-status';
+      statusEl.textContent = 'Sending...';
+
+      try {
+        const res = await fetch('/api/crosstrade/test', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ symbol, direction, account })
+        });
+        const data = await res.json();
+        if (data.success) {
+          statusEl.className = 'crosstrade-status success';
+          statusEl.textContent = data.message;
+          showToast('CrossTrade: ' + data.message);
+        } else {
+          statusEl.className = 'crosstrade-status error';
+          statusEl.textContent = data.message;
+          showToast('CrossTrade error: ' + data.message);
+        }
+      } catch (err) {
+        statusEl.className = 'crosstrade-status error';
+        statusEl.textContent = 'Network error';
+        showToast('CrossTrade network error');
+      }
+      btn.disabled = false;
     }
 
     function actionClass(action) {
