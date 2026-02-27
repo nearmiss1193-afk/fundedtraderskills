@@ -47,3 +47,4 @@ outputType = "webview"
 [userenv.shared]
 CROSSTRADE_ACCOUNT = "SIM101"
 MAX_CONTRACTS = "1"
+CROSSTRADE_WEBHOOK_URL = "https://app.crosstrade.io/v1/send/gz6mF31c/4yDuRtgqdf4aaFzZt_VXtg"
