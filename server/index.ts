@@ -78,6 +78,10 @@ app.use((req, res, next) => {
     return res.status(status).json({ message });
   });
 
+  app.get("/", (_req, res) => {
+    res.sendFile(path.resolve(process.cwd(), "public", "index.html"));
+  });
+
   if (process.env.NODE_ENV === "production") {
     const { serveStatic } = await import("./static");
     serveStatic(app);
