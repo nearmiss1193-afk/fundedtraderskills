@@ -19,10 +19,11 @@ Minimal Node.js + Express starter for a skill marketplace with autonomous AI ski
 - `GET /api/journal/analytics` - Advanced analytics (grouped by pattern/symbol/timeframe/confluence + recommendations)
 - `GET /api/settings` - Load trader settings
 - `POST /api/settings` - Save trader settings
-- `POST /api/trade-signal` - NinjaTrader API bridge endpoint `{ symbol, direction, entryPrice, stopLoss, takeProfit, riskReward, confluence, pattern, qty }` — auto-POSTed on every trade entry in Force Trading mode
-- `GET /api/trade-signals` - List recent trade signals (up to 200)
-- **Signal Bridge (Option A)**: All signals forwarded to `TRADE_BRIDGE_URL` env var (defaults to ngrok URL). Each signal gets a unique `signalId`. Bridge returns structured ACK: `{ status, signalId, orderId, message/reason }`. Pipeline: Replit → ngrok → Python bridge (localhost:5000) → NinjaTrader AddOn (TCP 7777) → SIM order → ACK back
-- **Test Signal Button**: UI button sends MES Long qty=1 test signal through the full pipeline
+- `POST /api/trade-signal` - Trade signal endpoint `{ symbol, direction, entryPrice, stopLoss, takeProfit, riskReward, confluence, pattern, qty }` — inserts into Supabase `trade_signals` table with status="NEW"
+- `GET /api/trade-signals` - List recent trade signals from memory (up to 200)
+- `GET /api/trade-ack/:signalId` - Poll Supabase `trade_acks` table for ACK on a signal (accepted/rejected/pending)
+- **Signal Queue (Supabase)**: All signals inserted into Supabase `trade_signals` table. Each signal gets a unique `signalId`. Local bridge polls Supabase for NEW signals, forwards to NinjaTrader, writes ACK back to `trade_acks`.
+- **Test Signal Button**: UI button sends MES Long qty=1 test signal, queues to Supabase
 - `GET /api/tradovate/status` - Tradovate connection status
 - `POST /api/tradovate/connect` - Attempt Tradovate connection
 
@@ -32,6 +33,7 @@ Minimal Node.js + Express starter for a skill marketplace with autonomous AI ski
 public/index.html   - Static frontend (4 tabs: Create Skill, Permit Checker, AI Futures Trader, Edge Builder)
 server/routes.ts    - API endpoints
 server/trader.ts    - AI Futures Trader engine (async loop, Polygon.io data, pattern detection, trailing stops)
+server/supabase.ts  - Supabase client, enqueueSignal(), getTradeAck()
 server/journal.ts   - Trade journal + settings persistence + advanced analytics
 server/tradovate.ts - Tradovate API integration (auth, bracket orders, position mgmt)
 server/storage.ts   - Stub (in-memory storage in routes.ts)
@@ -124,7 +126,8 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
 ## Environment
 
 - `POLYGON_API_KEY` - Polygon.io API key for real futures data (falls back to simulated if missing)
-- `TRADE_BRIDGE_URL` - URL to forward trade signals to (defaults to ngrok URL for NinjaTrader bridge)
+- `SUPABASE_URL` - Supabase project URL for trade signal queue
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key for server-side inserts
 - `TRADOVATE_USERNAME` - Tradovate demo account username
 - `TRADOVATE_PASSWORD` - Tradovate demo account password
 - `TRADOVATE_APP_ID` - Tradovate application ID
@@ -133,10 +136,9 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
 
 ## Local Components (run on your PC, not Replit)
 
-- `local-bridge/bridge.py` - Python Flask bridge that receives signals via ngrok, validates, forwards to NinjaTrader via TCP port 7777, returns ACK
-- `local-bridge/requirements.txt` - Python dependencies (flask)
+- `local-bridge/bridge.py` - Python bridge that polls Supabase `trade_signals` for NEW rows, forwards to NinjaTrader via TCP port 7777, writes ACK to `trade_acks`
 - `ninjatrader-addon/SovereignBridgeAddon.cs` - NinjaTrader 8 AddOn that listens on TCP 7777, places SIM orders, returns ACK with orderId
-- See `local-bridge/README.md` for full setup instructions
+- See `local-bridge/README.md` for setup instructions
 
 ## Running
 

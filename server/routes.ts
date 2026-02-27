@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { type Server } from "http";
 import path from "path";
 import express from "express";
-import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToBridge } from "./trader";
+import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase } from "./trader";
+import { getTradeAck } from "./supabase";
 import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
 
 let skills: any[] = [];
@@ -271,7 +272,7 @@ export async function registerRoutes(
 
     console.log(`[trade-signal] ${signal.source.toUpperCase()} | ${signal.direction} ${signal.symbol} @ ${signal.entryPrice} | SL: ${signal.stopLoss} TP: ${signal.takeProfit} | ${signal.pattern} (${signal.confluence}) | R:R ${signal.riskReward}`);
 
-    forwardSignalToBridge({
+    forwardSignalToSupabase({
       symbol: signal.symbol,
       direction: signal.direction,
       entryPrice: signal.entryPrice,
@@ -282,8 +283,10 @@ export async function registerRoutes(
       pattern: signal.pattern,
       qty: req.body.qty || 1,
       source: signal.source,
-    }).then((ack) => {
-      console.log(`[trade-signal] Bridge ACK for ${signal.symbol}: status=${ack.status} orderId=${ack.orderId || "N/A"} ${ack.reason || ack.message || ""}`);
+    }).then((result) => {
+      console.log(`[trade-signal] Supabase queue result for ${signal.symbol}: status=${result.status} signalId=${result.signalId}`);
+    }).catch((err) => {
+      console.error(`[trade-signal] Supabase queue error for ${signal.symbol}: ${err.message}`);
     });
 
     res.json({ success: true, message: "Signal received", signal });
@@ -291,6 +294,19 @@ export async function registerRoutes(
 
   app.get("/api/trade-signals", (_req, res) => {
     res.json({ signals: signalLog, count: signalLog.length });
+  });
+
+  app.get("/api/trade-ack/:signalId", async (req, res) => {
+    try {
+      const ack = await getTradeAck(req.params.signalId);
+      if (ack) {
+        res.json(ack);
+      } else {
+        res.json({ status: "pending", signalId: req.params.signalId });
+      }
+    } catch (err: any) {
+      res.status(500).json({ status: "error", signalId: req.params.signalId, reason: err.message });
+    }
   });
 
   app.get("/api/journal", (_req, res) => {

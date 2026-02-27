@@ -1,90 +1,25 @@
 import { addJournalEntry, type JournalEntry } from "./journal";
 import { connectTradovate, isTradovateConnected, getTradovateStatus, placeBracketOrder } from "./tradovate";
-import https from "https";
-import http from "http";
+import { enqueueSignal } from "./supabase";
 import { randomBytes } from "crypto";
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
 
-const TRADE_BRIDGE_URL = process.env.TRADE_BRIDGE_URL || "https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal";
-
 function generateSignalId(): string {
   return `sig-${Date.now()}-${randomBytes(3).toString("hex")}`;
 }
 
-export interface BridgeSignal {
-  signalId: string;
-  symbol: string;
-  direction: string;
-  qty: number;
-  orderType: string;
-  entryPrice: number;
-  stopLoss: number;
-  takeProfit: number;
-  pattern: string;
-  confluence: number;
-  riskReward: string;
-  timestamp: string;
-}
-
-export interface BridgeAck {
-  status: "accepted" | "rejected";
-  signalId: string;
-  orderId?: string;
-  reason?: string;
-  message?: string;
-}
-
-function sendToBridge(signal: BridgeSignal): Promise<BridgeAck> {
-  return new Promise((resolve) => {
-    const body = JSON.stringify(signal);
-    const url = new URL(TRADE_BRIDGE_URL);
-    const isHttps = url.protocol === "https:";
-    const mod = isHttps ? https : http;
-
-    console.log(`[trader] Sending signal ${signal.signalId} to: ${TRADE_BRIDGE_URL}`);
-    console.log(`[trader] Payload: ${signal.direction} ${signal.symbol} qty=${signal.qty} @ ${signal.entryPrice} | SL: ${signal.stopLoss} TP: ${signal.takeProfit} | ${signal.pattern} (confluence: ${signal.confluence}) | R:R ${signal.riskReward}`);
-
-    const req = mod.request(TRADE_BRIDGE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
-    }, (res) => {
-      let data = "";
-      res.on("data", (chunk) => { data += chunk; });
-      res.on("end", () => {
-        if (res.statusCode === 200 || res.statusCode === 201) {
-          console.log(`[trader] Signal sent to bridge successfully: ${signal.direction} ${signal.symbol} @ ${signal.entryPrice} | signalId: ${signal.signalId}`);
-          try {
-            const ack: BridgeAck = JSON.parse(data);
-            console.log(`[trader] Bridge ACK: status=${ack.status} signalId=${ack.signalId} orderId=${ack.orderId || "N/A"} message=${ack.message || ack.reason || ""}`);
-            resolve(ack);
-          } catch {
-            console.log(`[trader] Bridge response (non-JSON): ${data.slice(0, 200)}`);
-            resolve({ status: "accepted", signalId: signal.signalId, message: "Signal received (no structured ACK)" });
-          }
-        } else {
-          console.log(`[trader] Bridge returned status ${res.statusCode} for ${signal.symbol} (signalId: ${signal.signalId})`);
-          resolve({ status: "rejected", signalId: signal.signalId, reason: `HTTP ${res.statusCode}` });
-        }
-      });
-    });
-    req.on("error", (err) => {
-      console.log(`[trader] Bridge connection error for ${signal.symbol} (signalId: ${signal.signalId}): ${err.message}`);
-      resolve({ status: "rejected", signalId: signal.signalId, reason: err.message });
-    });
-    req.write(body);
-    req.end();
-  });
-}
-
-export function forwardSignalToBridge(payload: { symbol: string; direction: string; entryPrice: number; stopLoss: number; takeProfit: number; riskReward: string; confluence: number; pattern: string; qty?: number; source?: string }): Promise<BridgeAck> {
+export function forwardSignalToSupabase(payload: { symbol: string; direction: string; entryPrice: number; stopLoss: number; takeProfit: number; riskReward: string; confluence: number; pattern: string; qty?: number; source?: string }): Promise<{ status: string; signalId: string }> {
   const signalId = generateSignalId();
-  const now = new Date();
-  const signal: BridgeSignal = {
+  const dir = (payload.direction === "Long" || payload.direction === "LONG") ? "BUY" : "SELL";
+
+  console.log(`[trader] Queuing signal ${signalId} to Supabase: ${dir} ${payload.symbol} qty=${payload.qty || 1} @ ${payload.entryPrice} | SL: ${payload.stopLoss} TP: ${payload.takeProfit} | ${payload.pattern} (confluence: ${payload.confluence}) | R:R ${payload.riskReward}`);
+
+  return enqueueSignal({
     signalId,
     symbol: payload.symbol,
-    direction: (payload.direction === "Long" || payload.direction === "LONG") ? "BUY" : "SELL",
+    direction: dir,
     qty: payload.qty || 1,
     orderType: "MARKET",
     entryPrice: payload.entryPrice,
@@ -93,15 +28,16 @@ export function forwardSignalToBridge(payload: { symbol: string; direction: stri
     pattern: payload.pattern,
     confluence: payload.confluence,
     riskReward: payload.riskReward,
-    timestamp: now.toISOString(),
-  };
-  return sendToBridge(signal);
+  });
 }
 
 function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string) {
   const signalId = generateSignalId();
   const dir = direction === "LONG" ? "BUY" : "SELL";
-  const signal: BridgeSignal = {
+
+  console.log(`[trader] Queuing signal ${signalId} to Supabase: ${dir} ${symbol} qty=1 @ ${entry} | SL: ${stop} TP: ${target} | ${pattern} (confluence: ${confluence}) | R:R 1:${rewardRatio}`);
+
+  enqueueSignal({
     signalId,
     symbol,
     direction: dir,
@@ -113,9 +49,9 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
     pattern,
     confluence,
     riskReward: `1:${rewardRatio}`,
-    timestamp: new Date().toISOString(),
-  };
-  sendToBridge(signal);
+  }).catch((err) => {
+    console.error(`[trader] Failed to queue signal ${signalId}: ${err.message}`);
+  });
 }
 
 interface PolygonPrice {

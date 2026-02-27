@@ -45,4 +45,3 @@ outputType = "webview"
 [userenv]
 
 [userenv.shared]
-TRADE_BRIDGE_URL = "https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal"

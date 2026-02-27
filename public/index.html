@@ -1404,7 +1404,7 @@
           body: JSON.stringify(testSignal)
         });
         if (res.ok) {
-          showToast('Test signal sent to bridge: Long MES qty=1 @ 5823.50');
+          showToast('Signal queued to Supabase: Long MES qty=1 @ 5823.50');
         } else {
           showToast('Signal failed to send');
         }
