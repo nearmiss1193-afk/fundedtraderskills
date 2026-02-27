@@ -1,19 +1,1837 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Sovereign Skill Hub - Master Skills That Shape Your Future</title>
-    <meta name="description" content="Discover and master new skills from world-class instructors. Browse courses in development, design, data science, and more." />
-    <meta property="og:title" content="Sovereign Skill Hub - Skill Marketplace" />
-    <meta property="og:description" content="Learn from industry experts. Build real-world projects. Advance your career." />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fira+Code:wght@300..700&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Oxanium:wght@200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&family=Roboto:ital,wght@0,100..900;1,100..900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sovereign Skill Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #f4f4f7;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #7c3aed, #a855f7, #7c3aed);
+      padding: 3rem 1.5rem;
+      text-align: center;
+      color: #fff;
+    }
+
+    header h1 { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em; margin-bottom: 0.5rem; }
+    header p { font-size: 1.05rem; opacity: 0.85; max-width: 480px; margin: 0 auto; line-height: 1.5; }
+
+    .container { max-width: 720px; margin: -2rem auto 3rem; padding: 0 1rem; }
+
+    /* --- Tabs --- */
+    .tabs { display: flex; gap: 0.4rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+
+    .tab-btn {
+      flex: 1; min-width: 120px;
+      padding: 0.65rem 0.4rem;
+      font: inherit; font-size: 0.78rem; font-weight: 700;
+      border: 2px solid #e0dce8; border-radius: 10px;
+      background: #fff; color: #555; cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+
+    .tab-btn.active { border-color: #7c3aed; color: #7c3aed; background: #f5f0ff; }
+    .tab-btn:hover:not(.active) { border-color: #bbb; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* --- Card --- */
+    .card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      padding: 2rem; margin-bottom: 1.5rem;
+    }
+
+    .card h2 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.25rem; color: #1a1a2e; }
+    .card .card-sub { font-size: 0.85rem; color: #888; margin-bottom: 1.25rem; line-height: 1.4; }
+
+    /* --- Form Controls --- */
+    label {
+      display: block; font-size: 0.78rem; font-weight: 600; color: #555;
+      margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+
+    input, textarea, select {
+      width: 100%; padding: 0.7rem 0.85rem;
+      border: 1.5px solid #ddd; border-radius: 8px;
+      font: inherit; font-size: 0.95rem; color: #1a1a2e;
+      background: #fafafa; transition: border-color 0.15s, box-shadow 0.15s;
+      margin-bottom: 1rem; -webkit-appearance: none;
+    }
+
+    select {
+      background: #fafafa url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.85rem center;
+      padding-right: 2.5rem;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none; border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.12); background: #fff;
+    }
+
+    textarea { resize: vertical; min-height: 80px; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 100%; padding: 0.75rem 1.25rem;
+      font: inherit; font-size: 0.95rem; font-weight: 700;
+      border: none; border-radius: 8px; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-create { background: #16a34a; color: #fff; }
+    .btn-create:hover { background: #15803d; }
+    .btn-create:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* --- Skills List --- */
+    .skill-list { list-style: none; }
+    .skill-item { padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: flex-start; gap: 0.75rem; }
+    .skill-item:last-child { border-bottom: none; }
+    .skill-number { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: #ede9fe; color: #7c3aed; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+    .skill-info { flex: 1; min-width: 0; }
+    .skill-name { font-weight: 700; font-size: 0.95rem; color: #1a1a2e; }
+    .skill-desc { font-size: 0.85rem; color: #666; margin-top: 0.15rem; line-height: 1.4; }
+    .skill-time { font-size: 0.72rem; color: #aaa; margin-top: 0.25rem; }
+    .empty { text-align: center; padding: 2rem 0; color: #aaa; font-size: 0.9rem; }
+
+    /* --- Permit Results --- */
+    .permit-results { display: none; }
+    .permit-results.visible { display: block; }
+    .permit-section { margin-bottom: 1.25rem; }
+    .permit-section:last-child { margin-bottom: 0; }
+    .permit-section h3 { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #7c3aed; margin-bottom: 0.5rem; }
+    .permit-section ul { list-style: none; padding: 0; }
+    .permit-section ul li { padding: 0.4rem 0 0.4rem 1.25rem; position: relative; font-size: 0.88rem; line-height: 1.45; color: #333; }
+    .permit-section ul li::before { content: ''; position: absolute; left: 0; top: 0.65rem; width: 6px; height: 6px; border-radius: 50%; background: #7c3aed; }
+    .permit-section ul.notes-list li::before { background: #f59e0b; }
+    .permit-section ul.steps-list li::before { background: #16a34a; }
+    .permit-meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .meta-badge { flex: 1; min-width: 140px; background: #f5f0ff; border: 1px solid #e8e0f5; border-radius: 8px; padding: 0.75rem 1rem; text-align: center; }
+    .meta-badge .meta-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #888; margin-bottom: 0.2rem; }
+    .meta-badge .meta-value { font-size: 1.1rem; font-weight: 800; color: #1a1a2e; }
+    .links-list a { color: #7c3aed; text-decoration: none; font-weight: 600; }
+    .links-list a:hover { text-decoration: underline; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 1.25rem 0; }
+
+    /* ============================================ */
+    /* ===== AI FUTURES TRADER - DARK THEME ======= */
+    /* ============================================ */
+    .trader-card {
+      background: #0f1117;
+      border: 1px solid #1e2130;
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+      color: #c8cdd8;
+    }
+
+    .trader-card h2 {
+      color: #e0e4ec;
+      font-size: 1.25rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .trader-card .card-sub {
+      color: #6b7280;
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .trader-card label {
+      color: #8b92a5;
+      font-size: 0.72rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .trader-card input,
+    .trader-card textarea {
+      background: #181b27;
+      border: 1.5px solid #2a2e3d;
+      color: #e0e4ec;
+      border-radius: 8px;
+    }
+
+    .trader-card input:focus,
+    .trader-card textarea:focus {
+      border-color: #16a34a;
+      box-shadow: 0 0 0 3px rgba(22,163,74,0.15);
+      background: #1a1e2c;
+    }
+
+    .trader-card textarea { min-height: 60px; }
+
+    /* Checkbox groups */
+    .check-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .check-label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.75rem;
+      border: 1.5px solid #2a2e3d;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #8b92a5;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      user-select: none;
+    }
+
+    .check-label:hover { border-color: #444; }
+
+    .check-label input { display: none; }
+    .check-label input:checked + span { color: #16a34a; }
+    .check-label:has(input:checked) { border-color: #16a34a; background: rgba(22,163,74,0.08); color: #22c55e; }
+
+    .check-dot {
+      width: 14px; height: 14px;
+      border: 2px solid #3a3e4d;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .check-label:has(input:checked) .check-dot {
+      border-color: #16a34a;
+      background: #16a34a;
+    }
+
+    .check-label:has(input:checked) .check-dot::after {
+      content: '';
+      width: 5px; height: 8px;
+      border: solid #fff; border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+      margin-top: -2px;
+    }
+
+    /* Trading hours status */
+    .trading-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .trading-status.open { background: rgba(22,163,74,0.12); color: #22c55e; }
+    .trading-status.closed { background: rgba(239,68,68,0.12); color: #ef4444; }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .trading-status.open .status-dot { background: #22c55e; }
+    .trading-status.closed .status-dot { background: #ef4444; animation: none; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Trader buttons */
+    .trader-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn-start {
+      flex: 1;
+      background: #16a34a;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-start:hover { background: #15803d; }
+
+    .btn-stop {
+      flex: 1;
+      background: #dc2626;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-stop:hover { background: #b91c1c; }
+    .btn-start:disabled, .btn-stop:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-test-signal {
+      flex: 0 0 auto;
+      background: #4f46e5;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding: 0.85rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-test-signal:hover { background: #4338ca; }
+
+    /* Stats row */
+    .trader-stats {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .t-stat {
+      flex: 1;
+      min-width: 100px;
+      background: #181b27;
+      border: 1px solid #2a2e3d;
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      text-align: center;
+    }
+
+    .t-stat-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 0.15rem; }
+    .t-stat-value { font-size: 1.15rem; font-weight: 800; color: #e0e4ec; }
+    .t-stat-value.positive { color: #22c55e; }
+    .t-stat-value.negative { color: #ef4444; }
+
+    /* Trade log */
+    .trade-log-wrap {
+      background: #0b0d14;
+      border: 1px solid #1e2130;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .trade-log-header {
+      padding: 0.75rem 1rem;
+      background: #131620;
+      border-bottom: 1px solid #1e2130;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .trade-log-header h3 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #8b92a5;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .log-live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .log-live-dot.stopped { background: #6b7280; animation: none; }
+
+    .trade-log {
+      max-height: 420px;
+      overflow-y: auto;
+      padding: 0;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.72rem;
+      line-height: 1.6;
+    }
+
+    .trade-log::-webkit-scrollbar { width: 6px; }
+    .trade-log::-webkit-scrollbar-track { background: #0b0d14; }
+    .trade-log::-webkit-scrollbar-thumb { background: #2a2e3d; border-radius: 3px; }
+
+    .log-row {
+      display: grid;
+      grid-template-columns: 90px 70px 55px 100px 120px 1fr;
+      gap: 0;
+      padding: 0.4rem 0.75rem;
+      border-bottom: 1px solid #13151e;
+      align-items: center;
+    }
+
+    .log-row:hover { background: #131620; }
+
+    .log-cell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-time { color: #4b5563; }
+    .log-market { color: #a78bfa; font-weight: 700; }
+    .log-tf { color: #6b7280; }
+    .log-pattern { color: #f59e0b; font-weight: 600; }
+
+    .log-action { font-weight: 700; }
+    .log-action.long { color: #22c55e; }
+    .log-action.short { color: #f97316; }
+    .log-action.stopped { color: #ef4444; }
+    .log-action.target { color: #22c55e; }
+    .log-action.signal { color: #6366f1; }
+    .log-action.trailed { color: #f59e0b; }
+    .log-action.trail-update { color: #a78bfa; font-weight: 500; }
+    .log-action.scanning { color: #4b5563; font-weight: 500; }
+    .log-action.system { color: #6b7280; }
+    .log-action.tradovate { color: #8b5cf6; font-weight: 700; }
+    .log-action.tradovate-err { color: #dc2626; font-weight: 700; }
+
+    .log-detail { color: #8b92a5; font-size: 0.68rem; }
+    .log-pnl { font-weight: 700; }
+    .log-pnl.pos { color: #22c55e; }
+    .log-pnl.neg { color: #ef4444; }
+
+    .log-sltp { display: inline-flex; gap: 0.5rem; align-items: center; }
+    .log-entry-tag { color: #60a5fa; font-weight: 600; }
+    .log-sl-tag { color: #ef4444; font-weight: 600; }
+    .log-tp-tag { color: #22c55e; font-weight: 600; }
+    .log-open-tag { color: #3b82f6; }
+    .log-vol { color: #6b7280; font-size: 0.65rem; }
+    .log-bias { font-size: 0.62rem; font-weight: 600; padding: 1px 5px; border-radius: 3px; display: inline-block; margin-right: 2px; }
+    .log-bias.up { background: rgba(34,197,94,0.12); color: #22c55e; }
+    .log-bias.down { background: rgba(239,68,68,0.12); color: #ef4444; }
+    .log-bias.side { background: rgba(107,114,128,0.12); color: #9ca3af; }
+    .log-conf { font-size: 0.6rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; display: inline-block; margin-right: 2px; }
+    .log-conf.high { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .log-conf.med { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    .log-conf.low { background: rgba(107,114,128,0.12); color: #9ca3af; }
+    .log-sent { font-size: 0.6rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; display: inline-block; }
+    .log-sent.greed { background: rgba(34,197,94,0.1); color: #4ade80; }
+    .log-sent.fear { background: rgba(239,68,68,0.1); color: #f87171; }
+    .log-sent.neutral { background: rgba(107,114,128,0.08); color: #6b7280; }
+    .log-trail-tag { color: #f59e0b; font-weight: 600; }
+    .log-conf-label { font-size: 0.58rem; color: #6b7280; margin-left: 2px; display: inline-block; }
+    .log-vol-type { font-size: 0.56rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; display: inline-block; margin-right: 2px; }
+    .log-vol-type.igniting { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .log-vol-type.ending { background: rgba(239,68,68,0.12); color: #f87171; }
+    .log-vol-type.resting { background: rgba(107,114,128,0.08); color: #6b7280; }
+    .log-src { font-size: 0.58rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; display: inline-block; margin-left: 2px; }
+    .log-src.polygon { background: rgba(99,102,241,0.15); color: #818cf8; }
+    .log-src.sim { background: rgba(107,114,128,0.1); color: #6b7280; }
+    .log-reason { font-size: 0.62rem; color: #a78bfa; font-style: italic; margin-bottom: 2px; letter-spacing: 0.02em; }
+
+    .log-empty { padding: 2.5rem; text-align: center; color: #3a3e4d; font-size: 0.82rem; }
+
+    /* --- Toast --- */
+    .toast {
+      position: fixed; bottom: 1.5rem; left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1a1a2e; color: #fff;
+      padding: 0.7rem 1.25rem; border-radius: 8px;
+      font-size: 0.88rem; font-weight: 600;
+      opacity: 0; transition: transform 0.3s, opacity 0.3s;
+      pointer-events: none; z-index: 100;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    /* --- Journal --- */
+    .journal-section { margin-top: 1.5rem; }
+    .journal-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      padding: 1.5rem; margin-bottom: 1.5rem;
+    }
+    .journal-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.3rem; color: #1a1a2e; }
+    .journal-card .journal-sub { font-size: 0.82rem; color: #6b7280; margin-bottom: 1rem; font-style: italic; }
+
+    .journal-stats {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 0.6rem; margin-bottom: 1.2rem;
+    }
+    .j-stat {
+      background: #f8f7fc; border: 1px solid #e8e5f0; border-radius: 8px;
+      padding: 0.7rem 0.6rem; text-align: center;
+    }
+    .j-stat-label { font-size: 0.65rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; }
+    .j-stat-value { font-size: 1.1rem; font-weight: 800; color: #1a1a2e; margin-top: 2px; }
+    .j-stat-value.positive { color: #22c55e; }
+    .j-stat-value.negative { color: #ef4444; }
+
+    .journal-toolbar {
+      display: flex; gap: 0.5rem; margin-bottom: 0.8rem; flex-wrap: wrap; align-items: center;
+    }
+    .journal-toolbar input[type="text"],
+    .journal-toolbar select {
+      padding: 0.4rem 0.6rem; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 0.78rem; background: #fff; color: #1a1a2e;
+    }
+    .journal-toolbar input[type="text"] { flex: 1; min-width: 140px; }
+    .journal-toolbar select { min-width: 100px; }
+    .journal-toolbar .btn-sm {
+      padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer;
+      font-size: 0.75rem; font-weight: 700;
+    }
+    .btn-csv { background: #7c3aed; color: #fff; }
+    .btn-csv:hover { background: #6d28d9; }
+    .btn-clear { background: #ef4444; color: #fff; }
+    .btn-clear:hover { background: #dc2626; }
+
+    .journal-table-wrap {
+      overflow-x: auto; border: 1px solid #e8e5f0; border-radius: 8px;
+      max-height: 420px; overflow-y: auto;
+    }
+    .journal-table {
+      width: 100%; border-collapse: collapse; font-size: 0.72rem;
+      white-space: nowrap;
+    }
+    .journal-table th {
+      position: sticky; top: 0; background: #f3f0fa; color: #6b7280;
+      padding: 0.5rem 0.6rem; text-align: left; font-weight: 700;
+      border-bottom: 2px solid #e8e5f0; cursor: pointer; user-select: none;
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .journal-table th:hover { color: #7c3aed; }
+    .journal-table th .sort-arrow { margin-left: 3px; font-size: 0.6rem; }
+    .journal-table td {
+      padding: 0.45rem 0.6rem; border-bottom: 1px solid #f0eef5; color: #374151;
+    }
+    .journal-table tr:hover td { background: #faf8ff; }
+    .journal-table .win { color: #16a34a; font-weight: 700; }
+    .journal-table .loss { color: #ef4444; font-weight: 700; }
+    .journal-table .breakeven { color: #9ca3af; font-weight: 600; }
+    .journal-table .pnl-pos { color: #16a34a; font-weight: 600; }
+    .journal-table .pnl-neg { color: #ef4444; font-weight: 600; }
+    .journal-table .dir-long { color: #3b82f6; font-weight: 600; }
+    .journal-table .dir-short { color: #f97316; font-weight: 600; }
+    .journal-table .notes-cell {
+      max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: pointer; color: #7c3aed;
+    }
+    .journal-table .notes-cell:hover { text-decoration: underline; }
+    .journal-empty { padding: 2rem; text-align: center; color: #9ca3af; font-size: 0.85rem; }
+
+    .settings-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      padding: 1.5rem; margin-bottom: 1.5rem;
+    }
+    .settings-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.8rem; color: #1a1a2e; }
+    .settings-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;
+      margin-bottom: 1rem;
+    }
+    .settings-grid label { font-size: 0.78rem; font-weight: 600; color: #374151; margin-bottom: 0.2rem; display: block; }
+    .settings-grid input, .settings-grid select {
+      width: 100%; padding: 0.4rem 0.6rem; border: 1px solid #d1d5db;
+      border-radius: 6px; font-size: 0.82rem;
+    }
+    .btn-save-settings {
+      padding: 0.5rem 1.2rem; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 0.82rem; font-weight: 700; background: #7c3aed; color: #fff;
+    }
+    .btn-save-settings:hover { background: #6d28d9; }
+
+    .edge-card {
+      background: #fff; border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      padding: 1.75rem; margin-bottom: 1.5rem;
+    }
+    .edge-card h3 {
+      font-size: 1.15rem; font-weight: 800; margin-bottom: 0.3rem; color: #1a1a2e;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .edge-card h3 .edge-icon { font-size: 1.3rem; }
+    .edge-card .edge-sub { font-size: 0.82rem; color: #6b7280; margin-bottom: 1.2rem; font-style: italic; line-height: 1.4; }
+
+    .edge-overall {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.7rem; margin-bottom: 1.5rem;
+    }
+    .edge-metric {
+      background: linear-gradient(135deg, #f5f0ff, #ede9fe);
+      border: 1px solid #ddd6fe; border-radius: 10px;
+      padding: 0.9rem 0.7rem; text-align: center;
+    }
+    .edge-metric .em-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #7c3aed; margin-bottom: 0.2rem; }
+    .edge-metric .em-value { font-size: 1.3rem; font-weight: 900; color: #1a1a2e; }
+    .edge-metric .em-value.positive { color: #16a34a; }
+    .edge-metric .em-value.negative { color: #ef4444; }
+
+    .edge-section-title {
+      font-size: 0.85rem; font-weight: 800; color: #374151;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      margin: 1.5rem 0 0.7rem; padding-bottom: 0.35rem;
+      border-bottom: 2px solid #e8e5f0;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .edge-section-title .est { font-size: 1rem; }
+
+    .edge-group-table {
+      width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-bottom: 0.5rem;
+    }
+    .edge-group-table th {
+      background: #f8f7fc; color: #7c3aed; font-weight: 700;
+      padding: 0.5rem 0.6rem; text-align: left; border-bottom: 2px solid #e8e5f0;
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .edge-group-table td {
+      padding: 0.5rem 0.6rem; border-bottom: 1px solid #f0eef5; color: #374151;
+    }
+    .edge-group-table tr:hover td { background: #faf8ff; }
+    .edge-group-table .pnl-pos { color: #16a34a; font-weight: 700; }
+    .edge-group-table .pnl-neg { color: #ef4444; font-weight: 700; }
+    .edge-group-table .wr-high { color: #16a34a; font-weight: 700; }
+    .edge-group-table .wr-low { color: #ef4444; font-weight: 700; }
+
+    .edge-heatmap {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.5rem; margin-bottom: 1rem;
+    }
+    .hm-cell {
+      border-radius: 8px; padding: 0.65rem 0.5rem; text-align: center;
+      font-size: 0.72rem; font-weight: 700; border: 1px solid transparent;
+    }
+    .hm-cell .hm-name { font-size: 0.68rem; font-weight: 800; margin-bottom: 0.15rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .hm-cell .hm-wr { font-size: 1rem; font-weight: 900; }
+    .hm-cell .hm-pnl { font-size: 0.65rem; margin-top: 0.1rem; }
+    .hm-hot { background: rgba(22,163,74,0.1); border-color: rgba(22,163,74,0.25); color: #16a34a; }
+    .hm-warm { background: rgba(234,179,8,0.1); border-color: rgba(234,179,8,0.25); color: #ca8a04; }
+    .hm-cold { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.25); color: #ef4444; }
+    .hm-neutral { background: rgba(107,114,128,0.08); border-color: rgba(107,114,128,0.15); color: #6b7280; }
+
+    .edge-recs {
+      list-style: none; padding: 0; margin: 0;
+    }
+    .edge-recs li {
+      background: linear-gradient(135deg, #fffbeb, #fef3c7);
+      border: 1px solid #fde68a; border-radius: 8px;
+      padding: 0.65rem 0.9rem; margin-bottom: 0.5rem;
+      font-size: 0.8rem; font-weight: 600; color: #92400e;
+      display: flex; align-items: flex-start; gap: 0.5rem;
+    }
+    .edge-recs li .rec-icon { font-size: 1rem; flex-shrink: 0; }
+
+    .conf-checklist {
+      display: inline-flex; gap: 2px; align-items: center;
+    }
+    .conf-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block;
+    }
+    .conf-dot.on { background: #22c55e; }
+    .conf-dot.off { background: #e5e7eb; }
+    .conf-tooltip {
+      position: relative; cursor: help;
+    }
+    .conf-tooltip .conf-tip-text {
+      visibility: hidden; position: absolute; bottom: 120%;
+      left: 50%; transform: translateX(-50%);
+      background: #1a1a2e; color: #fff; font-size: 0.65rem;
+      padding: 0.4rem 0.6rem; border-radius: 6px; white-space: nowrap;
+      z-index: 10; pointer-events: none;
+    }
+    .conf-tooltip:hover .conf-tip-text { visibility: visible; }
+
+    .pattern-lib {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.8rem;
+    }
+    .pl-card {
+      background: #f8f7fc; border: 1px solid #e8e5f0; border-radius: 10px;
+      padding: 1rem; transition: box-shadow 0.15s;
+    }
+    .pl-card:hover { box-shadow: 0 2px 12px rgba(124,58,237,0.12); }
+    .pl-card .pl-name { font-size: 0.88rem; font-weight: 800; color: #7c3aed; margin-bottom: 0.2rem; }
+    .pl-card .pl-dir { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; margin-bottom: 0.3rem; }
+    .pl-card .pl-dir.long { color: #16a34a; }
+    .pl-card .pl-dir.short { color: #ef4444; }
+    .pl-card .pl-desc { font-size: 0.78rem; color: #4b5563; line-height: 1.45; margin-bottom: 0.4rem; }
+    .pl-card .pl-rules { font-size: 0.72rem; color: #6b7280; line-height: 1.5; }
+    .pl-card .pl-rules b { color: #374151; }
+    .pl-card .pl-tag { display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-right: 4px; }
+    .pl-tag.reversal { background: rgba(234,179,8,0.15); color: #b45309; }
+    .pl-tag.continuation { background: rgba(59,130,246,0.15); color: #2563eb; }
+    .pl-tag.momentum { background: rgba(22,163,74,0.15); color: #15803d; }
+    .pl-tag.exhaustion { background: rgba(239,68,68,0.15); color: #dc2626; }
+
+    .edge-empty {
+      text-align: center; padding: 2.5rem; color: #9ca3af; font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sovereign Skill Hub</h1>
+    <p>Build powerful AI agents &amp; skills in minutes. Earn while others use them.</p>
+  </header>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="create" onclick="switchTab('create')">Create a Skill</button>
+      <button class="tab-btn" data-tab="permit" onclick="switchTab('permit')">Permit Checker</button>
+      <button class="tab-btn" data-tab="trader" onclick="switchTab('trader')">AI Futures Trader</button>
+      <button class="tab-btn" data-tab="edge" onclick="switchTab('edge');loadEdgeBuilder()" data-testid="tab-edge-builder">Edge Builder</button>
+    </div>
+
+    <!-- TAB 1: Create a Skill -->
+    <div id="panel-create" class="tab-panel active">
+      <div class="card">
+        <h2>Create a Skill</h2>
+        <form id="skill-form">
+          <label for="name">Skill Name</label>
+          <input id="name" type="text" placeholder="e.g. Blog Post Writer" required />
+          <label for="description">Description</label>
+          <textarea id="description" placeholder="What does this skill do?"></textarea>
+          <button type="submit" class="btn btn-create">Create Skill &amp; Test</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Skills Created</h2>
+        <ul id="skill-list" class="skill-list">
+          <li class="empty">No skills yet. Create your first one above.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- TAB 2: Florida Permit Checker -->
+    <div id="panel-permit" class="tab-panel">
+      <div class="card">
+        <h2>Florida Permit Checker</h2>
+        <p class="card-sub">Find out exactly which permits you need for your renovation in Central Florida.</p>
+        <form id="permit-form">
+          <label for="renovationType">Renovation Type</label>
+          <select id="renovationType" required>
+            <option value="">Select renovation...</option>
+            <option value="kitchen">Kitchen Remodel</option>
+            <option value="bathroom">Bathroom Remodel</option>
+            <option value="roof">Roof Replacement</option>
+            <option value="addition">Room Addition</option>
+            <option value="pool">Pool Installation</option>
+            <option value="electrical">Electrical Upgrade</option>
+            <option value="plumbing">Plumbing Upgrade</option>
+            <option value="other">Other</option>
+          </select>
+          <label for="propertyType">Property Type</label>
+          <select id="propertyType" required>
+            <option value="">Select property type...</option>
+            <option value="single_family">Single Family</option>
+            <option value="multifamily">Multifamily</option>
+            <option value="commercial">Commercial</option>
+          </select>
+          <label for="county">County</label>
+          <select id="county" required>
+            <option value="">Select county...</option>
+            <option value="polk">Polk County / Lakeland</option>
+            <option value="orange">Orange County / Orlando</option>
+            <option value="hillsborough">Hillsborough County</option>
+            <option value="pasco">Pasco County</option>
+            <option value="other">Other Florida County</option>
+          </select>
+          <label for="details">Additional Details (optional)</label>
+          <textarea id="details" placeholder="e.g. Moving gas line, adding a second story..."></textarea>
+          <button type="submit" class="btn btn-create">Check Required Permits</button>
+        </form>
+      </div>
+      <div id="permit-results" class="permit-results">
+        <div class="card" id="permit-output"></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: AI Futures Trader -->
+    <div id="panel-trader" class="tab-panel">
+      <div class="trader-card">
+        <h2>AI Futures Trader</h2>
+        <p class="card-sub">Autonomous pattern-based futures engine (9/21 EMA + 200 SMA, trailing stops, confluence scoring). Based on Jared Wesley's "Trading With An Edge" (Live Traders).</p>
+
+        <div id="trader-status-badge" class="trading-status closed">
+          <span class="status-dot"></span>
+          <span id="trader-status-text">Checking market hours...</span>
+        </div>
+        <div id="tradovate-status" class="trading-status closed" style="margin-top:0.4rem;" data-testid="tradovate-status">
+          <span class="status-dot"></span>
+          <span id="tradovate-status-text">Tradovate: Checking...</span>
+        </div>
+
+        <label>Equity Index Futures</label>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" name="market" value="ES" checked /><span class="check-dot"></span><span>E-mini S&amp;P (ES)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="MES" /><span class="check-dot"></span><span>Micro S&amp;P (MES)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="NQ" /><span class="check-dot"></span><span>E-mini Nasdaq (NQ)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="MNQ" /><span class="check-dot"></span><span>Micro Nasdaq (MNQ)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="YM" /><span class="check-dot"></span><span>E-mini Dow (YM)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="MYM" /><span class="check-dot"></span><span>Micro Dow (MYM)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="RTY" /><span class="check-dot"></span><span>E-mini Russell (RTY)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="M2K" /><span class="check-dot"></span><span>Micro Russell (M2K)</span></label>
+        </div>
+
+        <label>Energy Futures</label>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" name="market" value="CL" /><span class="check-dot"></span><span>Crude Oil (CL)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="MCL" /><span class="check-dot"></span><span>Micro Crude (MCL)</span></label>
+        </div>
+
+        <label>Metals Futures</label>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" name="market" value="GC" /><span class="check-dot"></span><span>Gold (GC)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="MGC" /><span class="check-dot"></span><span>Micro Gold (MGC)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="SI" /><span class="check-dot"></span><span>Silver (SI)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="HG" /><span class="check-dot"></span><span>Copper (HG)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="PL" /><span class="check-dot"></span><span>Platinum (PL)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="PA" /><span class="check-dot"></span><span>Palladium (PA)</span></label>
+        </div>
+
+        <label>Crypto Futures</label>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" name="market" value="BTC" /><span class="check-dot"></span><span>Bitcoin (BTC)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="ETH" /><span class="check-dot"></span><span>Ether (ETH)</span></label>
+        </div>
+
+        <label>Treasury Futures</label>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" name="market" value="ZB" /><span class="check-dot"></span><span>30-Yr Bond (ZB)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="ZN" /><span class="check-dot"></span><span>10-Yr Note (ZN)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="ZF" /><span class="check-dot"></span><span>5-Yr Note (ZF)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="ZT" /><span class="check-dot"></span><span>2-Yr Note (ZT)</span></label>
+        </div>
+
+        <label>Agricultural Futures</label>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" name="market" value="ZC" /><span class="check-dot"></span><span>Corn (ZC)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="ZS" /><span class="check-dot"></span><span>Soybeans (ZS)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="ZW" /><span class="check-dot"></span><span>Wheat (ZW)</span></label>
+        </div>
+
+        <label>Timeframes</label>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" name="tf" value="2min" checked /><span class="check-dot"></span><span>2 min</span></label>
+          <label class="check-label"><input type="checkbox" name="tf" value="5min" checked /><span class="check-dot"></span><span>5 min</span></label>
+          <label class="check-label"><input type="checkbox" name="tf" value="15min" /><span class="check-dot"></span><span>15 min</span></label>
+          <label class="check-label"><input type="checkbox" name="tf" value="1hour" /><span class="check-dot"></span><span>1 hour</span></label>
+          <label class="check-label"><input type="checkbox" name="tf" value="4hour" /><span class="check-dot"></span><span>4 hour</span></label>
+          <label class="check-label"><input type="checkbox" name="tf" value="daily" /><span class="check-dot"></span><span>Daily</span></label>
+        </div>
+
+        <label>Trading Hours</label>
+        <div style="font-size:0.85rem; color:#6b7280; margin-bottom:0.5rem; padding:0.5rem 0.75rem; background:#181b27; border-radius:8px; border:1px solid #2a2e3d;">
+          Sun 6:00 PM &ndash; Fri 5:00 PM EST &bull; Daily maintenance 5&ndash;6 PM EST
+        </div>
+        <div class="check-group" style="margin-bottom:1rem;">
+          <label class="check-label" style="border-color:#f59e0b33;">
+            <input type="checkbox" id="forceTrading" data-testid="checkbox-force-trading" />
+            <span class="check-dot"></span>
+            <span style="color:#f59e0b;">Force Trading (ignore time window)</span>
+          </label>
+        </div>
+
+        <label for="riskPct">Risk Per Trade (% of Account)</label>
+        <input id="riskPct" type="number" value="0.5" min="0.1" max="5" step="0.1" style="max-width:160px;" data-testid="input-risk-pct" />
+
+        <label for="rewardRatio">Risk : Reward Ratio</label>
+        <select id="rewardRatio" style="max-width:200px;" data-testid="select-reward-ratio">
+          <option value="1">1:1</option>
+          <option value="1.5">1:1.5</option>
+          <option value="2" selected>1:2</option>
+          <option value="2.5">1:2.5</option>
+          <option value="3">1:3</option>
+          <option value="4">1:4</option>
+          <option value="5">1:5</option>
+        </select>
+
+        <label>Core Patterns (Jared Wesley / Live Traders)</label>
+        <div class="check-group" style="flex-direction:column;gap:0.3rem;">
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="3bar_long" checked /><span class="check-dot"></span><span>3 Bar Play Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="3bar_short" checked /><span class="check-dot"></span><span>3 Bar Play Short</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="buysetup" checked /><span class="check-dot"></span><span>Buy Setup</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="sellsetup" checked /><span class="check-dot"></span><span>Sell Setup</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="breakout_long" checked /><span class="check-dot"></span><span>Breakout Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="breakout_short" checked /><span class="check-dot"></span><span>Breakout Short</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="climax_long" checked /><span class="check-dot"></span><span>Climax Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="climax_short" checked /><span class="check-dot"></span><span>Climax Short</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="mabounce_long" checked /><span class="check-dot"></span><span>MA Bounce Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="mabounce_short" checked /><span class="check-dot"></span><span>MA Bounce Short</span></label>
+          </div>
+        </div>
+
+        <label for="customCondition">Custom Buy Condition (optional)</label>
+        <textarea id="customCondition" placeholder="e.g. Only enter if price is above VWAP and volume spike > 1.5x avg..."></textarea>
+
+        <div class="trader-actions">
+          <button id="btn-start-trader" class="btn-start" onclick="startTrader()" data-testid="button-start-trader">Start Autonomous Trader</button>
+          <button id="btn-stop-trader" class="btn-stop" onclick="stopTrader()" disabled data-testid="button-stop-trader">Stop Trading</button>
+          <button class="btn-test-signal" onclick="sendTestSignal()" data-testid="button-test-signal">&#x1f4e1; Test Signal</button>
+        </div>
+      </div>
+
+      <div id="trader-dashboard" style="display:none;">
+        <div class="trader-stats" id="trader-stats">
+          <div class="t-stat"><div class="t-stat-label">Trades</div><div class="t-stat-value" id="stat-trades">0</div></div>
+          <div class="t-stat"><div class="t-stat-label">Wins</div><div class="t-stat-value positive" id="stat-wins">0</div></div>
+          <div class="t-stat"><div class="t-stat-label">Losses</div><div class="t-stat-value negative" id="stat-losses">0</div></div>
+          <div class="t-stat"><div class="t-stat-label">Open</div><div class="t-stat-value" id="stat-open">0</div></div>
+          <div class="t-stat"><div class="t-stat-label">Simulated P&amp;L</div><div class="t-stat-value" id="stat-pnl">$0.00</div></div>
+          <div class="t-stat"><div class="t-stat-label">R:R</div><div class="t-stat-value" id="stat-rr" data-testid="text-reward-ratio">1:2</div></div>
+        </div>
+
+        <div class="trade-log-wrap">
+          <div class="trade-log-header">
+            <h3>Live Trading Log</h3>
+            <div class="log-live-dot" id="log-live-dot"></div>
+          </div>
+          <div class="trade-log" id="trade-log">
+            <div class="log-empty">Waiting for first signal...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trade Journal -->
+      <div class="journal-section" id="journal-section">
+        <div class="journal-card">
+          <h3>Trade Journal</h3>
+          <p class="journal-sub">Review your trades like a pro. Adjust settings to find what works best for you.</p>
+
+          <div class="journal-stats" id="journal-stats" data-testid="journal-stats">
+            <div class="j-stat"><div class="j-stat-label">Total Trades</div><div class="j-stat-value" id="j-total" data-testid="text-j-total">0</div></div>
+            <div class="j-stat"><div class="j-stat-label">Win Rate</div><div class="j-stat-value" id="j-winrate" data-testid="text-j-winrate">0%</div></div>
+            <div class="j-stat"><div class="j-stat-label">Profit Factor</div><div class="j-stat-value" id="j-pf" data-testid="text-j-pf">0</div></div>
+            <div class="j-stat"><div class="j-stat-label">Total P&amp;L</div><div class="j-stat-value" id="j-pnl" data-testid="text-j-pnl">$0.00</div></div>
+            <div class="j-stat"><div class="j-stat-label">Best Symbol</div><div class="j-stat-value" id="j-symbol" data-testid="text-j-symbol">--</div></div>
+            <div class="j-stat"><div class="j-stat-label">Best Pattern</div><div class="j-stat-value" id="j-pattern" data-testid="text-j-pattern">--</div></div>
+            <div class="j-stat"><div class="j-stat-label">Avg R:R</div><div class="j-stat-value" id="j-rr" data-testid="text-j-rr">0</div></div>
+          </div>
+
+          <div class="journal-toolbar">
+            <input type="text" id="j-search" placeholder="Search trades..." data-testid="input-j-search" oninput="renderJournal()" />
+            <select id="j-filter-symbol" data-testid="select-j-symbol" onchange="renderJournal()">
+              <option value="">All Symbols</option>
+            </select>
+            <select id="j-filter-pattern" data-testid="select-j-pattern" onchange="renderJournal()">
+              <option value="">All Patterns</option>
+            </select>
+            <select id="j-filter-outcome" data-testid="select-j-outcome" onchange="renderJournal()">
+              <option value="">All Outcomes</option>
+              <option value="WIN">Wins</option>
+              <option value="LOSS">Losses</option>
+              <option value="BREAKEVEN">Breakeven</option>
+            </select>
+            <button class="btn-sm btn-csv" onclick="exportCSV()" data-testid="button-export-csv">Export CSV</button>
+            <button class="btn-sm btn-clear" onclick="clearAllJournal()" data-testid="button-clear-journal">Clear All</button>
+          </div>
+
+          <div class="journal-table-wrap">
+            <table class="journal-table" id="journal-table" data-testid="journal-table">
+              <thead>
+                <tr>
+                  <th data-col="timestamp" onclick="sortJournal('timestamp')">Time <span class="sort-arrow"></span></th>
+                  <th data-col="symbol" onclick="sortJournal('symbol')">Symbol <span class="sort-arrow"></span></th>
+                  <th data-col="timeframe" onclick="sortJournal('timeframe')">TF <span class="sort-arrow"></span></th>
+                  <th data-col="pattern" onclick="sortJournal('pattern')">Pattern <span class="sort-arrow"></span></th>
+                  <th data-col="direction" onclick="sortJournal('direction')">Dir <span class="sort-arrow"></span></th>
+                  <th data-col="entry" onclick="sortJournal('entry')">Entry <span class="sort-arrow"></span></th>
+                  <th data-col="stop" onclick="sortJournal('stop')">SL <span class="sort-arrow"></span></th>
+                  <th data-col="target" onclick="sortJournal('target')">TP <span class="sort-arrow"></span></th>
+                  <th data-col="exit" onclick="sortJournal('exit')">Exit <span class="sort-arrow"></span></th>
+                  <th data-col="pnlDollars" onclick="sortJournal('pnlDollars')">P&amp;L <span class="sort-arrow"></span></th>
+                  <th data-col="confluence" onclick="sortJournal('confluence')">Conf <span class="sort-arrow"></span></th>
+                  <th data-col="outcome" onclick="sortJournal('outcome')">Result <span class="sort-arrow"></span></th>
+                  <th data-col="achievedRR" onclick="sortJournal('achievedRR')">R:R <span class="sort-arrow"></span></th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="journal-tbody" data-testid="journal-tbody"></tbody>
+            </table>
+            <div class="journal-empty" id="journal-empty" data-testid="journal-empty">No trades recorded yet. Start trading to build your journal.</div>
+          </div>
+        </div>
+
+        <div class="settings-card" id="settings-card">
+          <h3>Trader Settings</h3>
+          <div class="settings-grid">
+            <div>
+              <label for="set-risk">Risk Per Trade (%)</label>
+              <input id="set-risk" type="number" value="0.5" min="0.1" max="5" step="0.1" data-testid="input-set-risk" />
+            </div>
+            <div>
+              <label for="set-rr">Risk : Reward Ratio</label>
+              <select id="set-rr" data-testid="select-set-rr">
+                <option value="1">1:1</option>
+                <option value="1.5">1:1.5</option>
+                <option value="2" selected>1:2</option>
+                <option value="2.5">1:2.5</option>
+                <option value="3">1:3</option>
+                <option value="4">1:4</option>
+                <option value="5">1:5</option>
+              </select>
+            </div>
+          </div>
+          <label style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:0.4rem;display:block;">Enabled Patterns</label>
+          <div class="check-group" style="margin-bottom:0.6rem;flex-direction:column;gap:0.25rem;">
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="3bar_long" checked /><span class="check-dot"></span><span>3 Bar Play Long</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="3bar_short" checked /><span class="check-dot"></span><span>3 Bar Play Short</span></label>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="buysetup" checked /><span class="check-dot"></span><span>Buy Setup</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="sellsetup" checked /><span class="check-dot"></span><span>Sell Setup</span></label>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="breakout_long" checked /><span class="check-dot"></span><span>Breakout Long</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="breakout_short" checked /><span class="check-dot"></span><span>Breakout Short</span></label>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="climax_long" checked /><span class="check-dot"></span><span>Climax Long</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="climax_short" checked /><span class="check-dot"></span><span>Climax Short</span></label>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="mabounce_long" checked /><span class="check-dot"></span><span>MA Bounce Long</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="mabounce_short" checked /><span class="check-dot"></span><span>MA Bounce Short</span></label>
+            </div>
+          </div>
+
+          <label style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:0.4rem;display:block;">Enabled Timeframes</label>
+          <div class="check-group" style="margin-bottom:1rem;">
+            <label class="check-label"><input type="checkbox" name="set-tf" value="2min" checked /><span class="check-dot"></span><span>2 min</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="5min" checked /><span class="check-dot"></span><span>5 min</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="15min" checked /><span class="check-dot"></span><span>15 min</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="1hour" checked /><span class="check-dot"></span><span>1 hour</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="4hour" checked /><span class="check-dot"></span><span>4 hour</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="daily" checked /><span class="check-dot"></span><span>Daily</span></label>
+          </div>
+          <button class="btn-save-settings" onclick="saveTraderSettings()" data-testid="button-save-settings">Save Settings</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 4: Edge Builder Dashboard -->
+    <div id="panel-edge" class="tab-panel">
+      <div class="edge-card">
+        <h3><span class="edge-icon">&#9889;</span> Edge Builder Dashboard</h3>
+        <p class="edge-sub">"Consistency is the key to long-term trading success. Review every trade. Refine your edge." &mdash; Jared Wesley, Live Traders</p>
+
+        <div class="edge-overall" id="edge-overall" data-testid="edge-overall">
+          <div class="edge-metric"><div class="em-label">Total Trades</div><div class="em-value" id="edge-total" data-testid="text-edge-total">0</div></div>
+          <div class="edge-metric"><div class="em-label">Overall Win Rate</div><div class="em-value" id="edge-wr" data-testid="text-edge-wr">0%</div></div>
+          <div class="edge-metric"><div class="em-label">Profit Factor</div><div class="em-value" id="edge-pf" data-testid="text-edge-pf">0</div></div>
+          <div class="edge-metric"><div class="em-label">Expectancy</div><div class="em-value" id="edge-exp" data-testid="text-edge-exp">$0</div></div>
+          <div class="edge-metric"><div class="em-label">Total P&amp;L</div><div class="em-value" id="edge-pnl" data-testid="text-edge-pnl">$0</div></div>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#128293;</span> Optimize My Edge</div>
+        <ul class="edge-recs" id="edge-recs" data-testid="edge-recs">
+          <li class="edge-empty">Trade more to unlock personalized recommendations.</li>
+        </ul>
+
+        <div class="edge-section-title"><span class="est">&#127919;</span> Setup Heatmap &mdash; Top &amp; Bottom Performers</div>
+        <div class="edge-heatmap" id="edge-heatmap" data-testid="edge-heatmap">
+          <div class="edge-empty">No data yet. Complete trades to populate the heatmap.</div>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#128200;</span> Performance by Pattern</div>
+        <div style="overflow-x:auto;border:1px solid #e8e5f0;border-radius:8px;margin-bottom:0.5rem;">
+          <table class="edge-group-table" id="edge-by-pattern" data-testid="table-edge-pattern">
+            <thead><tr><th>Pattern</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Avg R:R</th><th>Profit Factor</th><th>Total P&amp;L</th></tr></thead>
+            <tbody id="edge-pattern-body"></tbody>
+          </table>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#128176;</span> Performance by Symbol</div>
+        <div style="overflow-x:auto;border:1px solid #e8e5f0;border-radius:8px;margin-bottom:0.5rem;">
+          <table class="edge-group-table" id="edge-by-symbol" data-testid="table-edge-symbol">
+            <thead><tr><th>Symbol</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Avg R:R</th><th>Profit Factor</th><th>Total P&amp;L</th></tr></thead>
+            <tbody id="edge-symbol-body"></tbody>
+          </table>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#9203;</span> Performance by Timeframe</div>
+        <div style="overflow-x:auto;border:1px solid #e8e5f0;border-radius:8px;margin-bottom:0.5rem;">
+          <table class="edge-group-table" id="edge-by-tf" data-testid="table-edge-tf">
+            <thead><tr><th>Timeframe</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Avg R:R</th><th>Profit Factor</th><th>Total P&amp;L</th></tr></thead>
+            <tbody id="edge-tf-body"></tbody>
+          </table>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#128301;</span> Performance by Confluence Level</div>
+        <div style="overflow-x:auto;border:1px solid #e8e5f0;border-radius:8px;margin-bottom:0.5rem;">
+          <table class="edge-group-table" id="edge-by-conf" data-testid="table-edge-conf">
+            <thead><tr><th>Confluence</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Avg R:R</th><th>Profit Factor</th><th>Total P&amp;L</th></tr></thead>
+            <tbody id="edge-conf-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="edge-card">
+        <h3><span class="edge-icon">&#128218;</span> Pattern Library &mdash; Live Traders Manual</h3>
+        <p class="edge-sub">Master these setups from Jared Wesley's "Trading With An Edge." Every pattern has clear rules for entry, stop, and target.</p>
+
+        <div class="pattern-lib" id="pattern-lib" data-testid="pattern-lib">
+          <div class="pl-card">
+            <div class="pl-name">3 Bar Play</div>
+            <div class="pl-dir long">LONG</div>
+            <div><span class="pl-tag reversal">Reversal</span><span class="pl-tag momentum">Momentum</span></div>
+            <div class="pl-desc">Three consecutive down bars followed by a strong bullish reversal bar that closes above the prior bar's high.</div>
+            <div class="pl-rules"><b>Entry:</b> Break above bar 4 high<br><b>Stop:</b> Below swing low of the 3-bar pullback<br><b>Target:</b> 2:1 R:R minimum or prior resistance<br><b>Confluence:</b> Volume spike on reversal, bottoming tail, at MA support</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">3 Bar Play</div>
+            <div class="pl-dir short">SHORT</div>
+            <div><span class="pl-tag reversal">Reversal</span><span class="pl-tag momentum">Momentum</span></div>
+            <div class="pl-desc">Three consecutive up bars followed by a strong bearish reversal bar that closes below the prior bar's low.</div>
+            <div class="pl-rules"><b>Entry:</b> Break below bar 4 low<br><b>Stop:</b> Above swing high of the 3-bar rally<br><b>Target:</b> 2:1 R:R minimum or prior support<br><b>Confluence:</b> Volume spike on reversal, topping tail, at MA resistance</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Buy Setup</div>
+            <div class="pl-dir long">LONG</div>
+            <div><span class="pl-tag continuation">Continuation</span></div>
+            <div class="pl-desc">Pullback into moving average support in an uptrend with decreasing volume on pullback and increasing volume on reversal.</div>
+            <div class="pl-rules"><b>Entry:</b> Close above 9 EMA after pullback to 21 EMA<br><b>Stop:</b> Below recent swing low<br><b>Target:</b> Prior high or measured move<br><b>Confluence:</b> Volume dries up on pullback, strong bar off MA, trend intact</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Sell Setup</div>
+            <div class="pl-dir short">SHORT</div>
+            <div><span class="pl-tag continuation">Continuation</span></div>
+            <div class="pl-desc">Rally into moving average resistance in a downtrend with decreasing volume on rally and increasing volume on reversal.</div>
+            <div class="pl-rules"><b>Entry:</b> Close below 9 EMA after rally to 21 EMA<br><b>Stop:</b> Above recent swing high<br><b>Target:</b> Prior low or measured move<br><b>Confluence:</b> Volume dries up on rally, weak bar off MA, downtrend intact</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Pivot Breakout</div>
+            <div class="pl-dir long">LONG</div>
+            <div><span class="pl-tag momentum">Momentum</span><span class="pl-tag continuation">Continuation</span></div>
+            <div class="pl-desc">Price breaks above a prior pivot high with expanding volume, confirming a continuation of the uptrend.</div>
+            <div class="pl-rules"><b>Entry:</b> Close above prior pivot high<br><b>Stop:</b> Below breakout bar low or pivot level<br><b>Target:</b> Measured move or next resistance<br><b>Confluence:</b> Volume expansion on breakout, no exhaustion signals, above all MAs</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Pivot Breakout</div>
+            <div class="pl-dir short">SHORT</div>
+            <div><span class="pl-tag momentum">Momentum</span><span class="pl-tag continuation">Continuation</span></div>
+            <div class="pl-desc">Price breaks below a prior pivot low with expanding volume, confirming a continuation of the downtrend.</div>
+            <div class="pl-rules"><b>Entry:</b> Close below prior pivot low<br><b>Stop:</b> Above breakout bar high or pivot level<br><b>Target:</b> Measured move or next support<br><b>Confluence:</b> Volume expansion on breakdown, no exhaustion signals, below all MAs</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Climactic Exhaustion</div>
+            <div class="pl-dir long">LONG (Reversal)</div>
+            <div><span class="pl-tag exhaustion">Exhaustion</span><span class="pl-tag reversal">Reversal</span></div>
+            <div class="pl-desc">Extended downtrend accelerates with wide-range bars and climactic volume, then reverses sharply as sellers exhaust.</div>
+            <div class="pl-rules"><b>Entry:</b> Reversal bar after climax volume<br><b>Stop:</b> Below climax low<br><b>Target:</b> Retracement to prior support-turned-resistance<br><b>Confluence:</b> Extreme volume spike, extended move (5+ bars), bottoming tail, divergence</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Climactic Exhaustion</div>
+            <div class="pl-dir short">SHORT (Reversal)</div>
+            <div><span class="pl-tag exhaustion">Exhaustion</span><span class="pl-tag reversal">Reversal</span></div>
+            <div class="pl-desc">Extended uptrend accelerates with wide-range bars and climactic volume, then reverses sharply as buyers exhaust.</div>
+            <div class="pl-rules"><b>Entry:</b> Reversal bar after climax volume<br><b>Stop:</b> Above climax high<br><b>Target:</b> Retracement to prior resistance-turned-support<br><b>Confluence:</b> Extreme volume spike, extended move (5+ bars), topping tail, divergence</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">MA Bounce</div>
+            <div class="pl-dir long">LONG</div>
+            <div><span class="pl-tag continuation">Continuation</span><span class="pl-tag momentum">Momentum</span></div>
+            <div class="pl-desc">Price pulls back to a key moving average (9, 21, or 200) and bounces with confirmation. The trend continues.</div>
+            <div class="pl-rules"><b>Entry:</b> Bounce off MA with bullish bar<br><b>Stop:</b> Below the MA or swing low<br><b>Target:</b> Prior high or 2R<br><b>Confluence:</b> Multiple MAs converging, volume confirmation, trend alignment</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">MA Bounce</div>
+            <div class="pl-dir short">SHORT</div>
+            <div><span class="pl-tag continuation">Continuation</span><span class="pl-tag momentum">Momentum</span></div>
+            <div class="pl-desc">Price rallies to a key moving average (9, 21, or 200) and rejects with confirmation. The downtrend continues.</div>
+            <div class="pl-rules"><b>Entry:</b> Rejection off MA with bearish bar<br><b>Stop:</b> Above the MA or swing high<br><b>Target:</b> Prior low or 2R<br><b>Confluence:</b> Multiple MAs converging, volume confirmation, trend alignment</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Multiple Bar Reversal</div>
+            <div class="pl-dir long">LONG</div>
+            <div><span class="pl-tag reversal">Reversal</span><span class="pl-tag exhaustion">Exhaustion</span></div>
+            <div class="pl-desc">Extended move of 5-7+ consecutive bars into pivot support with wide-range bars and increasing volume, followed by a green reversal bar with a bottoming tail.</div>
+            <div class="pl-rules"><b>Entry:</b> Reversal bar close above prior bar high<br><b>Stop:</b> Below swing low<br><b>Target:</b> Retracement to 21 EMA or prior pivot<br><b>Confluence:</b> 5+ bars down, multiple wide-range bars, at pivot support, increased volume, bottoming tail, near 21 EMA</div>
+          </div>
+
+          <div class="pl-card">
+            <div class="pl-name">Multiple Bar Reversal</div>
+            <div class="pl-dir short">SHORT</div>
+            <div><span class="pl-tag reversal">Reversal</span><span class="pl-tag exhaustion">Exhaustion</span></div>
+            <div class="pl-desc">Extended move of 5-7+ consecutive bars into pivot resistance with wide-range bars and increasing volume, followed by a red reversal bar with a topping tail.</div>
+            <div class="pl-rules"><b>Entry:</b> Reversal bar close below prior bar low<br><b>Stop:</b> Above swing high<br><b>Target:</b> Retracement to 21 EMA or prior pivot<br><b>Confluence:</b> 5+ bars up, multiple wide-range bars, at pivot resistance, increased volume, topping tail, near 21 EMA</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="edge-card" data-testid="trade-plan-section">
+        <h3><span class="edge-icon">&#128203;</span> Trade Plan &mdash; Trading With An Edge Principles</h3>
+        <p class="edge-sub">"The simple, organized, consistent trader makes money. The overcomplicated, unorganized, inconsistent trader generally quits out of frustration." &mdash; Jared Wesley</p>
+
+        <div class="trade-plan-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.75rem;margin-top:0.75rem;">
+          <div class="tp-rule" style="background:#f8f5ff;border:1px solid #e8e0f0;border-radius:10px;padding:0.75rem 1rem;">
+            <div style="font-weight:700;color:#7c3aed;margin-bottom:0.25rem;">1. Every Trade Has 3 Things</div>
+            <div style="font-size:0.85rem;color:#555;">Every trade MUST have an Entry, Stop Loss, and Target. Without any one of these, there is NO trade. Know exactly how much you are risking before taking a position.</div>
+          </div>
+          <div class="tp-rule" style="background:#f8f5ff;border:1px solid #e8e0f0;border-radius:10px;padding:0.75rem 1rem;">
+            <div style="font-weight:700;color:#7c3aed;margin-bottom:0.25rem;">2. Approach Every Trade The Same</div>
+            <div style="font-size:0.85rem;color:#555;">Consistency is the edge. Apply the same process, same patterns, same management every single day. Let statistical probability work in your favor over time.</div>
+          </div>
+          <div class="tp-rule" style="background:#f8f5ff;border:1px solid #e8e0f0;border-radius:10px;padding:0.75rem 1rem;">
+            <div style="font-weight:700;color:#7c3aed;margin-bottom:0.25rem;">3. Multiple Concepts Converging</div>
+            <div style="font-size:0.85rem;color:#555;">The best trades have multiple factors converging in one area: price pattern, volume confirmation, moving average support/resistance, and pivot levels. More concepts = higher odds.</div>
+          </div>
+          <div class="tp-rule" style="background:#f8f5ff;border:1px solid #e8e0f0;border-radius:10px;padding:0.75rem 1rem;">
+            <div style="font-weight:700;color:#7c3aed;margin-bottom:0.25rem;">4. The 3 Chart Keys</div>
+            <div style="font-size:0.85rem;color:#555;">Always ask: How did the bar form? Where did the bar form on the chart? How did it get to where it is? Individually they matter, but collectively they are powerful.</div>
+          </div>
+          <div class="tp-rule" style="background:#f8f5ff;border:1px solid #e8e0f0;border-radius:10px;padding:0.75rem 1rem;">
+            <div style="font-weight:700;color:#7c3aed;margin-bottom:0.25rem;">5. Only 3 Tools: Price, Volume, MAs</div>
+            <div style="font-size:0.85rem;color:#555;">Keep it simple. Candlestick price action shows what is happening. Volume shows commitment. Moving averages (21 EMA, 200 SMA) confirm direction and dynamic S/R.</div>
+          </div>
+          <div class="tp-rule" style="background:#f8f5ff;border:1px solid #e8e0f0;border-radius:10px;padding:0.75rem 1rem;">
+            <div style="font-weight:700;color:#7c3aed;margin-bottom:0.25rem;">6. Fear &amp; Greed Drive Markets</div>
+            <div style="font-size:0.85rem;color:#555;">Markets are human emotion. When one side takes control for too long, expect a reversal. Track Buyers/Sellers in Control. Stay objective, don't let ego write checks.</div>
+          </div>
+          <div class="tp-rule" style="background:#f8f5ff;border:1px solid #e8e0f0;border-radius:10px;padding:0.75rem 1rem;">
+            <div style="font-weight:700;color:#7c3aed;margin-bottom:0.25rem;">7. Volume Tells The Story</div>
+            <div style="font-size:0.85rem;color:#555;">3 volume types: Igniting (starts/continues a move), Ending (exhausts a move), Resting (allows continuation after pause). Price tells what, volume tells how.</div>
+          </div>
+          <div class="tp-rule" style="background:#f8f5ff;border:1px solid #e8e0f0;border-radius:10px;padding:0.75rem 1rem;">
+            <div style="font-weight:700;color:#7c3aed;margin-bottom:0.25rem;">8. Trade With The Trend</div>
+            <div style="font-size:0.85rem;color:#555;">Uptrend = Higher Pivot Highs &amp; Higher Pivot Lows. Downtrend = Lower Pivot Highs &amp; Lower Pivot Lows. Smooth trends are easier to profit from than sideways ranges.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    /* --- Tabs --- */
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+    }
+
+    const toast = document.getElementById('toast');
+    function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
+
+    function esc(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
+    /* ========== Skills Tab ========== */
+    const form = document.getElementById('skill-form');
+    const list = document.getElementById('skill-list');
+
+    function timeAgo(date) {
+      const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+      if (s < 5) return 'just now'; if (s < 60) return s + 's ago';
+      const m = Math.floor(s / 60); if (m < 60) return m + 'm ago';
+      return Math.floor(m / 60) + 'h ago';
+    }
+
+    function renderSkills(skills) {
+      if (!skills.length) { list.innerHTML = '<li class="empty">No skills yet. Create your first one above.</li>'; return; }
+      list.innerHTML = skills.map((s, i) =>
+        `<li class="skill-item"><span class="skill-number">${i + 1}</span><div class="skill-info"><div class="skill-name">${esc(s.name)}</div>${s.description ? `<div class="skill-desc">${esc(s.description)}</div>` : ''}<div class="skill-time">${timeAgo(s.createdAt)}</div></div></li>`
+      ).join('');
+    }
+
+    async function loadSkills() { try { renderSkills(await (await fetch('/api/skills')).json()); } catch {} }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim(), description = document.getElementById('description').value.trim();
+      if (!name) return;
+      try { const d = await (await fetch('/api/create-skill', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,description}) })).json(); if (d.success) { showToast('Skill created!'); form.reset(); loadSkills(); } else showToast('Error: '+(d.error||'Failed')); } catch { showToast('Network error'); }
+    });
+    loadSkills(); setInterval(loadSkills, 5000);
+
+    /* ========== Permit Checker Tab ========== */
+    const permitForm = document.getElementById('permit-form');
+    const permitResults = document.getElementById('permit-results');
+    const permitOutput = document.getElementById('permit-output');
+
+    permitForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = permitForm.querySelector('button'); btn.disabled = true; btn.textContent = 'Checking...';
+      const body = { renovationType: document.getElementById('renovationType').value, propertyType: document.getElementById('propertyType').value, county: document.getElementById('county').value, details: document.getElementById('details').value };
+      try {
+        const data = await (await fetch('/api/florida-permit-checker', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })).json();
+        if (!data.success) { showToast('Error: '+(data.error||'Failed')); btn.disabled=false; btn.textContent='Check Required Permits'; return; }
+        let h = `<h2>Permit Report</h2><div class="permit-meta"><div class="meta-badge"><div class="meta-label">Estimated Fees</div><div class="meta-value">${esc(data.estimatedFees)}</div></div><div class="meta-badge"><div class="meta-label">Approval Time</div><div class="meta-value">${esc(data.approvalTime)}</div></div></div>`;
+        h += `<div class="permit-section"><h3>Required Permits</h3><ul>${data.permits.map(p=>`<li>${esc(p)}</li>`).join('')}</ul></div><hr class="divider">`;
+        h += `<div class="permit-section"><h3>Important Notes</h3><ul class="notes-list">${data.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div><hr class="divider">`;
+        h += `<div class="permit-section"><h3>Next Steps</h3><ul class="steps-list">${data.nextSteps.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div><hr class="divider">`;
+        h += `<div class="permit-section"><h3>Official Resources</h3><ul class="links-list">${data.officialLinks.map(l=>`<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a></li>`).join('')}</ul></div>`;
+        permitOutput.innerHTML = h; permitResults.classList.add('visible'); showToast('Permit report ready!');
+        permitResults.scrollIntoView({ behavior:'smooth', block:'start' });
+      } catch { showToast('Network error'); }
+      btn.disabled = false; btn.textContent = 'Check Required Permits';
+    });
+
+    /* ========== AI Futures Trader Tab ========== */
+    let traderSessionId = null;
+    let traderPollInterval = null;
+    let lastLogId = 0;
+
+    async function checkTradingStatus() {
+      try {
+        const d = await (await fetch('/api/trader/status')).json();
+        const badge = document.getElementById('trader-status-badge');
+        const text = document.getElementById('trader-status-text');
+        if (d.forceActive) {
+          badge.className = 'trading-status open';
+          text.textContent = 'FORCE TRADING ACTIVE (time window bypassed)';
+        } else if (d.tradingOpen) {
+          badge.className = 'trading-status open';
+          text.textContent = 'Futures session OPEN (Sun 6PM - Fri 5PM EST)';
+        } else {
+          badge.className = 'trading-status closed';
+          text.textContent = 'Futures session CLOSED (maintenance or weekend)';
+        }
+
+        const tvBadge = document.getElementById('tradovate-status');
+        const tvText = document.getElementById('tradovate-status-text');
+        if (d.tradovate) {
+          if (d.tradovate.connected) {
+            tvBadge.className = 'trading-status open';
+            tvText.textContent = 'Tradovate: Connected — ' + d.tradovate.accountName + ' (Paper)';
+          } else if (d.tradovate.lastError && d.tradovate.lastError !== 'Not initialized') {
+            tvBadge.className = 'trading-status closed';
+            tvText.textContent = 'Tradovate: ' + d.tradovate.lastError;
+          } else {
+            tvBadge.className = 'trading-status closed';
+            tvText.textContent = 'Tradovate: Not connected — set credentials in Secrets';
+          }
+        }
+      } catch {}
+    }
+
+    checkTradingStatus();
+    setInterval(checkTradingStatus, 30000);
+
+    function getChecked(name) {
+      return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(c => c.value);
+    }
+
+    async function startTrader() {
+      const markets = getChecked('market');
+      const timeframes = getChecked('tf');
+      const patterns = getChecked('pattern');
+      const riskPct = parseFloat(document.getElementById('riskPct').value) || 0.5;
+      const rewardRatio = parseFloat(document.getElementById('rewardRatio').value) || 2;
+      const customCondition = document.getElementById('customCondition').value;
+      const forceTrading = document.getElementById('forceTrading').checked;
+
+      if (!markets.length) { showToast('Select at least one market'); return; }
+      if (!timeframes.length) { showToast('Select at least one timeframe'); return; }
+      if (!patterns.length) { showToast('Select at least one pattern'); return; }
+
+      document.getElementById('btn-start-trader').disabled = true;
+      document.getElementById('btn-stop-trader').disabled = false;
+
+      try {
+        const d = await (await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskPct,rewardRatio,patterns,customCondition,forceTrading}) })).json();
+        if (d.success) {
+          traderSessionId = d.sessionId;
+          lastLogId = 0;
+          document.getElementById('trade-log').innerHTML = '<div class="log-empty">Waiting for first signal...</div>';
+          document.getElementById('trader-dashboard').style.display = 'block';
+          document.getElementById('log-live-dot').className = 'log-live-dot';
+          document.getElementById('stat-rr').textContent = '1:' + rewardRatio;
+          showToast('Autonomous trader started!');
+          traderPollInterval = setInterval(pollTraderLogs, 2000);
+        } else { showToast('Failed to start'); document.getElementById('btn-start-trader').disabled = false; }
+      } catch { showToast('Network error'); document.getElementById('btn-start-trader').disabled = false; }
+    }
+
+    async function stopTrader() {
+      if (!traderSessionId) return;
+      try {
+        await fetch('/api/trader/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sessionId:traderSessionId}) });
+        showToast('Trader stopped');
+      } catch {}
+      document.getElementById('btn-start-trader').disabled = false;
+      document.getElementById('btn-stop-trader').disabled = true;
+      document.getElementById('log-live-dot').className = 'log-live-dot stopped';
+      if (traderPollInterval) clearInterval(traderPollInterval);
+      traderPollInterval = null;
+      pollTraderLogs();
+    }
+
+    async function sendTestSignal() {
+      const testSignal = {
+        symbol: "ES",
+        direction: "Long",
+        entryPrice: 5823.50,
+        stopLoss: 5818.00,
+        takeProfit: 5838.50,
+        riskReward: "1:3",
+        confluence: 4,
+        pattern: "3 Bar Play"
+      };
+      try {
+        const ngrokUrl = 'https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal';
+        const [localRes, ngrokRes] = await Promise.allSettled([
+          fetch('/api/trade-signal', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({...testSignal, source: 'test-button'})
+          }),
+          fetch(ngrokUrl, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(testSignal)
+          })
+        ]);
+        const localOk = localRes.status === 'fulfilled' && localRes.value.ok;
+        const ngrokOk = ngrokRes.status === 'fulfilled' && ngrokRes.value.ok;
+        if (ngrokOk) {
+          showToast('Test signal sent to ngrok bridge: Long ES @ 5823.50');
+        } else if (localOk) {
+          showToast('Test signal sent locally (ngrok unreachable)');
+        } else {
+          showToast('Signal failed to send');
+        }
+      } catch { showToast('Failed to send test signal'); }
+    }
+
+    function actionClass(action) {
+      if (action === 'LONG ENTERED') return 'long';
+      if (action === 'SHORT ENTERED') return 'short';
+      if (action === 'STOPPED OUT') return 'stopped';
+      if (action === 'TRAILED OUT') return 'trailed';
+      if (action === 'TARGET HIT') return 'target';
+      if (action === 'TRAIL UPDATED') return 'trail-update';
+      if (action.startsWith('SIGNAL')) return 'signal';
+      if (action === 'SCANNING') return 'scanning';
+      if (action === 'TRADOVATE ORDER') return 'tradovate';
+      if (action === 'TRADOVATE ERROR') return 'tradovate-err';
+      return 'system';
+    }
+
+    function formatPnl(pnl) {
+      if (pnl === null || pnl === undefined) return '';
+      const cls = pnl >= 0 ? 'pos' : 'neg';
+      return `<span class="log-pnl ${cls}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span>`;
+    }
+
+    function biasTag(bias) {
+      if (!bias) return '';
+      const cls = bias === 'UPTREND' ? 'up' : bias === 'DOWNTREND' ? 'down' : 'side';
+      const label = bias === 'UPTREND' ? 'UP' : bias === 'DOWNTREND' ? 'DN' : 'SW';
+      return `<span class="log-bias ${cls}">${label}</span>`;
+    }
+
+    function confTag(c, label) {
+      if (c === null || c === undefined) return '';
+      const cls = c >= 5 ? 'high' : c >= 3 ? 'med' : 'low';
+      let html = `<span class="log-conf ${cls}">${c}pt</span>`;
+      if (label) html += `<span class="log-conf-label">${esc(label)}</span>`;
+      return html;
+    }
+
+    function volTypeTag(v) {
+      if (!v || v === 'NORMAL') return '';
+      const cls = v === 'IGNITING' ? 'igniting' : v === 'ENDING' ? 'ending' : 'resting';
+      return `<span class="log-vol-type ${cls}">${v}</span>`;
+    }
+
+    function sentTag(s) {
+      if (!s) return '';
+      const cls = s === 'GREED' ? 'greed' : s === 'FEAR' ? 'fear' : 'neutral';
+      return `<span class="log-sent ${cls}">${s}</span>`;
+    }
+
+    function srcTag(s) {
+      if (!s) return '';
+      const cls = s === 'POLYGON' ? 'polygon' : s === 'TRADOVATE' ? 'polygon' : 'sim';
+      return `<span class="log-src ${cls}">${s}</span>`;
+    }
+
+    function fmtPrice(p) {
+      if (p === null || p === undefined) return '';
+      if (Math.abs(p) >= 1000) return p.toFixed(2);
+      if (Math.abs(p) >= 10) return p.toFixed(2);
+      return p.toFixed(4);
+    }
+
+    function buildLogDetail(log) {
+      let html = '';
+      if (log.reason) {
+        html += `<div class="log-reason">${esc(log.reason)}</div>`;
+      }
+      if (log.entry !== null) {
+        html += `<span class="log-entry-tag">E:${fmtPrice(log.entry)}</span> `;
+      }
+      if (log.stop !== null) {
+        html += `<span class="log-sl-tag">SL:${fmtPrice(log.stop)}</span> `;
+      }
+      if (log.target !== null) {
+        html += `<span class="log-tp-tag">TP:${fmtPrice(log.target)}</span> `;
+      }
+      if (log.trail !== null && log.trail !== undefined && log.trail !== log.stop) {
+        html += `<span class="log-trail-tag">TR:${fmtPrice(log.trail)}</span> `;
+      }
+      if (log.pnl !== null) {
+        html += formatPnl(log.pnl) + ' ';
+      }
+      html += biasTag(log.bias);
+      html += confTag(log.confluence, log.confluenceLabel);
+      html += volTypeTag(log.volumeType);
+      html += sentTag(log.sentiment);
+      html += srcTag(log.dataSource);
+      return html;
+    }
+
+    async function pollTraderLogs() {
+      if (!traderSessionId) return;
+      try {
+        const url = `/api/trader/logs/${traderSessionId}${lastLogId ? '?after=' + lastLogId : ''}`;
+        const d = await (await fetch(url)).json();
+
+        if (d.status) {
+          document.getElementById('stat-trades').textContent = d.status.tradeCount;
+          document.getElementById('stat-wins').textContent = d.status.wins;
+          document.getElementById('stat-losses').textContent = d.status.losses;
+          document.getElementById('stat-open').textContent = d.status.openPositions;
+          const pnlEl = document.getElementById('stat-pnl');
+          pnlEl.textContent = (d.status.cumPnl >= 0 ? '+' : '') + '$' + d.status.cumPnl.toFixed(2);
+          pnlEl.className = 't-stat-value ' + (d.status.cumPnl >= 0 ? 'positive' : 'negative');
+          if (d.status.rewardRatio) document.getElementById('stat-rr').textContent = '1:' + d.status.rewardRatio;
+        }
+
+        if (d.logs && d.logs.length > 0) {
+          const logEl = document.getElementById('trade-log');
+          if (lastLogId === 0) logEl.innerHTML = '';
+
+          d.logs.forEach(log => {
+            const row = document.createElement('div');
+            row.className = 'log-row';
+            const dir = log.direction && log.direction !== '--' ? ` [${log.direction}]` : '';
+            row.innerHTML = `
+              <span class="log-cell log-time">${esc(log.timestamp)}</span>
+              <span class="log-cell log-market">${esc(log.market)}</span>
+              <span class="log-cell log-tf">${esc(log.timeframe)}</span>
+              <span class="log-cell log-pattern">${esc(log.pattern)}</span>
+              <span class="log-cell log-action ${actionClass(log.action)}">${esc(log.action)}</span>
+              <span class="log-cell log-detail">${buildLogDetail(log)}</span>
+            `;
+            logEl.appendChild(row);
+            lastLogId = Math.max(lastLogId, log.id);
+          });
+
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+      } catch {}
+    }
+
+    /* --- Journal --- */
+    let journalData = [];
+    let journalSortCol = 'timestamp';
+    let journalSortAsc = false;
+
+    async function loadJournalData() {
+      try {
+        const d = await (await fetch('/api/journal')).json();
+        journalData = d.entries || [];
+        updateJournalStats(d.stats);
+        populateJournalFilters();
+        renderJournal();
+      } catch {}
+    }
+
+    function updateJournalStats(s) {
+      if (!s) return;
+      document.getElementById('j-total').textContent = s.totalTrades;
+      const wrEl = document.getElementById('j-winrate');
+      wrEl.textContent = s.winRate + '%';
+      wrEl.className = 'j-stat-value' + (s.winRate >= 50 ? ' positive' : s.winRate > 0 ? ' negative' : '');
+      document.getElementById('j-pf').textContent = s.profitFactor === Infinity ? '∞' : s.profitFactor;
+      const pnlEl = document.getElementById('j-pnl');
+      pnlEl.textContent = (s.totalPnl >= 0 ? '+' : '') + '$' + s.totalPnl.toFixed(2);
+      pnlEl.className = 'j-stat-value' + (s.totalPnl >= 0 ? ' positive' : ' negative');
+      document.getElementById('j-symbol').textContent = s.bestSymbol;
+      document.getElementById('j-pattern').textContent = s.bestPattern;
+      document.getElementById('j-rr').textContent = s.avgRR;
+    }
+
+    function populateJournalFilters() {
+      const symbols = [...new Set(journalData.map(e => e.symbol))].sort();
+      const patterns = [...new Set(journalData.map(e => e.pattern))].sort();
+      const symSel = document.getElementById('j-filter-symbol');
+      const patSel = document.getElementById('j-filter-pattern');
+      const curSym = symSel.value;
+      const curPat = patSel.value;
+      symSel.innerHTML = '<option value="">All Symbols</option>' + symbols.map(s => `<option value="${s}">${s}</option>`).join('');
+      patSel.innerHTML = '<option value="">All Patterns</option>' + patterns.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+      symSel.value = curSym;
+      patSel.value = curPat;
+    }
+
+    function getFilteredJournal() {
+      const search = (document.getElementById('j-search').value || '').toLowerCase();
+      const sym = document.getElementById('j-filter-symbol').value;
+      const pat = document.getElementById('j-filter-pattern').value;
+      const out = document.getElementById('j-filter-outcome').value;
+
+      let data = journalData;
+      if (sym) data = data.filter(e => e.symbol === sym);
+      if (pat) data = data.filter(e => e.pattern === pat);
+      if (out) data = data.filter(e => e.outcome === out);
+      if (search) data = data.filter(e =>
+        (e.symbol + ' ' + e.pattern + ' ' + e.direction + ' ' + e.reason + ' ' + e.notes + ' ' + e.timestamp).toLowerCase().includes(search)
+      );
+
+      data = [...data].sort((a, b) => {
+        let va = a[journalSortCol], vb = b[journalSortCol];
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+        if (va < vb) return journalSortAsc ? -1 : 1;
+        if (va > vb) return journalSortAsc ? 1 : -1;
+        return 0;
+      });
+      return data;
+    }
+
+    function sortJournal(col) {
+      if (journalSortCol === col) journalSortAsc = !journalSortAsc;
+      else { journalSortCol = col; journalSortAsc = true; }
+
+      document.querySelectorAll('.journal-table th .sort-arrow').forEach(el => el.textContent = '');
+      const th = document.querySelector(`.journal-table th[data-col="${col}"] .sort-arrow`);
+      if (th) th.textContent = journalSortAsc ? ' ▲' : ' ▼';
+      renderJournal();
+    }
+
+    function renderJournal() {
+      const data = getFilteredJournal();
+      const tbody = document.getElementById('journal-tbody');
+      const empty = document.getElementById('journal-empty');
+
+      if (data.length === 0) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      tbody.innerHTML = data.map(e => {
+        const ocls = e.outcome === 'WIN' ? 'win' : e.outcome === 'LOSS' ? 'loss' : 'breakeven';
+        const dcls = e.direction === 'LONG' ? 'dir-long' : 'dir-short';
+        const pcls = e.pnlDollars >= 0 ? 'pnl-pos' : 'pnl-neg';
+        const notesTxt = e.notes ? esc(e.notes) : '<i style="color:#ccc">click to add</i>';
+        return `<tr data-testid="row-trade-${e.id}">
+          <td>${esc(e.timestamp)}</td>
+          <td><b>${esc(e.symbol)}</b></td>
+          <td>${esc(e.timeframe)}</td>
+          <td>${esc(e.pattern)}</td>
+          <td class="${dcls}">${e.direction}</td>
+          <td>${fmtPrice(e.entry)}</td>
+          <td>${fmtPrice(e.stop)}</td>
+          <td>${fmtPrice(e.target)}</td>
+          <td>${fmtPrice(e.exit)}</td>
+          <td class="${pcls}">${e.pnlDollars >= 0 ? '+' : ''}$${e.pnlDollars.toFixed(2)}</td>
+          <td>${renderChecklist(e)}</td>
+          <td class="${ocls}">${e.outcome}</td>
+          <td>${e.achievedRR}</td>
+          <td class="notes-cell" onclick="editNote('${e.id}')" title="${esc(e.notes || 'Click to add notes')}">${notesTxt}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function editNote(id) {
+      const entry = journalData.find(e => e.id === id);
+      const note = prompt('Trade notes:', entry?.notes || '');
+      if (note === null) return;
+      fetch('/api/journal/' + id + '/notes', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ notes: note })
+      }).then(() => { if (entry) entry.notes = note; renderJournal(); });
+    }
+
+    function exportCSV() {
+      window.open('/api/journal/csv', '_blank');
+    }
+
+    function clearAllJournal() {
+      if (!confirm('Clear all trade history? This cannot be undone.')) return;
+      fetch('/api/journal', { method: 'DELETE' }).then(() => {
+        journalData = [];
+        updateJournalStats({ totalTrades:0, wins:0, losses:0, breakevens:0, winRate:0, profitFactor:0, totalPnl:0, bestSymbol:'--', bestPattern:'--', avgRR:0 });
+        renderJournal();
+        showToast('Journal cleared');
+      });
+    }
+
+    /* --- Settings --- */
+    async function loadTraderSettings() {
+      try {
+        const s = await (await fetch('/api/settings')).json();
+        document.getElementById('set-risk').value = s.riskPct || 0.5;
+        document.getElementById('set-rr').value = s.rewardRatio || 2;
+        document.getElementById('riskPct').value = s.riskPct || 0.5;
+        document.getElementById('rewardRatio').value = s.rewardRatio || 2;
+        if (s.enabledPatterns) {
+          document.querySelectorAll('input[name="set-pattern"]').forEach(cb => {
+            cb.checked = s.enabledPatterns.includes(cb.value);
+          });
+          document.querySelectorAll('input[name="pattern"]').forEach(cb => {
+            cb.checked = s.enabledPatterns.includes(cb.value);
+          });
+        }
+        if (s.enabledTimeframes) {
+          document.querySelectorAll('input[name="set-tf"]').forEach(cb => {
+            cb.checked = s.enabledTimeframes.includes(cb.value);
+          });
+          document.querySelectorAll('input[name="tf"]').forEach(cb => {
+            cb.checked = s.enabledTimeframes.includes(cb.value);
+          });
+        }
+      } catch {}
+    }
+
+    async function saveTraderSettings() {
+      const riskPct = parseFloat(document.getElementById('set-risk').value) || 0.5;
+      const rewardRatio = parseFloat(document.getElementById('set-rr').value) || 2;
+      const enabledPatterns = [...document.querySelectorAll('input[name="set-pattern"]:checked')].map(c => c.value);
+      const enabledTimeframes = [...document.querySelectorAll('input[name="set-tf"]:checked')].map(c => c.value);
+      if (!enabledPatterns.length) { showToast('Select at least one pattern'); return; }
+      if (!enabledTimeframes.length) { showToast('Select at least one timeframe'); return; }
+      try {
+        await fetch('/api/settings', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ riskPct, rewardRatio, enabledPatterns, enabledTimeframes })
+        });
+        document.getElementById('riskPct').value = riskPct;
+        document.getElementById('rewardRatio').value = rewardRatio;
+        document.querySelectorAll('input[name="pattern"]').forEach(cb => {
+          cb.checked = enabledPatterns.includes(cb.value);
+        });
+        document.querySelectorAll('input[name="tf"]').forEach(cb => {
+          cb.checked = enabledTimeframes.includes(cb.value);
+        });
+        showToast('Settings saved');
+      } catch { showToast('Failed to save settings'); }
+    }
+
+    function renderChecklist(e) {
+      const cl = e.checklist || {};
+      const items = [
+        { key: 'patternMatch', label: 'Pattern' },
+        { key: 'volumeConfirmation', label: 'Volume' },
+        { key: 'maRespect', label: 'MA' },
+        { key: 'priorPivotSR', label: 'Pivot/SR' },
+        { key: 'barFormation', label: 'Bar' },
+      ];
+      const score = items.filter(i => cl[i.key]).length;
+      const dots = items.map(i =>
+        `<span class="conf-dot ${cl[i.key] ? 'on' : 'off'}" title="${i.label}: ${cl[i.key] ? 'YES' : 'NO'}"></span>`
+      ).join('');
+      return `<span class="conf-tooltip"><span class="conf-checklist">${dots}</span> <span style="font-size:0.68rem;font-weight:700;color:#374151;">${score}/5</span><span class="conf-tip-text">${items.map(i => (cl[i.key] ? '\u2705' : '\u274C') + ' ' + i.label).join(' | ')}</span></span>`;
+    }
+
+    /* ========== Edge Builder ========== */
+    async function loadEdgeBuilder() {
+      try {
+        const ep = [...document.querySelectorAll('input[name="set-pattern"]:checked')].map(c => c.value).join(',');
+        const et = [...document.querySelectorAll('input[name="set-tf"]:checked')].map(c => c.value).join(',');
+        const qs = ep || et ? `?patterns=${encodeURIComponent(ep)}&timeframes=${encodeURIComponent(et)}` : '';
+        const d = await (await fetch('/api/journal/analytics' + qs)).json();
+        renderEdgeOverall(d.overall);
+        renderEdgeGroupTable('edge-pattern-body', d.byPattern);
+        renderEdgeGroupTable('edge-symbol-body', d.bySymbol);
+        renderEdgeGroupTable('edge-tf-body', d.byTimeframe);
+        renderEdgeGroupTable('edge-conf-body', d.byConfluence);
+        renderEdgeHeatmap(d.byPattern.concat(d.bySymbol));
+        renderEdgeRecs(d.recommendations);
+      } catch (err) { console.error('Edge builder load error:', err); }
+    }
+
+    function renderEdgeOverall(o) {
+      if (!o) return;
+      document.getElementById('edge-total').textContent = o.totalTrades;
+      const wrEl = document.getElementById('edge-wr');
+      wrEl.textContent = o.winRate + '%';
+      wrEl.className = 'em-value' + (o.winRate >= 50 ? ' positive' : o.winRate > 0 ? ' negative' : '');
+      const pfEl = document.getElementById('edge-pf');
+      pfEl.textContent = o.profitFactor >= 99 ? '\u221E' : o.profitFactor;
+      pfEl.className = 'em-value' + (o.profitFactor >= 1.5 ? ' positive' : o.profitFactor > 0 ? '' : '');
+      const expEl = document.getElementById('edge-exp');
+      expEl.textContent = (o.expectancy >= 0 ? '+' : '') + '$' + o.expectancy.toFixed(2);
+      expEl.className = 'em-value' + (o.expectancy >= 0 ? ' positive' : ' negative');
+      const pnlEl = document.getElementById('edge-pnl');
+      pnlEl.textContent = (o.totalPnl >= 0 ? '+' : '') + '$' + o.totalPnl.toFixed(2);
+      pnlEl.className = 'em-value' + (o.totalPnl >= 0 ? ' positive' : ' negative');
+    }
+
+    function renderEdgeGroupTable(tbodyId, rows) {
+      const tbody = document.getElementById(tbodyId);
+      if (!rows || rows.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:1rem;">No data yet</td></tr>'; return; }
+      tbody.innerHTML = rows.map(r => {
+        const wrCls = r.winRate >= 55 ? 'wr-high' : r.winRate < 40 ? 'wr-low' : '';
+        const pnlCls = r.totalPnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+        return `<tr data-testid="row-edge-${esc(r.name)}">
+          <td><b>${esc(r.name)}</b></td>
+          <td>${r.trades}</td>
+          <td>${r.wins}</td>
+          <td class="${wrCls}">${r.winRate}%</td>
+          <td>${r.avgRR}</td>
+          <td>${r.profitFactor >= 99 ? '\u221E' : r.profitFactor}</td>
+          <td class="${pnlCls}">${r.totalPnl >= 0 ? '+' : ''}$${r.totalPnl.toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderEdgeHeatmap(allItems) {
+      const hm = document.getElementById('edge-heatmap');
+      if (!allItems || allItems.length === 0) { hm.innerHTML = '<div class="edge-empty">No data yet. Complete trades to populate the heatmap.</div>'; return; }
+      const sorted = [...allItems].sort((a, b) => b.winRate - a.winRate);
+      const unique = [];
+      const seen = new Set();
+      sorted.forEach(s => { if (!seen.has(s.name)) { seen.add(s.name); unique.push(s); } });
+      hm.innerHTML = unique.slice(0, 12).map(s => {
+        const cls = s.winRate >= 60 ? 'hm-hot' : s.winRate >= 45 ? 'hm-warm' : s.trades === 0 ? 'hm-neutral' : 'hm-cold';
+        return `<div class="hm-cell ${cls}" data-testid="heatmap-${esc(s.name)}">
+          <div class="hm-name">${esc(s.name)}</div>
+          <div class="hm-wr">${s.winRate}%</div>
+          <div class="hm-pnl">${s.totalPnl >= 0 ? '+' : ''}$${s.totalPnl.toFixed(2)} | ${s.trades} trades</div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderEdgeRecs(recs) {
+      const el = document.getElementById('edge-recs');
+      if (!recs || recs.length === 0) { el.innerHTML = '<li class="edge-empty">Trade more to unlock personalized recommendations.</li>'; return; }
+      el.innerHTML = recs.map(r => `<li data-testid="rec-item"><span class="rec-icon">\u{1F4A1}</span> ${esc(r)}</li>`).join('');
+    }
+
+    loadJournalData();
+    loadTraderSettings();
+    setInterval(loadJournalData, 10000);
+  </script>
+</body>
 </html>
