@@ -1,13 +1,11 @@
 import { addJournalEntry, type JournalEntry } from "./journal";
 import { connectTradovate, isTradovateConnected, getTradovateStatus, placeBracketOrder } from "./tradovate";
-import http from "http";
 import https from "https";
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
 
 const NGROK_BRIDGE_URL = "https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal";
-const LOCAL_SIGNAL_PORT = parseInt(process.env.PORT || "5000", 10);
 
 export function forwardSignalToNgrok(payload: { symbol: string; direction: string; entryPrice: number; stopLoss: number; takeProfit: number; riskReward: string; confluence: number; pattern: string }) {
   const body = JSON.stringify(payload);
@@ -43,18 +41,6 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
     pattern,
   });
 
-  const localPayload = JSON.stringify({
-    symbol,
-    direction: direction === "LONG" ? "Long" : "Short",
-    entryPrice: entry,
-    stopLoss: stop,
-    takeProfit: target,
-    riskReward: `1:${rewardRatio}`,
-    confluence,
-    pattern,
-    source: "trader-engine",
-  });
-
   const dir = direction === "LONG" ? "Long" : "Short";
 
   const ngrokReq = https.request(NGROK_BRIDGE_URL, {
@@ -75,20 +61,6 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
   });
   ngrokReq.write(ngrokPayload);
   ngrokReq.end();
-
-  const localReq = http.request({
-    hostname: "127.0.0.1",
-    port: LOCAL_SIGNAL_PORT,
-    path: "/api/trade-signal",
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(localPayload) },
-  }, (res) => {
-    res.on("data", () => {});
-    res.on("end", () => {});
-  });
-  localReq.on("error", () => {});
-  localReq.write(localPayload);
-  localReq.end();
 }
 
 interface PolygonPrice {
