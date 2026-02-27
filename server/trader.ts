@@ -8,6 +8,7 @@ const POLYGON_BASE = "https://api.polygon.io";
 const NGROK_BRIDGE_URL = "https://jeanie-makable-deon.ngrok-free.dev/api/trade-signal";
 
 export function forwardSignalToNgrok(payload: { symbol: string; direction: string; entryPrice: number; stopLoss: number; takeProfit: number; riskReward: string; confluence: number; pattern: string }) {
+  console.log(`[trader] Sending signal to: ${NGROK_BRIDGE_URL}`);
   const body = JSON.stringify(payload);
   const ngrokReq = https.request(NGROK_BRIDGE_URL, {
     method: "POST",
@@ -43,6 +44,7 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
 
   const dir = direction === "LONG" ? "Long" : "Short";
 
+  console.log(`[trader] Sending signal to: ${NGROK_BRIDGE_URL}`);
   const ngrokReq = https.request(NGROK_BRIDGE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(ngrokPayload) },
