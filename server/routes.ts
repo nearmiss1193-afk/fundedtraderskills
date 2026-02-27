@@ -5,6 +5,7 @@ import express from "express";
 import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase } from "./trader";
 import { getTradeAck } from "./supabase";
 import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
+import { sendToCrossTrade } from "./services/crosstrade";
 
 let skills: any[] = [];
 
@@ -307,6 +308,20 @@ export async function registerRoutes(
     } catch (err: any) {
       res.status(500).json({ status: "error", signalId: req.params.signalId, reason: err.message });
     }
+  });
+
+  app.post("/api/crosstrade/test", async (req, res) => {
+    const { symbol, direction, account } = req.body;
+    if (!symbol || !direction) {
+      return res.status(400).json({ success: false, error: "Missing symbol or direction" });
+    }
+    const result = await sendToCrossTrade({
+      symbol: symbol.toUpperCase(),
+      direction: direction,
+      orderType: "MARKET",
+      account: account
+    });
+    res.json(result);
   });
 
   app.get("/api/journal", (_req, res) => {

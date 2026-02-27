@@ -45,3 +45,5 @@ outputType = "webview"
 [userenv]
 
 [userenv.shared]
+CROSSTRADE_ACCOUNT = "SIM101"
+MAX_CONTRACTS = "1"
