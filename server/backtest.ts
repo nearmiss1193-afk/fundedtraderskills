@@ -204,27 +204,25 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
 
   for (let i = 3; i < bars.length; i++) {
     const ignitingIdx = i - 2;
-    const pullbackIdx = i - 1;
+    const restingIdx = i - 1;
     const triggerIdx = i;
 
     if (ignitingIdx < 1) continue;
 
-    const isIgniting = green[ignitingIdx] &&
+    const isIgnitingLong = green[ignitingIdx] &&
       range[ignitingIdx] > 1.5 * avgRange[ignitingIdx] &&
       bars[ignitingIdx].volume > 1.5 * avgVol[ignitingIdx] &&
       body[ignitingIdx] > 0.5 * range[ignitingIdx];
 
-    const isPullback = range[pullbackIdx] < 0.5 * range[ignitingIdx] &&
-      bars[pullbackIdx].low > bars[ignitingIdx].low &&
-      Math.abs(bars[pullbackIdx].close - bars[ignitingIdx].open) < 0.5 * range[ignitingIdx];
+    const isRestingLong = range[restingIdx] < 0.5 * range[ignitingIdx] &&
+      bars[restingIdx].low > bars[ignitingIdx].low - 0.1 * range[ignitingIdx];
 
-    const isTrigger = green[triggerIdx] &&
-      bars[triggerIdx].high > bars[ignitingIdx].high &&
-      bars[triggerIdx].volume > bars[pullbackIdx].volume &&
-      bars[triggerIdx].close > ema21[triggerIdx] &&
-      bars[triggerIdx].low > bars[ignitingIdx].low;
+    const isTriggerLong = green[triggerIdx] &&
+      bars[triggerIdx].close > bars[restingIdx].high &&
+      bars[triggerIdx].volume > bars[restingIdx].volume &&
+      bars[triggerIdx].close > ema21[triggerIdx];
 
-    if (isIgniting && isPullback && isTrigger) {
+    if (isIgnitingLong && isRestingLong && isTriggerLong) {
       signals.push({ index: triggerIdx, direction: "LONG", pattern: "3 Bar Play" });
     }
 
@@ -233,17 +231,15 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
       bars[ignitingIdx].volume > 1.5 * avgVol[ignitingIdx] &&
       body[ignitingIdx] > 0.5 * range[ignitingIdx];
 
-    const isPullbackShort = range[pullbackIdx] < 0.5 * range[ignitingIdx] &&
-      bars[pullbackIdx].high < bars[ignitingIdx].high &&
-      Math.abs(bars[pullbackIdx].close - bars[ignitingIdx].open) < 0.5 * range[ignitingIdx];
+    const isRestingShort = range[restingIdx] < 0.5 * range[ignitingIdx] &&
+      bars[restingIdx].high < bars[ignitingIdx].high + 0.1 * range[ignitingIdx];
 
     const isTriggerShort = !green[triggerIdx] &&
-      bars[triggerIdx].low < bars[ignitingIdx].low &&
-      bars[triggerIdx].volume > bars[pullbackIdx].volume &&
-      bars[triggerIdx].close < ema21[triggerIdx] &&
-      bars[triggerIdx].high < bars[ignitingIdx].high;
+      bars[triggerIdx].close < bars[restingIdx].low &&
+      bars[triggerIdx].volume > bars[restingIdx].volume &&
+      bars[triggerIdx].close < ema21[triggerIdx];
 
-    if (isIgnitingShort && isPullbackShort && isTriggerShort) {
+    if (isIgnitingShort && isRestingShort && isTriggerShort) {
       signals.push({ index: triggerIdx, direction: "SHORT", pattern: "3 Bar Play" });
     }
   }
