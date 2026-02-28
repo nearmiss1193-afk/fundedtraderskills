@@ -737,6 +737,47 @@
     .pl-card .pl-dir.short { color: #ef4444; }
     .pl-card .pl-desc { font-size: 0.78rem; color: #4b5563; line-height: 1.45; margin-bottom: 0.4rem; }
     .pl-card .pl-rules { font-size: 0.72rem; color: #6b7280; line-height: 1.5; }
+
+    .bt-panel { margin-top: 0.5rem; }
+    .bt-controls { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 0.8rem; }
+    .bt-controls .bt-field { display: flex; flex-direction: column; gap: 0.15rem; }
+    .bt-controls .bt-field label { font-size: 0.65rem; font-weight: 700; color: #6b7280; text-transform: uppercase; }
+    .bt-controls .bt-field select,
+    .bt-controls .bt-field input {
+      padding: 0.35rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 0.75rem; background: #fff; color: #1a1a2e;
+    }
+    .bt-run-btn {
+      padding: 0.45rem 1rem; border: none; border-radius: 8px;
+      background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff;
+      font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+    }
+    .bt-run-btn:hover { background: linear-gradient(135deg, #6d28d9, #9333ea); }
+    .bt-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .bt-results { margin-top: 0.6rem; }
+    .bt-metrics {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 0.4rem; margin-bottom: 0.8rem;
+    }
+    .bt-metric {
+      background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;
+      padding: 0.5rem; text-align: center;
+    }
+    .bt-metric.negative { background: #fef2f2; border-color: #fecaca; }
+    .bt-metric .bt-label { font-size: 0.6rem; font-weight: 700; color: #6b7280; text-transform: uppercase; }
+    .bt-metric .bt-val { font-size: 1rem; font-weight: 800; color: #1a1a2e; }
+    .bt-metric .bt-val.pos { color: #16a34a; }
+    .bt-metric .bt-val.neg { color: #ef4444; }
+    .bt-trades-wrap {
+      max-height: 250px; overflow-y: auto; border: 1px solid #e8e5f0; border-radius: 8px;
+    }
+    .bt-trades-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; white-space: nowrap; }
+    .bt-trades-table th { background: #f8f7fc; color: #7c3aed; font-weight: 700; padding: 0.4rem; text-align: left; font-size: 0.65rem; text-transform: uppercase; border-bottom: 2px solid #e8e5f0; position: sticky; top: 0; }
+    .bt-trades-table td { padding: 0.35rem 0.4rem; border-bottom: 1px solid #f0eef5; }
+    .bt-trades-table .bt-win { color: #16a34a; font-weight: 700; }
+    .bt-trades-table .bt-loss { color: #ef4444; font-weight: 700; }
+    .bt-trades-table .bt-timeout { color: #9ca3af; font-weight: 600; }
+    .bt-status { font-size: 0.8rem; color: #7c3aed; font-weight: 600; padding: 1rem 0; text-align: center; }
     .pl-card .pl-rules b { color: #374151; }
     .pl-card .pl-tag { display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-right: 4px; }
     .pl-tag.reversal { background: rgba(234,179,8,0.15); color: #b45309; }
@@ -1222,6 +1263,69 @@
       </div>
 
       <div class="edge-card">
+        <h3><span class="edge-icon">&#128202;</span> Historical Backtester</h3>
+        <p class="edge-sub">Test patterns against real historical Polygon data. Compare backtest results with your live journal to validate your edge.</p>
+
+        <div class="bt-panel" id="bt-panel" data-testid="bt-panel">
+          <div class="bt-controls">
+            <div class="bt-field">
+              <label for="bt-symbol">Symbol</label>
+              <select id="bt-symbol" data-testid="select-bt-symbol">
+                <option value="ES" selected>ES (E-mini S&P)</option>
+                <option value="NQ">NQ (E-mini Nasdaq)</option>
+                <option value="YM">YM (E-mini Dow)</option>
+                <option value="RTY">RTY (Russell 2000)</option>
+                <option value="CL">CL (Crude Oil)</option>
+                <option value="GC">GC (Gold)</option>
+                <option value="ZB">ZB (30Y Bond)</option>
+                <option value="ZN">ZN (10Y Note)</option>
+              </select>
+            </div>
+            <div class="bt-field">
+              <label for="bt-pattern">Pattern</label>
+              <select id="bt-pattern" data-testid="select-bt-pattern">
+                <option value="3bar" selected>3 Bar Play</option>
+                <option value="buysetup">Buy/Sell Setup</option>
+                <option value="breakout">Breakout</option>
+                <option value="climax">Climax Reversal</option>
+                <option value="all">All Patterns</option>
+              </select>
+            </div>
+            <div class="bt-field">
+              <label for="bt-from">From</label>
+              <input type="date" id="bt-from" value="2023-01-01" data-testid="input-bt-from" />
+            </div>
+            <div class="bt-field">
+              <label for="bt-to">To</label>
+              <input type="date" id="bt-to" data-testid="input-bt-to" />
+            </div>
+            <div class="bt-field">
+              <label for="bt-rr">R:R</label>
+              <select id="bt-rr" data-testid="select-bt-rr">
+                <option value="1.5">1:1.5</option>
+                <option value="2" selected>1:2</option>
+                <option value="2.5">1:2.5</option>
+                <option value="3">1:3</option>
+              </select>
+            </div>
+            <div class="bt-field">
+              <label for="bt-hold">Max Hold</label>
+              <select id="bt-hold" data-testid="select-bt-hold">
+                <option value="3">3 bars</option>
+                <option value="5" selected>5 bars</option>
+                <option value="8">8 bars</option>
+                <option value="10">10 bars</option>
+              </select>
+            </div>
+            <button class="bt-run-btn" id="bt-run-btn" onclick="runBacktestUI()" data-testid="button-run-backtest">Run Backtest</button>
+          </div>
+          <div id="bt-results" data-testid="bt-results">
+            <div class="bt-status" id="bt-status">Select parameters and click Run Backtest to analyze historical pattern performance.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="edge-card">
         <h3><span class="edge-icon">&#128218;</span> Pattern Library &mdash; Live Traders Manual</h3>
         <p class="edge-sub">Master these setups from Jared Wesley's "Trading With An Edge." Every pattern has clear rules for entry, stop, and target.</p>
 
@@ -1529,11 +1633,47 @@
           body: JSON.stringify(testSignal)
         });
         if (res.ok) {
+          const data = await res.json();
           showToast('Signal queued to Supabase: Long MES qty=1 @ 5823.50');
+          if (data.signalId) {
+            pollForAck(data.signalId);
+          }
         } else {
           showToast('Signal failed to send');
         }
       } catch { showToast('Failed to send test signal'); }
+    }
+
+    async function pollForAck(signalId) {
+      if (!signalId) return;
+      let attempts = 0;
+      const maxAttempts = 6;
+      const interval = 2500;
+      const poll = async () => {
+        attempts++;
+        try {
+          const res = await fetch(`/api/trade-ack/${encodeURIComponent(signalId)}`);
+          const data = await res.json();
+          if (data.status === 'accepted') {
+            showToast(`ACK: Signal ACCEPTED by NinjaTrader (orderId: ${data.orderId || 'n/a'})`);
+            return;
+          } else if (data.status === 'rejected') {
+            showToast(`ACK: Signal REJECTED — ${data.reason || data.message || 'unknown reason'}`);
+            return;
+          } else if (data.status === 'error') {
+            showToast(`ACK: Error checking status — ${data.reason || 'unknown'}`);
+            return;
+          } else {
+            showToast(`ACK poll ${attempts}/${maxAttempts}: pending...`);
+          }
+        } catch {}
+        if (attempts < maxAttempts) {
+          setTimeout(poll, interval);
+        } else {
+          showToast('ACK polling complete — no response from bridge yet. Signal is queued in Supabase.');
+        }
+      };
+      setTimeout(poll, interval);
     }
 
     function syncAccountFields() {
@@ -2083,6 +2223,95 @@
       const el = document.getElementById('edge-recs');
       if (!recs || recs.length === 0) { el.innerHTML = '<li class="edge-empty">Trade more to unlock personalized recommendations.</li>'; return; }
       el.innerHTML = recs.map(r => `<li data-testid="rec-item"><span class="rec-icon">\u{1F4A1}</span> ${esc(r)}</li>`).join('');
+    }
+
+    document.getElementById('bt-to').value = new Date().toISOString().slice(0, 10);
+
+    async function runBacktestUI() {
+      const btn = document.getElementById('bt-run-btn');
+      const resultsDiv = document.getElementById('bt-results');
+      const statusDiv = document.getElementById('bt-status');
+
+      const symbol = document.getElementById('bt-symbol').value;
+      const pattern = document.getElementById('bt-pattern').value;
+      const from = document.getElementById('bt-from').value;
+      const to = document.getElementById('bt-to').value;
+      const rrRatio = parseFloat(document.getElementById('bt-rr').value);
+      const maxHold = parseInt(document.getElementById('bt-hold').value);
+
+      btn.disabled = true;
+      btn.textContent = 'Running...';
+      resultsDiv.innerHTML = '<div class="bt-status">Fetching historical data from Polygon and running backtest... This may take a moment.</div>';
+
+      try {
+        const resp = await fetch('/api/backtest/pattern', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol, pattern, from, to, rrRatio, maxHold })
+        });
+        const d = await resp.json();
+
+        if (!d.success) {
+          resultsDiv.innerHTML = `<div class="bt-status" style="color:#ef4444">Backtest failed: ${esc(d.error || 'Unknown error')}</div>`;
+          return;
+        }
+
+        if (d.totalTrades === 0) {
+          resultsDiv.innerHTML = `<div class="bt-status">No signals found for ${esc(symbol)} ${esc(pattern)} in the selected period. Try a wider date range or different symbol.</div>`;
+          return;
+        }
+
+        const pnlCls = d.totalPnlDollars >= 0 ? 'pos' : 'neg';
+        const pnlSign = d.totalPnlDollars >= 0 ? '+' : '';
+        const wrCls = d.winRate >= 50 ? 'pos' : 'neg';
+        const pfCls = d.profitFactor >= 1.5 ? 'pos' : d.profitFactor < 1 ? 'neg' : '';
+        const expCls = d.expectancy >= 0 ? 'pos' : 'neg';
+
+        let html = `<div class="bt-metrics">
+          <div class="bt-metric"><div class="bt-label">Total Trades</div><div class="bt-val">${d.totalTrades}</div></div>
+          <div class="bt-metric"><div class="bt-label">Win Rate</div><div class="bt-val ${wrCls}">${d.winRate}%</div></div>
+          <div class="bt-metric"><div class="bt-label">Profit Factor</div><div class="bt-val ${pfCls}">${d.profitFactor >= 99 ? '\u221E' : d.profitFactor}</div></div>
+          <div class="bt-metric"><div class="bt-label">Total P&amp;L</div><div class="bt-val ${pnlCls}">${pnlSign}$${d.totalPnlDollars.toLocaleString()}</div></div>
+          <div class="bt-metric"><div class="bt-label">Expectancy</div><div class="bt-val ${expCls}">${d.expectancy >= 0 ? '+' : ''}$${d.expectancy.toFixed(2)}</div></div>
+          <div class="bt-metric"><div class="bt-label">Max Drawdown</div><div class="bt-val neg">${d.maxDrawdownPct}%</div></div>
+          <div class="bt-metric"><div class="bt-label">Wins / Losses</div><div class="bt-val">${d.wins}W / ${d.losses}L</div></div>
+          <div class="bt-metric"><div class="bt-label">Best Trade</div><div class="bt-val pos">+$${d.bestTrade.toLocaleString()}</div></div>
+          <div class="bt-metric"><div class="bt-label">Worst Trade</div><div class="bt-val neg">$${d.worstTrade.toLocaleString()}</div></div>
+          <div class="bt-metric"><div class="bt-label">Data Points</div><div class="bt-val">${d.dataPoints.toLocaleString()}</div></div>
+        </div>`;
+
+        if (d.trades && d.trades.length > 0) {
+          html += `<div style="font-size:0.72rem;color:#6b7280;margin-bottom:0.3rem;">Recent ${d.trades.length} trades (most recent):</div>`;
+          html += `<div class="bt-trades-wrap"><table class="bt-trades-table">
+            <thead><tr><th>Date</th><th>Dir</th><th>Pattern</th><th>Entry</th><th>SL</th><th>TP</th><th>Exit</th><th>P&amp;L</th><th>Result</th><th>Bars</th></tr></thead>
+            <tbody>`;
+          for (const t of d.trades) {
+            const cls = t.outcome === 'WIN' ? 'bt-win' : t.outcome === 'LOSS' ? 'bt-loss' : 'bt-timeout';
+            const dcls = t.direction === 'LONG' ? 'dir-long' : 'dir-short';
+            const pSign = t.pnlDollars >= 0 ? '+' : '';
+            html += `<tr>
+              <td>${esc(t.date)}</td>
+              <td class="${dcls}">${t.direction}</td>
+              <td>${esc(t.pattern)}</td>
+              <td>${t.entry}</td>
+              <td>${t.stop}</td>
+              <td>${t.target}</td>
+              <td>${t.exit}</td>
+              <td class="${cls}">${pSign}$${t.pnlDollars.toFixed(2)}</td>
+              <td class="${cls}">${t.outcome}</td>
+              <td>${t.holdBars}</td>
+            </tr>`;
+          }
+          html += '</tbody></table></div>';
+        }
+
+        resultsDiv.innerHTML = html;
+      } catch (err) {
+        resultsDiv.innerHTML = `<div class="bt-status" style="color:#ef4444">Error: ${esc(err.message || 'Network error')}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Backtest';
+      }
     }
 
     loadJournalData();

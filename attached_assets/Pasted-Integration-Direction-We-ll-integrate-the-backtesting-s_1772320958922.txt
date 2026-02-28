@@ -1,0 +1,114 @@
+Integration Direction: We'll integrate the backtesting script into the Replit system as an endpoint (e.g., /api/backtest/pattern) that can be called from the Edge Builder dashboard. This allows running historical tests on patterns like 3 Bar Play, feeding results (win rate, avg profit, drawdown) into Edge Builder for comparison with live journaled trades. It enhances self-optimization by adjusting confluence thresholds based on backtest data. Standalone use is possible via console, but integration aligns with the sovereign hub goal.
+Symbol Corrections for Polygon and NinjaTrader Consistency:
+Polygon API uses contract-specific tickers for futures, not "C:ES" (which is invalid; "C:" is for crypto). For E-mini S&P 500 (ES), use formats like "ESH6" (Mar 2026), "ESM6" (Jun 2026), etc. H/M/U/Z for quarters, last digit of year (6 for 2026). No native continuous contract; for years of data, fetch multiple contracts and concatenate, adjusting for roll gaps (e.g., add offset based on expiration overlap).
+In NinjaTrader/CrossTrade, use "ES 03-26" for specific Mar 2026 contract or "ES1!" for continuous front-month simulation. In our bridge, stick to "instrument=ES1!" for sim orders to match continuous backtesting. This ensures system orders align: Replit scans current front-month, backtester simulates historical rolls, bridge executes on continuous.
+
+Enhanced 3 Bar Play Detection: The manual doesn't explicitly detail "3 Bar Play" (search yielded no hits), but references general patterns in "Charts We've Traded" with emphasis on high-odds setups using price, volume, and MAs. Based on Live Traders' standard 3 Bar Play (from research: strong igniting bar > avg range/volume, shallow pullback <50% without new lows, trigger bar breaking highs with volume surge), we've refined the script. Added pivot support (close above prior low), volume types (igniting >1.5x avg), bar quality (body >50% range for igniting/trigger).
+API Key Handling: In Replit, use os.getenv('POLYGON_API_KEY') for the client. The env is pre-configured in code_execution, so it works seamlessly.
+Updated Backtesting Script: Here's the corrected Python script for Replit integration. It fetches data for a chain of ES contracts (2010-2026), stitches them (simple concatenation with roll adjustment via avg price diff), detects nuanced 3 Bar Play longs (short variant TODO), simulates trades with risk (1:2 R:R, exit on target/stop or 5 bars). Run via code_execution to test; add to Replit as a module.
+
+Pythonimport os
+import pandas as pd
+import numpy as np
+from polygon import RESTClient
+from datetime import datetime, timedelta
+
+# API key from env
+api_key = os.getenv('POLYGON_API_KEY') or 'configured_key'  # Fallback for local
+client = RESTClient(api_key)
+
+# Function to get contract tickers for years (quarterly rolls: H,M,U,Z)
+def get_es_contracts(start_year=2010, end_year=2026):
+    months = ['H', 'M', 'U', 'Z']
+    contracts = []
+    for year in range(start_year, end_year + 1):
+        y = str(year)[-1]  # Last digit, e.g., '0' for 2010
+        for m in months:
+            contracts.append(f"ES{m}{y}")
+    return contracts
+
+# Fetch and stitch data (daily bars for simplicity; adjust multiplier for intraday)
+def fetch_stitched_data(contracts, from_date, to_date, multiplier=1, timespan='day'):
+    data = pd.DataFrame()
+    prev_close = None
+    for ticker in contracts:
+        aggs = client.get_aggs(ticker, multiplier, timespan, from_date, to_date)
+        if not aggs:
+            continue
+        df = pd.DataFrame(aggs)
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df.set_index('timestamp', inplace=True)
+        df = df[['open', 'high', 'low', 'close', 'volume']]
+        
+        # Adjust for roll: offset by difference if prev_close
+        if prev_close is not None:
+            roll_diff = df['open'][0] - prev_close
+            df[['open', 'high', 'low', 'close']] -= roll_diff
+        prev_close = df['close'][-1]
+        
+        data = pd.concat([data, df])
+    return data.drop_duplicates()
+
+# Main backtest
+contracts = get_es_contracts()
+data = fetch_stitched_data(contracts, '2010-01-01', '2026-02-28')
+
+# Indicators
+data['ema21'] = data['close'].ewm(span=21).mean()
+data['avg_range'] = (data['high'] - data['low']).rolling(20).mean()
+data['avg_vol'] = data['volume'].rolling(20).mean()
+
+data['range'] = data['high'] - data['low']
+data['body'] = abs(data['close'] - data['open'])
+data['green'] = data['close'] > data['open']
+
+# Nuanced 3 Bar Play Long: Igniting (strong green >1.5x avg range/vol, body>50% range), Pullback (red/green shallow <50% igniting range, no new low), Trigger (green break high, vol surge)
+data['igniting'] = (data['green'] & (data['range'] > 1.5 * data['avg_range']) & 
+                    (data['volume'] > 1.5 * data['avg_vol']) & (data['body'] > 0.5 * data['range']))
+
+data['pullback'] = (~data['igniting'].shift(1) & (data['range'] < 0.5 * data['range'].shift(1)) & 
+                    (data['low'] > data['low'].shift(1)) & (abs(data['close'] - data['open'].shift(1)) < 0.5 * data['range'].shift(1)))
+
+data['trigger'] = (data['green'] & data['igniting'].shift(2) & data['pullback'].shift(1) & 
+                   (data['high'] > data['high'].shift(2)) & (data['volume'] > data['volume'].shift(1)) & 
+                   (data['close'] > data['ema21']) & (data['low'] > data['low'].shift(2)))  # Pivot support
+
+data['signal'] = data['trigger']
+
+# Simulate trades: Entry on signal close, SL = entry - ATR (risk 1%), TP = entry + 2*ATR, or max 5 bars
+data['atr'] = data['range'].rolling(14).mean()  # Simple ATR proxy
+trades = []
+for idx in data[data['signal']].index:
+    entry = data.loc[idx, 'close']
+    atr = data.loc[idx, 'atr']
+    sl = entry - atr
+    tp = entry + 2 * atr
+    max_hold = 5
+    for i in range(1, max_hold + 1):
+        future_idx = data.index.get_loc(idx) + i
+        if future_idx >= len(data):
+            break
+        high = data.iloc[future_idx]['high']
+        low = data.iloc[future_idx]['low']
+        if low <= sl:
+            profit = (sl - entry) / entry
+            break
+        if high >= tp:
+            profit = (tp - entry) / entry
+            break
+    else:
+        profit = (data.iloc[future_idx]['close'] - entry) / entry
+    trades.append({'date': idx, 'profit': profit})
+
+# Results
+if trades:
+    df_trades = pd.DataFrame(trades)
+    print(df_trades.describe())
+    print(f"Win rate: {(df_trades['profit'] > 0).mean() * 100}%")
+    print(f"Avg profit: {df_trades['profit'].mean() * 100}%")
+    print(f"Max drawdown: {df_trades['profit'].min() * 100}%")
+else:
+    print("No signals found.")
+
+Testing: Copy to code_execution tool; run to get stats on historical ES. Adjust dates/symbols. For NT match, use same risk logic in bridge ATM strategies.
+Replit Integration: Add as /api/backtest in server.ts (Node.js). Call from Vercel UI tab. Store results in journal DB for Edge Builder analysis.

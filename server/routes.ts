@@ -6,6 +6,7 @@ import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen,
 import { getTradeAck } from "./supabase";
 import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
 import { sendToCrossTrade } from "./services/crosstrade";
+import { runBacktest } from "./backtest";
 
 let skills: any[] = [];
 
@@ -245,7 +246,7 @@ export async function registerRoutes(
     res.json({ logs, status });
   });
 
-  app.post("/api/trade-signal", (req, res) => {
+  app.post("/api/trade-signal", async (req, res) => {
     const { symbol, direction, entryPrice, stopLoss, takeProfit, riskReward, confluence, pattern } = req.body;
     if (!symbol || !direction || entryPrice == null || stopLoss == null || takeProfit == null) {
       return res.status(400).json({ success: false, error: "Missing required fields: symbol, direction, entryPrice, stopLoss, takeProfit" });
@@ -273,24 +274,30 @@ export async function registerRoutes(
 
     console.log(`[trade-signal] ${signal.source.toUpperCase()} | ${signal.direction} ${signal.symbol} @ ${signal.entryPrice} | SL: ${signal.stopLoss} TP: ${signal.takeProfit} | ${signal.pattern} (${signal.confluence}) | R:R ${signal.riskReward}`);
 
-    forwardSignalToSupabase({
-      symbol: signal.symbol,
-      direction: signal.direction,
-      entryPrice: signal.entryPrice,
-      stopLoss: signal.stopLoss,
-      takeProfit: signal.takeProfit,
-      riskReward: signal.riskReward,
-      confluence: signal.confluence,
-      pattern: signal.pattern,
-      qty: req.body.qty || 1,
-      source: signal.source,
-    }).then((result) => {
+    let signalId = "";
+    let queueStatus = "skipped";
+    try {
+      const result = await forwardSignalToSupabase({
+        symbol: signal.symbol,
+        direction: signal.direction,
+        entryPrice: signal.entryPrice,
+        stopLoss: signal.stopLoss,
+        takeProfit: signal.takeProfit,
+        riskReward: signal.riskReward,
+        confluence: signal.confluence,
+        pattern: signal.pattern,
+        qty: req.body.qty || 1,
+        source: signal.source,
+      });
+      signalId = result.signalId;
+      queueStatus = result.status;
       console.log(`[trade-signal] Supabase queue result for ${signal.symbol}: status=${result.status} signalId=${result.signalId}`);
-    }).catch((err) => {
+    } catch (err: any) {
       console.error(`[trade-signal] Supabase queue error for ${signal.symbol}: ${err.message}`);
-    });
+      return res.status(502).json({ success: false, error: `Supabase insert failed: ${err.message}`, signal });
+    }
 
-    res.json({ success: true, message: "Signal received", signal });
+    res.json({ success: true, message: "Signal received", signal, signalId, queueStatus });
   });
 
   app.get("/api/trade-signals", (_req, res) => {
@@ -300,6 +307,9 @@ export async function registerRoutes(
   app.get("/api/trade-ack/:signalId", async (req, res) => {
     try {
       const ack = await getTradeAck(req.params.signalId);
+      if (ack === null && !process.env.SUPABASE_URL) {
+        return res.json({ status: "error", signalId: req.params.signalId, reason: "Supabase not configured" });
+      }
       if (ack) {
         res.json(ack);
       } else {
@@ -398,6 +408,32 @@ export async function registerRoutes(
   app.post("/api/settings", (req, res) => {
     const saved = saveSettings(req.body);
     res.json({ success: true, settings: saved });
+  });
+
+  app.post("/api/backtest/pattern", async (req, res) => {
+    const { symbol, pattern, from, to, rrRatio, maxHold } = req.body;
+
+    const validPatterns = ["3bar", "buysetup", "breakout", "climax", "all"];
+    if (pattern && !validPatterns.includes(pattern)) {
+      return res.status(400).json({ success: false, error: `Invalid pattern: ${pattern}. Valid: ${validPatterns.join(", ")}` });
+    }
+    if (from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+      return res.status(400).json({ success: false, error: "Invalid 'from' date format. Use YYYY-MM-DD." });
+    }
+    if (to && !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return res.status(400).json({ success: false, error: "Invalid 'to' date format. Use YYYY-MM-DD." });
+    }
+
+    try {
+      const result = await runBacktest({ symbol, pattern, from, to, rrRatio, maxHold });
+      if (result.error) {
+        return res.status(400).json({ success: false, error: result.error });
+      }
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error("[backtest] Error:", err);
+      res.status(500).json({ success: false, error: err.message || "Backtest failed" });
+    }
   });
 
   return httpServer;
