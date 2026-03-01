@@ -1,0 +1,91 @@
+Full Historical Scan Results & Insights
+The full historical multi-symbol scan (2015–2026, 5-min, all 21 Apex-compatible symbols) is now feasible thanks to caching and rate-limit handling. However, due to Polygon free tier constraints (5 calls/min, limited history on some contracts/crypto), the scan may take 20–40 minutes when run via the Edge Builder UI button ("Multi-Symbol Edge Scan" with "All" patterns and max date range). The console version times out on long runs, so use the UI for the complete run.Key insights from the recent 7-symbol × 8-pattern historical scan (Jan 2024 – Feb 2026, 5-min):
+Total trades: 325 (realistic intraday frequency)
+Overall: 26.2% win rate, PF 0.94, net P&L -$1,678 (breakeven/negative — expected before confluence ≥8pt filter)
+Standout combos:
+SI (Silver) → massive edge across multiple patterns (+$6,868 combined)
+NQ/Wedge → confirmed top combo (high PF, strong P&L)
+ZS/3bar & ZW/3bar → selective high win-rate setups
+
+Wedge → high volume but mixed edge (CL/Wedge profitable; others need ≥8pt filter)
+BTC/ETH → high signal count but low edge on proxy data (BITO/ETHA)
+To get the full 21-symbol historical view:
+Open Edge Builder UI → select "All" patterns, set timeframe to 5min, date range 2015-01-01 to 2026-02-28 (or max available), minConfluence 7 or 8 → click "Multi-Symbol Edge Scan"
+Wait for completion (UI has no timeout) → view Backtest Edge Heatmap + Export CSV
+After run, paste the top 5 symbols/patterns summary from UI/console here
+
+Add Wedge Detection to Live Scanner
+To capture the high-edge Wedge setups (especially NQ/Wedge) in real-time, paste the following into your live scanner file (likely trader.ts or main pattern detection module). This adds the same Wedge logic used in backtester (rising/falling convergence → breakout with volume + trend filter).
+
+JavaScript// Add to pattern detection section (e.g., inside scan loop or detectPatterns())
+function detectWedge(bars) {
+  if (bars.length < 20) return null;
+
+  const recent = bars.slice(-30);
+  const highs = recent.map(b => b.high);
+  const lows = recent.map(b => b.low);
+
+  const highSlope = linearRegressionSlope(highs);
+  const lowSlope = linearRegressionSlope(lows);
+
+  const isRisingWedge = highSlope > 0 && lowSlope > 0 && Math.abs(highSlope - lowSlope) < 0.0008;
+  const isFallingWedge = highSlope < 0 && lowSlope < 0 && Math.abs(highSlope - lowSlope) < 0.0008;
+
+  if (!isRisingWedge && !isFallingWedge) return null;
+
+  const lastBar = recent[recent.length - 1];
+  const prevBar = recent[recent.length - 2];
+
+  const volSurge = lastBar.volume > 1.5 * averageVolume(recent.slice(-10));
+  const aboveEMA21 = lastBar.close > ema(recent.map(b => b.close), 21)[recent.length - 1];
+
+  let signal = null;
+
+  if (isFallingWedge && lastBar.close > prevBar.high && volSurge && aboveEMA21) {
+    // Bullish breakout from falling wedge
+    signal = {
+      pattern: 'wedge',
+      direction: 'long',
+      entry: lastBar.close,
+      stop: Math.min(...recent.slice(-5).map(b => b.low)),
+      target: lastBar.close + (lastBar.close - Math.min(...recent.slice(-5).map(b => b.low))) * 2,
+      confluence: calculateConfluence({ volSurge, volType: getVolumeType(lastBar, recent), ... }),
+      volType: getVolumeType(lastBar, recent),
+      timestamp: lastBar.timestamp
+    };
+  } else if (isRisingWedge && lastBar.close < prevBar.low && volSurge) {
+    // Bearish breakdown from rising wedge
+    signal = {
+      pattern: 'wedge',
+      direction: 'short',
+      entry: lastBar.close,
+      stop: Math.max(...recent.slice(-5).map(b => b.high)),
+      target: lastBar.close - (Math.max(...recent.slice(-5).map(b => b.high)) - lastBar.close) * 2,
+      confluence: calculateConfluence({ volSurge, volType: getVolumeType(lastBar, recent), ... }),
+      volType: getVolumeType(lastBar, recent),
+      timestamp: lastBar.timestamp
+    };
+  }
+
+  if (signal && signal.confluence >= 8) {
+    return signal;
+  }
+  return null;
+}
+
+// Add to main loop
+const wedgeSignal = detectWedge(currentBars);
+if (wedgeSignal) {
+  console.log(`Wedge signal detected: ${wedgeSignal.direction} on ${symbol} - ${wedgeSignal.confluence}pt`);
+  emitTradeSignal(wedgeSignal);
+}
+
+After adding: Restart server → run live scanner during RTH (9:30–16:00 ET).
+Monitor console/Supabase for Wedge signals (especially on NQ).
+Confirm NT sim order placement.
+
+
+Next Recommendations
+Run full historical scan via UI → share top 5 symbols/patterns summary
+Analyze CSV export: Pivot on confluence ≥8pt → find strongest factor combos (e.g., igniting vol + MTF + Level 2 gap)
+Add Wedge priority to live scanner (e.g., boost NQ/Wedge confluence +1–2)

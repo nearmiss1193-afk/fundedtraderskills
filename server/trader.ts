@@ -1442,6 +1442,25 @@ async function simulateTick(session: TraderSession) {
         if (ws.detected) { detectedPattern = "Wedge Breakout"; direction = "SHORT"; confluence = ws.confluence; confluenceLabel = ws.confluenceLabel; entryReason = ws.reason; }
       }
 
+      if (detectedPattern && confluence > 0) {
+        const edgeBoostCombos: Record<string, string[]> = {
+          "NQ": ["Wedge Breakout"],
+          "MNQ": ["Wedge Breakout"],
+          "SI": ["Buy Setup", "Sell Setup", "Pivot Breakout", "3 Bar Play"],
+          "ZS": ["3 Bar Play"],
+          "ZW": ["3 Bar Play"],
+          "CL": ["Wedge Breakout"],
+          "MCL": ["Wedge Breakout"],
+        };
+        const boostPatterns = edgeBoostCombos[mk];
+        if (boostPatterns && boostPatterns.includes(detectedPattern)) {
+          const boost = (mk === "NQ" || mk === "MNQ" || mk === "SI") ? 2 : 1;
+          confluence += boost;
+          confluenceLabel = `${confluenceLabel} [EDGE+${boost}]`;
+          console.log(`[trader] Edge boost: ${mk}/${detectedPattern} +${boost}pt → ${confluence}pt`);
+        }
+      }
+
       const openCount = Object.keys(session.openTrades).length;
       if (detectedPattern && !session.openTrades[tradeKey] && openCount < session.maxOpenTrades) {
           const entry = state.price;

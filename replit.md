@@ -52,6 +52,7 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
 *   **Risk Management:** Implements fixed dollar risk per trade, strict R:R adherence (no trailing stops affecting final P&L), and a configurable maximum number of open trades.
 *   **Safety Guardrails:**
     *   **Live confluence filter:** ≥8pt required (`LIVE_CONFLUENCE_MIN = 8` in trader.ts)
+    *   **Edge boost:** Data-driven confluence bonus for proven combos: NQ/Wedge +2, SI/BuySetup|Breakout|3Bar +2, ZS/3Bar +1, ZW/3Bar +1, CL/Wedge +1. Logged as `[EDGE+N]` in confluence label.
     *   **Max risk per trade:** 1% of $50,000 account (`MAX_RISK_PCT = 0.01`)
     *   **Daily loss limit:** -3% stops all scanning (`DAILY_LOSS_LIMIT_PCT = -0.03`)
     *   **SIM-only enforcement:** Non-SIM accounts blocked unless `ALLOW_LIVE_TRADES=true`
