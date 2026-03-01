@@ -1304,6 +1304,8 @@
                 <option value="buysetup">Buy/Sell Setup</option>
                 <option value="breakout">Breakout</option>
                 <option value="climax">Climax Reversal</option>
+                <option value="cuphandle">Cup &amp; Handle</option>
+                <option value="wedge">Wedge Breakout</option>
                 <option value="all">All Patterns</option>
               </select>
             </div>
@@ -1686,7 +1688,7 @@
         if (attempts < maxAttempts) {
           setTimeout(poll, interval);
         } else {
-          showToast('ACK polling complete — no response from bridge yet. Signal is queued in Supabase.');
+          showToast('ACK polling complete — no ACK received yet. Signal is queued in Supabase.');
         }
       };
       setTimeout(poll, interval);

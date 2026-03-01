@@ -413,7 +413,7 @@ export async function registerRoutes(
   app.post("/api/backtest/pattern", async (req, res) => {
     const { symbol, pattern, from, to, rrRatio, maxHold } = req.body;
 
-    const validPatterns = ["3bar", "buysetup", "breakout", "climax", "all"];
+    const validPatterns = ["3bar", "buysetup", "breakout", "climax", "cuphandle", "wedge", "all"];
     if (pattern && !validPatterns.includes(pattern)) {
       return res.status(400).json({ success: false, error: `Invalid pattern: ${pattern}. Valid: ${validPatterns.join(", ")}` });
     }

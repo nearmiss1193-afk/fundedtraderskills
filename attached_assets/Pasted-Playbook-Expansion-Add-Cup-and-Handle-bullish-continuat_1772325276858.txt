@@ -1,0 +1,57 @@
+Playbook Expansion: Add Cup and Handle (bullish continuation) and Wedge Breakout (rising bearish/falling bullish) to Replit scanner/backtester. These are classic TA patterns, not core Live Traders setups (their focus: 3/4 Bar Plays, Buy/Sell Setups, Breakouts, Wedges as consolidation, retests, pattern boosters like tails/volume/EMA). Adapt for ES/NQ futures: shorter durations (intraday/1-15 min), volume surge on breakout, trend filter (e.g., above EMA21 for longs), confluence with existing patterns (e.g., 3 Bar Play trigger in handle breakout).
+Cup and Handle (Bullish): Rounded U bottom (cup) + shallow consolidation (handle). Breakout above handle resistance + volume increase. Target: cup depth projected up. SL below handle low. Futures adaptation: Often on 5-15 min charts after pullback in uptrend.
+Wedge Breakout:
+Rising Wedge: Bearish (upward converging lines → downward break).
+Falling Wedge: Bullish (downward converging → upward break).
+Entry on trendline break + volume surge. Target: pattern height projected.
+
+
+Implementation in Backtester/Replit: Use Polygon intraday data (1-15 min). Detect patterns via peak/trough finding (scipy.signal.find_peaks) or trendline approximation (linear regression on highs/lows). Add to existing 3 Bar Play logic; score confluence (volume, EMA, trend). Test on ES/NQ stitched chains.Sample Detection Snippet (paste into backtest.py or patterns module; requires scipy import):
+
+Pythonimport pandas as pd
+import numpy as np
+from scipy.signal import find_peaks
+
+# Assume 'data' is OHLCV DataFrame (intraday, e.g., 5-min ES)
+data['ema21'] = data['close'].ewm(span=21, adjust=False).mean()
+data['volume_avg'] = data['volume'].rolling(20).mean()
+
+# Simple Cup and Handle (bullish): Find cup bottom (min), left/right peaks similar height, handle pullback shallow
+# Use peaks for rim/handle resistance
+high_peaks, _ = find_peaks(data['high'], distance=10)  # Adjust distance for timeframe
+low_peaks, _ = find_peaks(-data['low'], distance=10)   # Inverted for lows
+
+# Example logic (simplified; refine with rolling windows)
+# Cup: low point between two highs ~equal, rounded (many bars)
+# Handle: shallow down/up from right cup high, breakout above
+
+# For Wedge: converging lines (fit trendlines to recent highs/lows)
+# Rising Wedge: higher highs/lows converging downward break
+def detect_rising_wedge(df, window=30):
+    recent = df.tail(window)
+    highs = recent['high'].values
+    lows = recent['low'].values
+    if len(highs) < 10: return False
+    # Simple slope check: highs slope up, lows slope up but steeper convergence
+    high_slope = np.polyfit(range(len(highs)), highs, 1)[0]
+    low_slope = np.polyfit(range(len(lows)), lows, 1)[0]
+    vol_decline = recent['volume'].mean() < df['volume_avg'].mean() * 1.2
+    return high_slope > 0 and low_slope > 0 and abs(high_slope - low_slope) < 0.01 and vol_decline  # Converging + vol drop
+
+# Add signals
+data['cup_handle_signal'] = False  # Placeholder; implement detection
+data['falling_wedge_signal'] = (detect_rising_wedge(data.shift(1)) == False)  # Invert for falling
+
+# Filter + volume confirmation
+data['long_signal'] = (data['cup_handle_signal'] | data['falling_wedge_signal']) & (data['close'] > data['ema21']) & (data['volume'] > 1.5 * data['volume_avg'])
+
+Backtest Expansion: Run on ES/NQ intraday (5-min, stitch contracts). Add volume surge filter, higher TF trend (e.g., 60-min EMA). Compare performance vs current 3 Bar Play (low frequency suggests need for intraday).
+Risk Alignment: For new patterns in futures:
+Entry: Market order on breakout bar close.
+SL: Below handle low (Cup) or wedge low.
+TP: Measured move (pattern height) or 1:2+ R:R.
+Max risk 1% per trade, paper only.
+
+Visual References — Cup and Handle breakout examples (bullish continuation with volume).
+Falling Wedge (bullish reversal/continuation).
+Rising Wedge (bearish).

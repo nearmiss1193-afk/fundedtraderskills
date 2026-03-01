@@ -482,16 +482,184 @@ function computeResults(trades: BacktestTrade[], symbol: string, pattern: string
   };
 }
 
+function findLocalPeaks(values: number[], distance: number): number[] {
+  const peaks: number[] = [];
+  for (let i = distance; i < values.length - distance; i++) {
+    let isPeak = true;
+    for (let j = 1; j <= distance; j++) {
+      if (values[i] <= values[i - j] || values[i] <= values[i + j]) {
+        isPeak = false;
+        break;
+      }
+    }
+    if (isPeak) peaks.push(i);
+  }
+  return peaks;
+}
+
+function findLocalTroughs(values: number[], distance: number): number[] {
+  const troughs: number[] = [];
+  for (let i = distance; i < values.length - distance; i++) {
+    let isTrough = true;
+    for (let j = 1; j <= distance; j++) {
+      if (values[i] >= values[i - j] || values[i] >= values[i + j]) {
+        isTrough = false;
+        break;
+      }
+    }
+    if (isTrough) troughs.push(i);
+  }
+  return troughs;
+}
+
+function linregSlope(values: number[]): number {
+  const n = values.length;
+  if (n < 2) return 0;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += i;
+    sumY += values[i];
+    sumXY += i * values[i];
+    sumX2 += i * i;
+  }
+  const denom = n * sumX2 - sumX * sumX;
+  if (denom === 0) return 0;
+  return (n * sumXY - sumX * sumY) / denom;
+}
+
+function detectCupAndHandle(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema21, ema9, avgVol, green } = data;
+  const cupMin = 15;
+  const cupMax = 60;
+  const peakDist = 5;
+
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const peaks = findLocalPeaks(highs, peakDist);
+  const troughs = findLocalTroughs(lows, peakDist);
+
+  for (let pi = 0; pi < peaks.length - 1; pi++) {
+    const leftRim = peaks[pi];
+    const rightRim = peaks[pi + 1];
+    const cupWidth = rightRim - leftRim;
+    if (cupWidth < cupMin || cupWidth > cupMax) continue;
+
+    const rimDiffPct = Math.abs(highs[leftRim] - highs[rightRim]) / highs[leftRim];
+    if (rimDiffPct > 0.02) continue;
+
+    const cupTroughs = troughs.filter(t => t > leftRim && t < rightRim);
+    if (cupTroughs.length === 0) continue;
+    const cupBottom = cupTroughs.reduce((a, b) => lows[a] < lows[b] ? a : b);
+
+    const cupDepth = Math.min(highs[leftRim], highs[rightRim]) - lows[cupBottom];
+    const avgPrice = (highs[leftRim] + highs[rightRim]) / 2;
+    if (cupDepth / avgPrice < 0.01) continue;
+
+    const leftHalf = bars.slice(leftRim, cupBottom + 1);
+    const rightHalf = bars.slice(cupBottom, rightRim + 1);
+    const leftSlope = linregSlope(leftHalf.map(b => b.close));
+    const rightSlope = linregSlope(rightHalf.map(b => b.close));
+    if (leftSlope > 0 || rightSlope < 0) continue;
+
+    const rimHigh = Math.max(highs[leftRim], highs[rightRim]);
+    const handleMaxBars = Math.min(Math.floor(cupWidth * 0.4), 15);
+    const handleEnd = Math.min(rightRim + handleMaxBars, bars.length - 2);
+
+    let handleLow = Infinity;
+    let handleFound = false;
+    for (let h = rightRim + 1; h <= handleEnd; h++) {
+      if (bars[h].low < handleLow) handleLow = bars[h].low;
+      const handleRetrace = rimHigh - handleLow;
+      if (handleRetrace > cupDepth * 0.5) break;
+
+      if (h > rightRim + 2 &&
+          green[h] &&
+          bars[h].close > rimHigh &&
+          bars[h].volume > 1.5 * avgVol[h] &&
+          bars[h].close > ema21[h] &&
+          ema9[h] > ema21[h]) {
+        handleFound = true;
+        signals.push({ index: h, direction: "LONG", pattern: "Cup & Handle" });
+        break;
+      }
+    }
+  }
+
+  return signals;
+}
+
+function detectWedgeBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema21, ema9, avgVol, avgRange, green } = data;
+  const windows = [20, 30];
+
+  for (const window of windows) {
+    for (let i = window + 1; i < bars.length; i++) {
+      const slice = bars.slice(i - window, i);
+      const sliceHighs = slice.map(b => b.high);
+      const sliceLows = slice.map(b => b.low);
+
+      const highSlope = linregSlope(sliceHighs);
+      const lowSlope = linregSlope(sliceLows);
+
+      const highRange = Math.max(...sliceHighs) - Math.min(...sliceHighs);
+      const lowRange = Math.max(...sliceLows) - Math.min(...sliceLows);
+      const avgPrice = slice[slice.length - 1].close;
+      if (highRange / avgPrice < 0.005 || lowRange / avgPrice < 0.005) continue;
+
+      const convergence = Math.abs(highSlope - lowSlope);
+      const maxSlope = Math.max(Math.abs(highSlope), Math.abs(lowSlope));
+      if (maxSlope === 0) continue;
+      const convergenceRatio = convergence / maxSlope;
+
+      const halfVol = slice.slice(0, Math.floor(window / 2));
+      const recentVol = slice.slice(Math.floor(window / 2));
+      const earlyAvgVol = halfVol.reduce((s, b) => s + b.volume, 0) / halfVol.length;
+      const lateAvgVol = recentVol.reduce((s, b) => s + b.volume, 0) / recentVol.length;
+      const volDecline = lateAvgVol < earlyAvgVol * 0.9;
+
+      const curr = bars[i];
+      const volSurge = curr.volume > 1.5 * avgVol[i];
+
+      if (highSlope > 0 && lowSlope > 0 && convergenceRatio < 0.5 && volDecline) {
+        if (!green[i] && curr.close < sliceLows[sliceLows.length - 1] &&
+            volSurge && curr.close < ema21[i] && ema9[i] < ema21[i]) {
+          signals.push({ index: i, direction: "SHORT", pattern: "Rising Wedge" });
+        }
+      }
+
+      if (highSlope < 0 && lowSlope < 0 && convergenceRatio < 0.5 && volDecline) {
+        if (green[i] && curr.close > sliceHighs[sliceHighs.length - 1] &&
+            volSurge && curr.close > ema21[i] && ema9[i] > ema21[i]) {
+          signals.push({ index: i, direction: "LONG", pattern: "Falling Wedge" });
+        }
+      }
+    }
+  }
+
+  const seen = new Set<number>();
+  return signals.filter(s => {
+    if (seen.has(s.index)) return false;
+    seen.add(s.index);
+    return true;
+  });
+}
+
 const PATTERN_DETECTORS: Record<string, (data: ReturnType<typeof addIndicators>) => Signal[]> = {
   "3bar": detect3BarPlay,
   "buysetup": detectBuySetup,
   "breakout": detectBreakout,
   "climax": detectClimaxReversal,
+  "cuphandle": detectCupAndHandle,
+  "wedge": detectWedgeBreakout,
   "all": (data) => [
     ...detect3BarPlay(data),
     ...detectBuySetup(data),
     ...detectBreakout(data),
     ...detectClimaxReversal(data),
+    ...detectCupAndHandle(data),
+    ...detectWedgeBreakout(data),
   ],
 };
 
