@@ -1,0 +1,108 @@
+Status Update
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+PhaseStatusDescription1CompletedReplit skill with Live Traders patterns (3 Bar Play, Buy/Sell Setup, Breakout, Climactic, MA 9/21, volume confirmation, confluence scoring, trend filter, risk management, journal, Edge Builder dashboard).2CompletedPython bridge on localhost:5000/api/trade-signal.3CompletedReplit sends signals; bridge receives/logs; NinjaTrader sim orders placed (Long/Short with SL/TP via CrossTrade webhook). Safety: paper/sim only, risk limits enforced.4CompletedFull automation integration (signal → bridge → NinjaTrader). Monitoring: heartbeat, error alerts. Supabase direct inserts, signalId return, ACK polling, error handling, replit.md updated.5CompletedLearning system: backtesting module for historical ES/NQ data (Polygon API), pattern optimization, A/B testing. All enhancements integrated: 4 Bar Play, Retest (W-Bottom/W-Top + double bottom/top), MTF alignment, gaps (L1/L2/L3), parabolic filter, Cup & Handle/Wedge confluence, tails, volume types, sideways filter, full manual alignment. Multi-symbol batch backtest endpoint + CSV export + expanded dropdown. NT continuous format supported. Pattern breakdown & heatmap data added; Backtest Edge Heatmap tab in UI. Rate-limit fixes verified. Intraday timeframe support fully threaded (including 1min). Wedge detection & edge boosts live in scanner. Convergence bonus added.6In ProgressPackage as deliverable product (GitHub repo with install guide, UI dashboard on Vercel, mobile alerts).
+Failures/Lessons: Tradovate blocked; C# → Python bridge. Ngrok for testing. Supabase shift. Polygon free tier 5 calls/min → caching + retry fixes active. W-Bottom/Top intraday-focused. BTC/ETH low profitability on ETF proxies → direct futures need paid Polygon tier.
+Progress Metrics: Signals sent/received: Confirmed (Supabase). Orders placed: Yes (sim). Edge score threshold: 70+. Risk ratio: 1:2 min. Backtest runs: Intraday 5-min scan → 482 trades, Wedge dominant, NQ/Wedge top combo. Live scanner includes Wedge + edge boosts + convergence bonus.
+Actionable Steps
+Here are the next immediate steps — prioritized and ready to execute right now:
+
+Add All Timeframes (including 1min) to Edge Builder Dropdown
+Paste this updated <select> block into your UI code (likely in public/index.html or the EdgeBuilder component). This ensures all supported timeframes are visible and selectable.
+
+HTML<select id="timeframe">
+  <option value="1min">1 Minute</option>
+  <option value="5min" selected>5 Minutes</option>
+  <option value="15min">15 Minutes</option>
+  <option value="1hour">1 Hour</option>
+  <option value="4hour">4 Hours</option>
+  <option value="daily">Daily</option>
+</select>
+After pasting:
+
+Save → restart Replit server (or refresh browser)
+Confirm the dropdown now shows 1min → daily
+Quick test: Select "1 Minute", symbol NQ, short range (e.g., 2025-01-01 to 2025-01-15), minConfluence 9 → run single backtest
+Share the comparison:
+1min: total trades, top pattern(s), net P&L, PF
+5min (same range): total trades, top pattern(s), net P&L, PF
+Any notable difference (e.g., ~10× more trades on 1min, but lower PF due to noise)
+
+
+
+Run Full Historical UI Scan & Paste Top 5 Summary
+This is the highest-priority step for long-term edge insights.In Edge Builder UI:
+Click Multi-Symbol Edge Scan
+Settings:
+Timeframe: 5min (best balance of signal quality & volume)
+Patterns: All
+Date range: 2015-01-01 to 2026-02-28 (or farthest Polygon returns)
+Min Confluence: 8 (matches live scanner filter)
+
+Start the scan → let it finish (20–40 min, UI has no timeout)
+After completion:
+Go to Backtest Edge Heatmap tab
+Copy the top 5 symbol/pattern combos from the grid or pattern breakdown table
+(include: Symbol, Pattern, Trades, Win %, Profit Factor, Net P&L)
+Paste them here
+This will show the all-time strongest combinations (e.g., NQ/Wedge, SI/Buy Setup, ZS/3bar) and help prioritize live scanner focus.
+Test Wedge Live During Next RTH & Share Logs/NT Results
+Wedge detection + edge boost is already live.During next RTH session (9:30–16:00 ET):
+Run live scanner on priority symbols: NQ, SI, ZS, GC, CL
+Monitor Replit console for Wedge signals (look for lines like):
+"Wedge long on NQ – 9pt [EDGE+2] IGNITING"
+"[CONVERGENCE] NQ @ timestamp: Convergence detected: wedge, 3bar (+3.0pt)"
+
+If a Wedge signal fires:
+Check Supabase trade_signals table (confluence ≥8, volType, notes)
+Verify NT sim account → Orders tab (instrument=NQ1! or CL1!, SL/TP placed?)
+
+Share:
+3–5 relevant console log lines
+NT sim result (order placed? filled? rejected? screenshot/log if possible)
+
+
+
+Recommended Execution Order (do them in this sequence for fastest progress):
+
+Add 1min to dropdown (30 seconds) → run quick 1min vs 5min comparison test → share results
+Run full historical UI scan (longest step) → paste top 5 symbols/patterns summary
+Run live scanner during next RTH → share Wedge logs & NT results
