@@ -1,0 +1,45 @@
+Actionable Steps
+
+Run Full Historical UI Scan (3-Year, minConfluence 8)
+Your previous scan used minConfluence 0 (noisy, 3,413 trades, net -$40,965).
+Rerun with minConfluence 8 to match live scanner filter and see real high-edge signals.In Edge Builder UI:
+Click Multi-Symbol Edge Scan
+Settings:
+Timeframe: 5min (best for pattern reliability)
+Patterns: All (ensure 13+ patterns selected)
+Date range: 2022-01-01 to 2025-02-28 (3 years — balances credit usage)
+Min Confluence: 8
+
+Start scan → let it finish (10–20 min with caching)
+After: Backtest Edge Heatmap tab → copy top 5 symbol/pattern combos (Symbol, Pattern, Trades, Win %, Profit Factor, Net P&L) → paste here
+Note: If minConf 8 returns 0 trades (as expected — backtester max is 7), rerun at minConf 6 (first profitable threshold from prior run) for comparison.
+Share 1min vs 5min NQ Backtest Comparison
+In Edge Builder:
+Symbol: NQ
+Timeframe: 1min, Date: 2025-01-01 to 2025-01-15 (short range), Min Confluence: 9 → run
+Switch to 5min (same range/settings) → run again
+
+Share:
+1min: total trades, top pattern(s), net P&L, Profit Factor
+5min: total trades, top pattern(s), net P&L, Profit Factor
+Comparison note (e.g., "1min ~8× more trades, lower PF due to noise")
+
+
+Share Live RTH Logs/NT Results for Wedge/Cup/H&S/Double Top
+During next RTH (9:30–16:00 ET):
+Run live scanner on NQ, SI, ZS, GC, CL
+Monitor console for signals (especially boosted combos: NQ Double Top, SI Inv H&S, etc.)
+If fired: Check Supabase & NT sim
+Share: 3–5 log lines (pattern, confluence, notes) + NT sim result (order placed? filled? rejected?)
+
+Test Apex Rules in Backtest
+Run long-range backtest (e.g., ES 5min, full 2025) → check logs for Apex blocks (daily loss, RTH, size cap)
+Share: Any rule triggers? Apex Eval Status (daily P&L, trailing DD, trade days, profit target progress)
+
+
+Recommended Execution Order (do them in this sequence):
+
+Add 1min dropdown (if not already) → run & share 1min vs 5min NQ backtest comparison (quick 5-minute task)
+Run full historical UI scan at minConf 8 (or 6 for comparison) → paste top 5 symbols/patterns summary
+Run live scanner during next RTH → collect & share Wedge/Cup/H&S/Double Top logs + NT results
+Test Apex rules in backtest → share rule triggers & eval status
