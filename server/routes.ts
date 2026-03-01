@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { type Server } from "http";
 import path from "path";
 import express from "express";
-import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase, getSafetyStatus } from "./trader";
+import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase, getSafetyStatus, getApexEvalStatus } from "./trader";
 import { getTradeAck } from "./supabase";
 import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
 import { sendToCrossTrade } from "./services/crosstrade";
@@ -216,6 +216,11 @@ export async function registerRoutes(
 
   app.get("/api/trader/safety", (_req, res) => {
     res.json(getSafetyStatus());
+  });
+
+  app.get("/api/trader/apex-eval", (req, res) => {
+    const plan = (req.query.plan as string) || "50k";
+    res.json(getApexEvalStatus(undefined, plan));
   });
 
   app.post("/api/tradovate/connect", async (_req, res) => {

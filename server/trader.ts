@@ -49,13 +49,35 @@ function generateSignalId(): string {
 
 const APEX_RULES = {
   dailyLossLimit: -0.03,
+  trailingDrawdownPct: -0.03,
   rthOnly: true,
   rthStart: { hour: 9, minute: 30 },
   rthEnd: { hour: 16, minute: 0 },
-  maxContracts: 10,
+  maxContractsPerSymbol: {
+    ES: 10, MES: 50, NQ: 8, MNQ: 40, YM: 10, MYM: 50,
+    RTY: 10, M2K: 50, CL: 5, MCL: 25, GC: 3, MGC: 15,
+    SI: 5, HG: 5, BTC: 2, ETH: 2, ZB: 10, ZN: 10,
+    ZC: 5, ZS: 5, ZW: 5,
+  } as Record<string, number>,
+  maxContractsDefault: 5,
   minTradeDays: 5,
-  profitTarget: 1000,
+  profitTarget: { "50k": 1000, "100k": 2000, "150k": 3000 } as Record<string, number>,
 };
+
+let apexHighWaterMark = DEFAULT_ACCOUNT_SIZE;
+let apexTradeDays = new Set<string>();
+
+function resetApexTracker(accountSize: number = DEFAULT_ACCOUNT_SIZE) {
+  apexHighWaterMark = accountSize;
+  apexTradeDays = new Set();
+  console.log("[apex] Tracker reset — high water mark: $" + accountSize);
+}
+
+function updateApexHighWater(currentBalance: number) {
+  if (currentBalance > apexHighWaterMark) {
+    apexHighWaterMark = currentBalance;
+  }
+}
 
 function isRTH(now?: Date): boolean {
   const d = now || new Date();
@@ -65,27 +87,59 @@ function isRTH(now?: Date): boolean {
   const totalMin = h * 60 + m;
   const startMin = APEX_RULES.rthStart.hour * 60 + APEX_RULES.rthStart.minute;
   const endMin = APEX_RULES.rthEnd.hour * 60 + APEX_RULES.rthEnd.minute;
+  const dow = et.getDay();
+  if (dow === 0 || dow === 6) return false;
   return totalMin >= startMin && totalMin < endMin;
 }
 
-function checkApexRules(direction: string, qty: number, accountSize: number = DEFAULT_ACCOUNT_SIZE): { allowed: boolean; reason?: string; adjustedQty: number } {
+function checkApexRules(direction: string, qty: number, symbol?: string, accountSize: number = DEFAULT_ACCOUNT_SIZE): { allowed: boolean; reason?: string; adjustedQty: number } {
   if (isDailyLossLimitHit(accountSize)) {
     return { allowed: false, reason: "Apex daily loss limit hit", adjustedQty: qty };
   }
+
+  const currentBalance = accountSize + dailyPnlTracker;
+  updateApexHighWater(currentBalance);
+  const trailingDrawdown = (currentBalance - apexHighWaterMark) / apexHighWaterMark;
+  if (trailingDrawdown <= APEX_RULES.trailingDrawdownPct) {
+    console.log(`[apex] TRAILING DRAWDOWN HIT: balance $${currentBalance.toFixed(2)}, HWM $${apexHighWaterMark.toFixed(2)}, drawdown ${(trailingDrawdown * 100).toFixed(2)}%`);
+    return { allowed: false, reason: `Trailing drawdown exceeded (${(trailingDrawdown * 100).toFixed(1)}% from HWM $${apexHighWaterMark.toFixed(0)})`, adjustedQty: qty };
+  }
+
   if (APEX_RULES.rthOnly && !isRTH()) {
     const now = new Date();
     const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" });
     return { allowed: false, reason: `Outside RTH (${etStr} ET)`, adjustedQty: qty };
   }
+
   let adjQty = qty;
-  if (adjQty > APEX_RULES.maxContracts) {
-    console.log(`[apex] Size limit enforced: qty ${adjQty} → ${APEX_RULES.maxContracts}`);
-    adjQty = APEX_RULES.maxContracts;
+  const symKey = (symbol || "").toUpperCase();
+  const maxAllowed = APEX_RULES.maxContractsPerSymbol[symKey] || APEX_RULES.maxContractsDefault;
+  if (adjQty > maxAllowed) {
+    console.log(`[apex] Size limit enforced for ${symKey}: qty ${adjQty} → ${maxAllowed}`);
+    adjQty = maxAllowed;
   }
+
+  const today = new Date().toISOString().slice(0, 10);
+  apexTradeDays.add(today);
+
   return { allowed: true, adjustedQty: adjQty };
 }
 
-export { isRTH, checkApexRules, APEX_RULES };
+function getApexEvalStatus(accountSize: number = DEFAULT_ACCOUNT_SIZE, planKey: string = "50k"): { tradeDays: number; minTradeDays: number; profitTarget: number; currentPnl: number; targetMet: boolean; trailingDrawdown: number; highWaterMark: number } {
+  const currentBalance = accountSize + dailyPnlTracker;
+  const target = APEX_RULES.profitTarget[planKey] || 1000;
+  return {
+    tradeDays: apexTradeDays.size,
+    minTradeDays: APEX_RULES.minTradeDays,
+    profitTarget: target,
+    currentPnl: dailyPnlTracker,
+    targetMet: dailyPnlTracker >= target,
+    trailingDrawdown: apexHighWaterMark > 0 ? ((currentBalance - apexHighWaterMark) / apexHighWaterMark) : 0,
+    highWaterMark: apexHighWaterMark,
+  };
+}
+
+export { isRTH, checkApexRules, APEX_RULES, getApexEvalStatus, resetApexTracker };
 
 export function forwardSignalToSupabase(payload: { symbol: string; direction: string; entryPrice: number; stopLoss: number; takeProfit: number; riskReward: string; confluence: number; pattern: string; qty?: number; source?: string }): Promise<{ status: string; signalId: string }> {
   const signalId = generateSignalId();
@@ -114,7 +168,7 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
     return;
   }
 
-  const apexCheck = checkApexRules(direction, 1);
+  const apexCheck = checkApexRules(direction, 1, symbol);
   if (!apexCheck.allowed) {
     console.warn(`[apex] BLOCKED: ${apexCheck.reason} — ${direction} ${symbol} ${pattern}`);
     return;

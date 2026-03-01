@@ -886,6 +886,14 @@
           <span class="status-dot"></span>
           <span id="rth-status-text">RTH: Checking...</span>
         </div>
+        <div id="apex-eval-panel" style="margin-top:0.5rem;padding:0.5rem 0.7rem;background:#1e293b;border-radius:0.5rem;font-size:0.72rem;color:#94a3b8;display:flex;gap:0.8rem;flex-wrap:wrap;align-items:center;" data-testid="apex-eval-panel">
+          <span style="font-weight:600;color:#facc15;">Apex Eval</span>
+          <span>Daily P&amp;L: <b id="apex-pnl" data-testid="text-apex-pnl" style="color:#e2e8f0">$0.00</b></span>
+          <span>HWM: <b id="apex-hwm" data-testid="text-apex-hwm" style="color:#e2e8f0">$50,000</b></span>
+          <span>Drawdown: <b id="apex-dd" data-testid="text-apex-dd" style="color:#e2e8f0">0.0%</b></span>
+          <span>Trade Days: <b id="apex-days" data-testid="text-apex-days" style="color:#e2e8f0">0/5</b></span>
+          <span>Target: <b id="apex-target" data-testid="text-apex-target" style="color:#e2e8f0">$0 / $1,000</b></span>
+        </div>
 
         <label>Equity Index Futures</label>
         <div class="check-group">
@@ -1701,6 +1709,20 @@
             rthBadge.className = 'trading-status closed';
             rthText.textContent = 'Outside RTH (signals blocked by Apex rules) | Daily P&L: $' + (safety.dailyPnl || 0).toFixed(2);
           }
+        } catch {}
+
+        try {
+          const apex = await (await fetch('/api/trader/apex-eval')).json();
+          document.getElementById('apex-pnl').textContent = '$' + (apex.currentPnl || 0).toFixed(2);
+          document.getElementById('apex-pnl').style.color = (apex.currentPnl || 0) >= 0 ? '#34d399' : '#ef4444';
+          document.getElementById('apex-hwm').textContent = '$' + (apex.highWaterMark || 50000).toLocaleString();
+          const dd = ((apex.trailingDrawdown || 0) * 100).toFixed(1);
+          document.getElementById('apex-dd').textContent = dd + '%';
+          document.getElementById('apex-dd').style.color = parseFloat(dd) <= -2 ? '#ef4444' : '#e2e8f0';
+          document.getElementById('apex-days').textContent = (apex.tradeDays || 0) + '/' + (apex.minTradeDays || 5);
+          document.getElementById('apex-days').style.color = (apex.tradeDays || 0) >= (apex.minTradeDays || 5) ? '#34d399' : '#e2e8f0';
+          document.getElementById('apex-target').textContent = '$' + (apex.currentPnl || 0).toFixed(0) + ' / $' + (apex.profitTarget || 1000).toLocaleString();
+          document.getElementById('apex-target').style.color = apex.targetMet ? '#34d399' : '#e2e8f0';
         } catch {}
       } catch {}
     }

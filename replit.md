@@ -58,7 +58,7 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
     *   **Daily loss limit:** -3% stops all scanning (`DAILY_LOSS_LIMIT_PCT = -0.03`)
     *   **SIM-only enforcement:** Non-SIM accounts blocked unless `ALLOW_LIVE_TRADES=true`
     *   **Contract limit:** `MAX_CONTRACTS` env var (default 1) in CrossTrade
-    *   **Apex Trader Funding rules:** RTH-only filter (9:30 AM – 4:00 PM ET), max 10 contracts, daily loss limit enforcement via `checkApexRules()`. RTH status badge shown in trader panel with live daily P&L. `isRTH()` and `APEX_RULES` exported for external use.
+    *   **Apex Trader Funding rules:** Full eval guardrails — RTH-only filter (9:30 AM – 4:00 PM ET, weekdays only), per-symbol max contracts (ES:10, NQ:8, CL:5, GC:3, BTC:2, etc.), trailing drawdown from high water mark (-3%), daily loss limit, trade day tracking, profit target per plan (50k: $1K, 100k: $2K, 150k: $3K). `checkApexRules()` called before every signal emission. Apex eval status panel in trader UI shows P&L, HWM, drawdown, trade days, and target progress in real-time. API: `GET /api/trader/apex-eval?plan=50k`.
     *   **Safety status API:** `GET /api/trader/safety` returns daily P&L, limits, confluence min, `rthActive` boolean, full `apexRules` object
 *   **CrossTrade Integration:** Connects to CrossTrade webhook for sending orders to NinjaTrader.
 
