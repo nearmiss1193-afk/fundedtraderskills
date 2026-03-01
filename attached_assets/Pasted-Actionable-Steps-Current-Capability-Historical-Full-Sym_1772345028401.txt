@@ -1,0 +1,94 @@
+Actionable Steps
+
+Current Capability: Historical Full-Symbol Scan
+Yes — the backtester can already scan all supported symbols across their full available history (limited only by Polygon's data availability and free tier rate limits). The multi-scan endpoint and caching layer make this practical:
+Cache stores bars per symbol/timeframe/date-range (5-min TTL, ETF proxy sharing reduces calls dramatically)
+21-symbol Apex list (ES, NQ, CL, GC, BTC, ETH, ZS, etc.) fully covered
+Intraday timeframes (5min/15min) now fully supported and produce meaningful trade counts
+To run a full historical scan across all symbols and discover new patterns/insights:
+Use the multi-scan UI button ("Multi-Symbol Edge Scan") with "All" patterns selected
+Or paste the console prompt below (adjust date range to max available, e.g., 2015–2026 if Polygon allows)
+
+Paste this in Replit Console for Full Historical Multi-Symbol Scan
+This scans the complete Apex-compatible list over the longest feasible range (2015–2026 for most futures; shorter for crypto). It will reveal the most consistent patterns, symbols, timeframes, and confluence factors across history.
+
+JavaScript// Paste into Replit console and run — Full historical multi-symbol scan
+const axios = require('axios');
+
+const BASE_URL = 'http://localhost:3000';
+
+const symbols = [
+  'ES', 'MES', 'NQ', 'MNQ', 'YM', 'MYM', 'RTY', 'M2K',
+  'CL', 'MCL', 'GC', 'MGC', 'SI', 'HG',
+  'BTC', 'ETH', 'ZB', 'ZN', 'ZC', 'ZS', 'ZW'
+];
+
+const scanParams = {
+  timeframe: '5min',                  // switch to '15min' or '1hour' later
+  startDate: '2015-01-01',            // max history (Polygon limits apply)
+  endDate: '2026-02-28',
+  patterns: ['3bar', '4bar', 'buysetup', 'retest', 'breakout', 'climax', 'cuphandle', 'wedge'],
+  minConfluence: 7
+};
+
+async function runFullHistoricalScan() {
+  console.log('Starting FULL historical multi-symbol scan...');
+  console.log(`Symbols (${symbols.length}): ${symbols.join(', ')}`);
+  console.log(`Timeframe: ${scanParams.timeframe} | Range: ${scanParams.startDate} – ${scanParams.endDate}`);
+
+  try {
+    const res = await axios.post(`${BASE_URL}/api/backtest/multi`, {
+      symbols,
+      ...scanParams
+    });
+
+    const data = res.data;
+
+    console.log('\nFULL HISTORICAL SCAN SUMMARY');
+    console.log(`Symbols Scanned: ${data.summary.symbolsScanned}`);
+    console.log(`Total Trades: ${data.summary.totalTrades}`);
+    console.log(`Win Rate: ${(data.summary.winRate * 100).toFixed(1)}%`);
+    console.log(`Profit Factor: ${data.summary.profitFactor.toFixed(2)}`);
+    console.log(`Net P&L: ${data.summary.netPnL.toFixed(2)}`);
+
+    console.log('\nTOP 5 SYMBOLS BY P&L (ALL-TIME)');
+    data.results
+      .sort((a, b) => b.totalPnL - a.totalPnL)
+      .slice(0, 5)
+      .forEach(r => {
+        console.log(`${r.symbol.padEnd(6)} | P&L: ${r.totalPnL.toFixed(2)} | WR: ${(r.winRate * 100).toFixed(1)}% | PF: ${r.profitFactor.toFixed(2)} | Trades: ${r.tradeCount}`);
+      });
+
+    console.log('\nTOP 5 PATTERNS (ALL-TIME AGGREGATED)');
+    if (data.patternBreakdown) {
+      Object.entries(data.patternBreakdown)
+        .sort(([,a], [,b]) => b.pnl - a.pnl)
+        .slice(0, 5)
+        .forEach(([pat, s]) => {
+          console.log(`${pat.padEnd(12)} | P&L: ${s.pnl.toFixed(2)} | WR: ${(s.winRate * 100).toFixed(1)}% | PF: ${s.profitFactor.toFixed(2)} | Trades: ${s.count}`);
+        });
+    }
+
+    console.log('\nNext: Edge Builder → Backtest Edge Heatmap + Export CSV for deeper insights');
+    console.log('Look for new patterns/insights: highest PF combos, confluence factors, timeframe performance');
+
+  } catch (err) {
+    console.error('Full scan error:', err.message);
+    if (err.response) console.error('Response:', err.response.data);
+  }
+}
+
+runFullHistoricalScan();
+
+What this reveals:
+Most profitable symbols across history (e.g., NQ, ES, CL)
+Best patterns/timeframes (e.g., Wedge on 5-min NQ)
+Confluence alignment insights (from CSV: filter ≥9pt → see vol type, MTF, gap, tail correlations)
+Potential new patterns (e.g., if certain combos repeatedly show edge > backtest baseline)
+
+
+
+Insights from Current Heatmap (Quick Wins)
+Prioritize NQ/Wedge — highest PF (5.41) → add Wedge to live scanner (code in previous response)
+ZS/3bar — exceptional selectivity (75% WR, PF 17) → test live on soybeans
+BTC/ETH — high signal volume but low edge → upgrade to direct futures data or skip until paid Polygon tier

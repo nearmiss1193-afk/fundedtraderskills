@@ -992,6 +992,154 @@ function detectClimaxReversal(bars: Bar[], state: MarketState): { detected: bool
   return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
 }
 
+function linearRegressionSlope(values: number[]): number {
+  const n = values.length;
+  if (n < 2) return 0;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += i;
+    sumY += values[i];
+    sumXY += i * values[i];
+    sumX2 += i * i;
+  }
+  const denom = n * sumX2 - sumX * sumX;
+  if (denom === 0) return 0;
+  return (n * sumXY - sumX * sumY) / denom;
+}
+
+function recentAvgVolume(bars: Bar[], lookback: number): number {
+  const slice = bars.slice(-lookback);
+  if (slice.length === 0) return 0;
+  return slice.reduce((s, b) => s + b.volume, 0) / slice.length;
+}
+
+function projectedTrendlineValue(slope: number, intercept: number, index: number): number {
+  return intercept + slope * index;
+}
+
+function linearRegressionIntercept(values: number[], slope: number): number {
+  const n = values.length;
+  const sumY = values.reduce((a, b) => a + b, 0);
+  const sumX = (n * (n - 1)) / 2;
+  return (sumY - slope * sumX) / n;
+}
+
+function isConvergingWedge(highs: number[], lows: number[]): { converging: boolean; narrowPct: number } {
+  const n = highs.length;
+  if (n < 10) return { converging: false, narrowPct: 0 };
+  const firstThird = Math.floor(n / 3);
+  const lastThird = n - firstThird;
+  const earlySpan = Math.max(...highs.slice(0, firstThird)) - Math.min(...lows.slice(0, firstThird));
+  const lateSpan = Math.max(...highs.slice(lastThird)) - Math.min(...lows.slice(lastThird));
+  if (earlySpan === 0) return { converging: false, narrowPct: 0 };
+  const narrowPct = 1 - (lateSpan / earlySpan);
+  return { converging: narrowPct >= 0.2, narrowPct };
+}
+
+function detectWedgeLong(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 15) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  const recent = bars.slice(-Math.min(bars.length, 30));
+  const n = recent.length;
+  const highs = recent.map(b => b.high);
+  const lows = recent.map(b => b.low);
+  const highSlope = linearRegressionSlope(highs);
+  const lowSlope = linearRegressionSlope(lows);
+
+  const { converging, narrowPct } = isConvergingWedge(highs, lows);
+  if (!converging) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const isFallingWedge = highSlope < 0 && lowSlope < 0 && Math.abs(lowSlope) > Math.abs(highSlope);
+  if (!isFallingWedge) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const curr = recent[n - 1];
+  const prev = recent[n - 2];
+  const highIntercept = linearRegressionIntercept(highs, highSlope);
+  const projectedHighTrendline = projectedTrendlineValue(highSlope, highIntercept, n - 1);
+  const breaksAboveTrendline = curr.close > projectedHighTrendline && curr.bullish;
+
+  if (!breaksAboveTrendline) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const recentVol = recentAvgVolume(recent, 10);
+  const volSurge = curr.volume > recentVol * 1.5;
+  const aboveEMA21 = curr.close > state.ema21;
+  const aboveEMA9 = curr.close > state.ema9;
+  const avgRange = getAvgRange(bars);
+
+  const factors = [
+    volSurge,
+    isIgnitingVolume(bars, state.avgVolume),
+    aboveEMA21,
+    aboveEMA9,
+    curr.close > state.sma200,
+    state.bias !== "DOWNTREND",
+    hasBottomingTail(prev) || hasBottomingTail(curr),
+    isWideRangeBar(curr, avgRange),
+    isNearPivot(state.price, state.pivotLow, state.price) || isNearPivot(state.price, state.priorPivotLow, state.price),
+    barFormationQuality(curr, "LONG") >= 3,
+    narrowPct >= 0.35,
+  ];
+  const conf = calcConfluence(factors);
+  const reasons: string[] = [`falling wedge breakout (${(narrowPct * 100).toFixed(0)}% converged)`];
+  if (volSurge) reasons.push("vol surge");
+  if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+  if (aboveEMA21) reasons.push("above 21 EMA");
+  if (hasBottomingTail(curr)) reasons.push("bottoming tail");
+  if (isWideRangeBar(curr, avgRange)) reasons.push("wide range bar");
+  return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+}
+
+function detectWedgeShort(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 15) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  const recent = bars.slice(-Math.min(bars.length, 30));
+  const n = recent.length;
+  const highs = recent.map(b => b.high);
+  const lows = recent.map(b => b.low);
+  const highSlope = linearRegressionSlope(highs);
+  const lowSlope = linearRegressionSlope(lows);
+
+  const { converging, narrowPct } = isConvergingWedge(highs, lows);
+  if (!converging) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const isRisingWedge = highSlope > 0 && lowSlope > 0 && Math.abs(highSlope) < Math.abs(lowSlope);
+  if (!isRisingWedge) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const curr = recent[n - 1];
+  const prev = recent[n - 2];
+  const lowIntercept = linearRegressionIntercept(lows, lowSlope);
+  const projectedLowTrendline = projectedTrendlineValue(lowSlope, lowIntercept, n - 1);
+  const breaksBelowTrendline = curr.close < projectedLowTrendline && !curr.bullish;
+
+  if (!breaksBelowTrendline) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const recentVol = recentAvgVolume(recent, 10);
+  const volSurge = curr.volume > recentVol * 1.5;
+  const belowEMA21 = curr.close < state.ema21;
+  const belowEMA9 = curr.close < state.ema9;
+  const avgRange = getAvgRange(bars);
+
+  const factors = [
+    volSurge,
+    isIgnitingVolume(bars, state.avgVolume),
+    belowEMA21,
+    belowEMA9,
+    curr.close < state.sma200,
+    state.bias !== "UPTREND",
+    hasToppingTail(prev) || hasToppingTail(curr),
+    isWideRangeBar(curr, avgRange),
+    isNearPivot(state.price, state.pivotHigh, state.price) || isNearPivot(state.price, state.priorPivotHigh, state.price),
+    barFormationQuality(curr, "SHORT") >= 3,
+    narrowPct >= 0.35,
+  ];
+  const conf = calcConfluence(factors);
+  const reasons: string[] = [`rising wedge breakdown (${(narrowPct * 100).toFixed(0)}% converged)`];
+  if (volSurge) reasons.push("vol surge");
+  if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+  if (belowEMA21) reasons.push("below 21 EMA");
+  if (hasToppingTail(curr)) reasons.push("topping tail");
+  if (isWideRangeBar(curr, avgRange)) reasons.push("wide range bar");
+  return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+}
+
 function sentimentLabel(s: MarketState): string {
   if (s.sentiment === "BUYERS_CONTROL") return "GREED";
   if (s.sentiment === "SELLERS_CONTROL") return "FEAR";
@@ -1224,7 +1372,7 @@ async function simulateTick(session: TraderSession) {
 
       const bar = generateBar(state, mk, livePrice);
       session.bars[barKey].push(bar);
-      if (session.bars[barKey].length > 30) session.bars[barKey].shift();
+      if (session.bars[barKey].length > 35) session.bars[barKey].shift();
 
       const bars = session.bars[barKey];
       if (bars.length < 7) continue;
@@ -1283,6 +1431,15 @@ async function simulateTick(session: TraderSession) {
       if (!detectedPattern && session.patterns.includes("climax_short")) {
         const c = detectClimaxReversal(bars, state);
         if (c.detected && c.direction === "SHORT") { detectedPattern = "Climax Reversal"; direction = "SHORT"; confluence = c.confluence; confluenceLabel = c.confluenceLabel; entryReason = c.reason; }
+      }
+
+      if (!detectedPattern && session.patterns.includes("wedge_long")) {
+        const wl = detectWedgeLong(bars, state);
+        if (wl.detected) { detectedPattern = "Wedge Breakout"; direction = "LONG"; confluence = wl.confluence; confluenceLabel = wl.confluenceLabel; entryReason = wl.reason; }
+      }
+      if (!detectedPattern && session.patterns.includes("wedge_short")) {
+        const ws = detectWedgeShort(bars, state);
+        if (ws.detected) { detectedPattern = "Wedge Breakout"; direction = "SHORT"; confluence = ws.confluence; confluenceLabel = ws.confluenceLabel; entryReason = ws.reason; }
       }
 
       const openCount = Object.keys(session.openTrades).length;
@@ -1464,6 +1621,7 @@ export function startTrader(config: {
     "buysetup": "Buy Setup", "sellsetup": "Sell Setup",
     "breakout_long": "Breakout Long", "breakout_short": "Breakout Short",
     "climax_long": "Climax Long", "climax_short": "Climax Short",
+    "wedge_long": "Wedge Long", "wedge_short": "Wedge Short",
   };
   const enabledNames = config.patterns.map(p => patternNames[p] || p).join(", ");
   const enabledTFs = config.timeframes.join(", ");

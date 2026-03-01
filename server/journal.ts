@@ -53,7 +53,7 @@ const DEFAULT_SETTINGS: TraderSettings = {
   riskDollars: 100,
   rewardRatio: 2,
   maxOpenTrades: 3,
-  enabledPatterns: ["3bar_long", "3bar_short", "buysetup", "sellsetup", "breakout_long", "breakout_short", "climax_long", "climax_short"],
+  enabledPatterns: ["3bar_long", "3bar_short", "buysetup", "sellsetup", "breakout_long", "breakout_short", "climax_long", "climax_short", "wedge_long", "wedge_short"],
   enabledTimeframes: ["2min", "5min", "15min", "1hour", "4hour", "daily"],
 };
 
@@ -150,6 +150,9 @@ export function loadSettings(): TraderSettings {
       const missingNewKeys = raw.enabledPatterns && !raw.enabledPatterns.some((p: string) => p.includes("_long") || p.includes("_short") || p === "sellsetup");
       if (needsMigration || missingNewKeys) {
         raw.enabledPatterns = migratePatternKeys(raw.enabledPatterns);
+      }
+      if (raw.enabledPatterns && !raw.enabledPatterns.includes("wedge_long")) {
+        raw.enabledPatterns.push("wedge_long", "wedge_short");
       }
       return { ...DEFAULT_SETTINGS, ...raw };
     }

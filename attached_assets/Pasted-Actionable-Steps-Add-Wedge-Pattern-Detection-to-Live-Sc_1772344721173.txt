@@ -1,0 +1,107 @@
+Actionable Steps
+
+Add Wedge Pattern Detection to Live Scanner
+The backtest heatmap shows Wedge as the dominant pattern (277/482 trades, PF 1.98) and NQ/Wedge as the standout combo (PF 5.41, +$8,490). Since Wedge currently only exists in the backtester, adding it to the live scanner (trader.ts or main pattern engine) will allow real-time capture of this high-edge setup.Paste this code block into your live scanner file (likely trader.ts or patterns.ts) – adds Wedge detection logic aligned with backtester (rising/falling wedge breakout with volume surge + trend filter).
+
+JavaScript// Add to pattern detection functions (e.g., inside detectPatterns() or as new function detectWedge())
+function detectWedge(bars, symbol, timeframe) {
+  const recent = bars.slice(-30); // lookback 30 bars for wedge formation
+  if (recent.length < 15) return null;
+
+  // Simple wedge detection: converging highs/lows
+  const highs = recent.map(b => b.high);
+  const lows = recent.map(b => b.low);
+
+  const highSlope = linearRegressionSlope(highs);   // helper function below
+  const lowSlope = linearRegressionSlope(lows);
+
+  const isRising = highSlope > 0 && lowSlope > 0 && Math.abs(highSlope - lowSlope) < 0.0005; // converging upward
+  const isFalling = highSlope < 0 && lowSlope < 0 && Math.abs(highSlope - lowSlope) < 0.0005; // converging downward
+
+  if (!isRising && !isFalling) return null;
+
+  // Breakout confirmation: last bar breaks upper (falling wedge) or lower (rising wedge) trendline
+  const last = recent[recent.length - 1];
+  const prev = recent[recent.length - 2];
+
+  const volSurge = last.volume > 1.5 * averageVolume(recent.slice(-10));
+  const aboveEMA = last.close > ema(recent.map(b => b.close), 21)[recent.length - 1];
+
+  let direction = null;
+  let entryPrice = last.close;
+  let stopPrice = 0;
+  let targetPrice = 0;
+
+  if (isFalling && last.close > prev.high && volSurge && aboveEMA) {
+    // Bullish falling wedge breakout
+    direction = 'long';
+    stopPrice = Math.min(...recent.slice(-5).map(b => b.low)); // below recent lows
+    targetPrice = entryPrice + (entryPrice - stopPrice) * 2; // 1:2 R:R
+  } else if (isRising && last.close < prev.low && volSurge) {
+    // Bearish rising wedge breakdown
+    direction = 'short';
+    stopPrice = Math.max(...recent.slice(-5).map(b => b.high));
+    targetPrice = entryPrice - (stopPrice - entryPrice) * 2;
+  }
+
+  if (!direction) return null;
+
+  const confluence = calculateConfluence({
+    volSurge,
+    volType: getVolumeType(last, recent),
+    tailPresent: hasTail(last),
+    strongBody: isStrongBody(last),
+    maRespect: aboveEMA,
+    htfAligned: isHTFAligned(symbol, direction),
+    gapLevel: detectGapLevel(recent),
+    wBottomTop: detectWBottomTop(recent, direction)
+  });
+
+  if (confluence < 7) return null; // enforce live threshold
+
+  return {
+    symbol,
+    timeframe,
+    pattern: 'wedge',
+    direction,
+    entry: entryPrice,
+    stop: stopPrice,
+    target: targetPrice,
+    confluence,
+    volType: getVolumeType(last, recent),
+    timestamp: last.timestamp
+  };
+}
+
+// Helper: simple linear regression slope
+function linearRegressionSlope(values) {
+  const n = values.length;
+  const x = Array.from({length: n}, (_, i) => i);
+  const sumX = x.reduce((a, b) => a + b, 0);
+  const sumY = values.reduce((a, b) => a + b, 0);
+  const sumXY = x.reduce((sum, xi, i) => sum + xi * values[i], 0);
+  const sumX2 = x.reduce((sum, xi) => sum + xi * xi, 0);
+  return (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+}
+
+// Add to main detection loop
+const wedgeSignal = detectWedge(currentBars, symbol, timeframe);
+if (wedgeSignal) {
+  emitTradeSignal(wedgeSignal);
+}
+
+After pasting: Restart Replit server.
+Test: Run live scanner during RTH → watch for Wedge signals in console/Supabase.
+Expected: More real-time captures of high-edge Wedge setups (especially on NQ).
+
+
+Validate Wedge in Live Flow
+Monitor Replit logs during next session for Wedge signals (e.g., "Wedge detected on NQ 5min – 9pt IGNITING").
+Check Supabase trade_signals table → signalId & status.
+Confirm bridge → NT sim order placement (instrument=NQ1! or similar).
+If no signals: Lower live threshold temporarily to ≥7pt for testing, then raise back.
+
+Next Milestone Options
+Add other high-edge backtest patterns to live scanner (e.g., ZS/3bar boost).
+Create "Edge Optimizer" tab in UI: auto-rank combos from heatmap, suggest live filters.
+Finalize GitHub repo export + README push.
