@@ -1,0 +1,58 @@
+Add 1-Minute Timeframe Support
+The backtester already supports intraday timeframes via parseTimeframe(), but 1-minute is missing from the UI dropdown and needs explicit Polygon mapping (multiplier=1, timespan="minute"). Paste this into your frontend code (likely index.html or EdgeBuilder.js) to add "1min" to the timeframe dropdown.
+
+HTML<!-- In the timeframe select element (e.g., <select id="timeframe">) -->
+<option value="1min">1 Minute</option>
+Backend adjustment (routes.ts or backtest.ts):
+JavaScript// In parseTimeframe() function
+function parseTimeframe(tf) {
+  const map = {
+    '1min':   { multiplier: 1, timespan: 'minute' },
+    '5min':   { multiplier: 5, timespan: 'minute' },
+    '15min':  { multiplier: 15, timespan: 'minute' },
+    '1hour':  { multiplier: 1, timespan: 'hour' },
+    '4hour':  { multiplier: 4, timespan: 'hour' },
+    'daily':  { multiplier: 1, timespan: 'day' }
+  };
+  return map[tf] || { multiplier: 1, timespan: 'day' }; // default daily
+}
+Cache key update (already includes timeframe) — no change needed.
+After adding: Restart server → test single-symbol backtest on 1min (expect ~10× more bars/trades than 5min). Use cautiously — 1min is noisy; confluence ≥9pt recommended.
+
+Multiple Signals Converging Factor (from Manual)
+The manual emphasizes confluence (multiple factors aligning = higher edge). Your current 0–11pt system already does this (vol surge, igniting vol, tail, body, MA respect, MTF, gaps, W-Bottom/Top). To strengthen "multiple signals converging":
+Add Convergence Bonus: If 2+ patterns fire on same bar (e.g., Wedge + 3 Bar Play + Buy Setup), boost confluence +2–3 and log "Multi-pattern convergence".
+Paste into trader.ts (signal emission logic):
+
+JavaScript// In emitTradeSignal() or signal processing
+let convergenceCount = 0;
+const activePatternsOnBar = getPatternsOnSameBar(signal.timestamp); // helper to check other signals same bar
+
+if (activePatternsOnBar.length >= 2) {
+  convergenceCount = activePatternsOnBar.length - 1;
+  signal.confluence += convergenceCount * 1.5; // e.g., +1.5 per extra pattern
+  signal.notes = `Convergence: ${activePatternsOnBar.join(', ')} (+${convergenceCount * 1.5}pt)`;
+  console.log(`[CONVERGENCE] ${signal.symbol} ${signal.timestamp}: ${signal.notes}`);
+}
+
+Helper (add to scanner):
+
+JavaScriptfunction getPatternsOnSameBar(timestamp) {
+  // Query recent signals or in-memory buffer for same timestamp
+  return recentSignals
+    .filter(s => s.timestamp === timestamp && s.symbol === currentSymbol)
+    .map(s => s.pattern);
+}
+This matches manual's "multiple concept convergence" (Ch.4–5) for higher-probability setups.
+
+Full Historical UI Scan & Wedge Live Test
+Full Scan: Use Edge Builder UI → "Multi-Symbol Edge Scan" button.
+Settings: All patterns, 5min timeframe, 2015-01-01 to 2026-02-28 (or max available), minConfluence 7 or 8.
+UI has no timeout → let it run (20–40 min).
+After completion: Copy top 5 symbols/patterns from Heatmap tab or console summary and paste here.
+Wedge Live Test: Already added to live scanner (detectWedgeLong/Short + edge boosts).
+During next RTH (9:30–16:00 ET):
+Run scanner on NQ/ES/CL/GC/SI/ZS
+Watch Replit console for Wedge logs (e.g., "Wedge long on NQ – 9pt [EDGE+2] IGNITING")
+Check Supabase trade_signals & NT sim for orders
+Share: 3–5 relevant log lines + NT sim order screenshot/description

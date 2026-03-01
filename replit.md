@@ -53,6 +53,7 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
 *   **Safety Guardrails:**
     *   **Live confluence filter:** ≥8pt required (`LIVE_CONFLUENCE_MIN = 8` in trader.ts)
     *   **Edge boost:** Data-driven confluence bonus for proven combos: NQ/Wedge +2, SI/BuySetup|Breakout|3Bar +2, ZS/3Bar +1, ZW/3Bar +1, CL/Wedge +1. Logged as `[EDGE+N]` in confluence label.
+    *   **Multi-pattern convergence:** All patterns checked on each bar; if 2+ fire simultaneously, highest-confluence pattern is selected and gets +1.5pt per extra pattern (max +3). Logged as `[CONVERGE+N w/ Pattern1, Pattern2]`.
     *   **Max risk per trade:** 1% of $50,000 account (`MAX_RISK_PCT = 0.01`)
     *   **Daily loss limit:** -3% stops all scanning (`DAILY_LOSS_LIMIT_PCT = -0.03`)
     *   **SIM-only enforcement:** Non-SIM accounts blocked unless `ALLOW_LIVE_TRADES=true`

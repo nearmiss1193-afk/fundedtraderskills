@@ -1385,61 +1385,66 @@ async function simulateTick(session: TraderSession) {
       let confluenceLabel = "";
       let entryReason = "";
 
+      const candidates: Array<{ pattern: string; dir: "LONG" | "SHORT"; conf: number; label: string; reason: string }> = [];
+
       if (session.patterns.includes("3bar_long")) {
-        const buyResult = detect3BarPlayBuy(bars, state);
-        if (buyResult.detected) {
-          detectedPattern = "3 Bar Play";
-          direction = "LONG";
-          confluence = buyResult.confluence;
-          confluenceLabel = buyResult.confluenceLabel;
-          entryReason = buyResult.reason;
+        const r = detect3BarPlayBuy(bars, state);
+        if (r.detected) candidates.push({ pattern: "3 Bar Play", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("3bar_short")) {
+        const r = detect3BarPlaySell(bars, state);
+        if (r.detected) candidates.push({ pattern: "3 Bar Play", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("buysetup")) {
+        const r = detectBuySetup(bars, state);
+        if (r.detected) candidates.push({ pattern: "Buy Setup", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("sellsetup")) {
+        const r = detectSellSetup(bars, state);
+        if (r.detected) candidates.push({ pattern: "Sell Setup", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("breakout_long")) {
+        const r = detectBreakoutLong(bars, state);
+        if (r.detected) candidates.push({ pattern: "Pivot Breakout", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("breakout_short")) {
+        const r = detectBreakoutShort(bars, state);
+        if (r.detected) candidates.push({ pattern: "Pivot Breakout", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("climax_long")) {
+        const r = detectClimaxReversal(bars, state);
+        if (r.detected && r.direction === "LONG") candidates.push({ pattern: "Climax Reversal", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("climax_short")) {
+        const r = detectClimaxReversal(bars, state);
+        if (r.detected && r.direction === "SHORT") candidates.push({ pattern: "Climax Reversal", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("wedge_long")) {
+        const r = detectWedgeLong(bars, state);
+        if (r.detected) candidates.push({ pattern: "Wedge Breakout", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("wedge_short")) {
+        const r = detectWedgeShort(bars, state);
+        if (r.detected) candidates.push({ pattern: "Wedge Breakout", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => b.conf - a.conf);
+        const best = candidates[0];
+        detectedPattern = best.pattern;
+        direction = best.dir;
+        confluence = best.conf;
+        confluenceLabel = best.label;
+        entryReason = best.reason;
+
+        const sameDir = candidates.filter(c => c.dir === best.dir && c.pattern !== best.pattern);
+        if (sameDir.length >= 1) {
+          const convergenceBonus = Math.min(sameDir.length * 1.5, 3);
+          confluence += convergenceBonus;
+          const otherPatterns = sameDir.map(c => c.pattern).join(", ");
+          confluenceLabel = `${confluenceLabel} [CONVERGE+${convergenceBonus} w/ ${otherPatterns}]`;
+          console.log(`[trader] Multi-pattern convergence on ${mk} ${best.dir}: ${best.pattern} + ${otherPatterns} → +${convergenceBonus}pt (${confluence}pt total)`);
         }
-      }
-      if (!detectedPattern && session.patterns.includes("3bar_short")) {
-        const sellResult = detect3BarPlaySell(bars, state);
-        if (sellResult.detected) {
-          detectedPattern = "3 Bar Play";
-          direction = "SHORT";
-          confluence = sellResult.confluence;
-          confluenceLabel = sellResult.confluenceLabel;
-          entryReason = sellResult.reason;
-        }
-      }
-
-      if (!detectedPattern && session.patterns.includes("buysetup")) {
-        const buy = detectBuySetup(bars, state);
-        if (buy.detected) { detectedPattern = "Buy Setup"; direction = "LONG"; confluence = buy.confluence; confluenceLabel = buy.confluenceLabel; entryReason = buy.reason; }
-      }
-      if (!detectedPattern && session.patterns.includes("sellsetup")) {
-        const sell = detectSellSetup(bars, state);
-        if (sell.detected) { detectedPattern = "Sell Setup"; direction = "SHORT"; confluence = sell.confluence; confluenceLabel = sell.confluenceLabel; entryReason = sell.reason; }
-      }
-
-      if (!detectedPattern && session.patterns.includes("breakout_long")) {
-        const bl = detectBreakoutLong(bars, state);
-        if (bl.detected) { detectedPattern = "Pivot Breakout"; direction = "LONG"; confluence = bl.confluence; confluenceLabel = bl.confluenceLabel; entryReason = bl.reason; }
-      }
-      if (!detectedPattern && session.patterns.includes("breakout_short")) {
-        const bs = detectBreakoutShort(bars, state);
-        if (bs.detected) { detectedPattern = "Pivot Breakout"; direction = "SHORT"; confluence = bs.confluence; confluenceLabel = bs.confluenceLabel; entryReason = bs.reason; }
-      }
-
-      if (!detectedPattern && session.patterns.includes("climax_long")) {
-        const c = detectClimaxReversal(bars, state);
-        if (c.detected && c.direction === "LONG") { detectedPattern = "Climax Reversal"; direction = "LONG"; confluence = c.confluence; confluenceLabel = c.confluenceLabel; entryReason = c.reason; }
-      }
-      if (!detectedPattern && session.patterns.includes("climax_short")) {
-        const c = detectClimaxReversal(bars, state);
-        if (c.detected && c.direction === "SHORT") { detectedPattern = "Climax Reversal"; direction = "SHORT"; confluence = c.confluence; confluenceLabel = c.confluenceLabel; entryReason = c.reason; }
-      }
-
-      if (!detectedPattern && session.patterns.includes("wedge_long")) {
-        const wl = detectWedgeLong(bars, state);
-        if (wl.detected) { detectedPattern = "Wedge Breakout"; direction = "LONG"; confluence = wl.confluence; confluenceLabel = wl.confluenceLabel; entryReason = wl.reason; }
-      }
-      if (!detectedPattern && session.patterns.includes("wedge_short")) {
-        const ws = detectWedgeShort(bars, state);
-        if (ws.detected) { detectedPattern = "Wedge Breakout"; direction = "SHORT"; confluence = ws.confluence; confluenceLabel = ws.confluenceLabel; entryReason = ws.reason; }
       }
 
       if (detectedPattern && confluence > 0) {
