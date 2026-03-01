@@ -1,0 +1,40 @@
+Validate Full System on Intraday Futures Data — Run comprehensive backtest on stitched ES/NQ 5-min/15-min data (2020–2026). Focus on:
+Trades per pattern (expect higher frequency on intraday).
+Avg confluence score vs win rate/PF (target ≥5/7 for live filter).
+Vol type impact (prefer igniting on trigger, resting in consolidation).
+MTF alignment lift (higher win rate when htfUp/htfDown confirms).
+Use code_execution tool or Replit to simulate; adjust if over-filtered (e.g., loosen MTF to EMA21 only if pivots too strict).
+
+Add Final Manual-Aligned Boosters — Incorporate remaining elements from Jared Wesley/Live Traders (bottoming/topping tails already in, but add):
+Gap Entries (Level 2/3 gaps) as confluence +1–2 if signal near gap fill or continuation.
+Double Bottom/Top Retest variant in Retest Buy/Sell (prior support/resistance retest + tail/vol support).
+Parabolic/Extended Moves filter for Climactic (avoid overextended entries).
+Quick code addition (paste to patterns or backtest module):
+
+Python# Gap detection (simple: open > prev close * 1.005 for up gap)
+data['gap_up'] = data['open'] > data['close'].shift(1) * 1.005
+data['gap_down'] = data['open'] < data['close'].shift(1) * 0.995
+
+# Add to confluence
+confluence_factors = [
+    data['volume_surge'],
+    data['vol_type'] == 'igniting',
+    data['tail_present'],  # bottoming/topping
+    data['strong_body'],
+    data['ma_respect'],
+    data['htf_aligned'],
+    data['gap_up'] | data['gap_down']  # +0.5–1 bonus
+]
+data['confluence_score'] = sum(confluence_factors)  # 0-7, adjust weights if needed
+
+Edge Optimization & A/B Testing — Use backtest results to:
+Rank patterns by historical edge (win rate × avg R:R).
+A/B test confluence thresholds (e.g., ≥5 vs ≥6) → feed to Edge Builder dashboard.
+Journal top setups in Supabase for live comparison.
+
+Phase 6 Preparation — With backtester mature (8 patterns, full manual alignment), shift toward packaging:
+Clean GitHub repo structure (Replit export → GitHub).
+Create install guide (README.md: clone, setup Replit secrets (POLYGON_API_KEY), run bridge, connect NT sim, Vercel deploy).
+Add simple alert stub (e.g., print/email on high-confluence signals).
+
+Visual References — Recent enhancements in action: 4 Bar Play (double resting for stronger setup), Retest Buy with tail confluence, MTF-aligned 3 Bar Play.

@@ -2309,7 +2309,7 @@
             const cls = t.outcome === 'WIN' ? 'bt-win' : t.outcome === 'LOSS' ? 'bt-loss' : 'bt-timeout';
             const dcls = t.direction === 'LONG' ? 'dir-long' : 'dir-short';
             const pSign = t.pnlDollars >= 0 ? '+' : '';
-            const confLabel = t.confluence != null ? `${t.confluence}/7` : '—';
+            const confLabel = t.confluence != null ? `${t.confluence}/9` : '—';
             const vtLabel = t.volType || '—';
             html += `<tr>
               <td>${esc(t.date)}</td>
