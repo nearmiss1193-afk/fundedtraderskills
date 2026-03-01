@@ -22,6 +22,8 @@ interface BacktestTrade {
   holdBars: number;
   pattern: string;
   direction: "LONG" | "SHORT";
+  confluence?: number;
+  volType?: string;
 }
 
 interface BacktestResult {
@@ -160,6 +162,8 @@ async function fetchETFProxy(symbol: string, from: string, to: string): Promise<
   }));
 }
 
+type VolType = "IGNITING" | "ENDING" | "RESTING" | "NORMAL";
+
 function addIndicators(bars: Bar[]): {
   bars: Bar[];
   ema21: number[];
@@ -170,6 +174,12 @@ function addIndicators(bars: Bar[]): {
   range: number[];
   body: number[];
   green: boolean[];
+  tail: number[];
+  wick: number[];
+  bottomingTail: boolean[];
+  toppingTail: boolean[];
+  volType: VolType[];
+  sideways: boolean[];
 } {
   const ema21: number[] = [];
   const ema9: number[] = [];
@@ -179,6 +189,12 @@ function addIndicators(bars: Bar[]): {
   const range: number[] = [];
   const body: number[] = [];
   const green: boolean[] = [];
+  const tail: number[] = [];
+  const wick: number[] = [];
+  const bottomingTail: boolean[] = [];
+  const toppingTail: boolean[] = [];
+  const volType: VolType[] = [];
+  const sideways: boolean[] = [];
 
   const ema21k = 2 / 22;
   const ema9k = 2 / 10;
@@ -187,8 +203,20 @@ function addIndicators(bars: Bar[]): {
     const b = bars[i];
     const r = b.high - b.low;
     range.push(r);
-    body.push(Math.abs(b.close - b.open));
-    green.push(b.close > b.open);
+    const bd = Math.abs(b.close - b.open);
+    body.push(bd);
+    const isGreen = b.close > b.open;
+    green.push(isGreen);
+
+    const tl = isGreen ? (b.open - b.low) : (b.close - b.low);
+    const wk = isGreen ? (b.high - b.close) : (b.high - b.open);
+    tail.push(tl);
+    wick.push(wk);
+
+    const isBT = r > 0 && tl > 0.5 * r && bd < 0.3 * r && isGreen;
+    bottomingTail.push(isBT);
+    const isTT = r > 0 && wk > 0.5 * r && bd < 0.3 * r && !isGreen;
+    toppingTail.push(isTT);
 
     if (i === 0) {
       ema21.push(b.close);
@@ -210,20 +238,45 @@ function addIndicators(bars: Bar[]): {
       const atrSlice = bars.slice(i - 13, i + 1);
       atr.push(atrSlice.reduce((s, x) => s + (x.high - x.low), 0) / 14);
     }
+
+    const avgP = ema21[i] || b.close;
+    const emaDiffPct = avgP > 0 ? Math.abs(ema9[i] - ema21[i]) / avgP : 0;
+    sideways.push(emaDiffPct < 0.002);
+
+    if (i < 5) {
+      volType.push("NORMAL");
+    } else {
+      const prevBars = bars.slice(i - 5, i);
+      const consDown = prevBars.every(pb => pb.close < pb.open);
+      const consUp = prevBars.every(pb => pb.close > pb.open);
+      const isExtended = consDown || consUp;
+
+      if (isExtended && b.volume > avgVol[i] * 2.5 && r > avgRange[i] * 2 && bd < 0.3 * r) {
+        volType.push("ENDING");
+      } else if (b.volume > avgVol[i] * 1.5 && r > avgRange[i] * 1.5) {
+        volType.push("IGNITING");
+      } else if (b.volume < avgVol[i] * 0.6 && r < avgRange[i] * 0.5) {
+        volType.push("RESTING");
+      } else {
+        volType.push("NORMAL");
+      }
+    }
   }
 
-  return { bars, ema21, ema9, avgRange, avgVol, atr, range, body, green };
+  return { bars, ema21, ema9, avgRange, avgVol, atr, range, body, green, tail, wick, bottomingTail, toppingTail, volType, sideways };
 }
 
 interface Signal {
   index: number;
   direction: "LONG" | "SHORT";
   pattern: string;
+  confluence?: number;
+  volType?: VolType;
 }
 
 function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
-  const { bars, ema21, ema9, avgRange, avgVol, range, body, green } = data;
+  const { bars, ema21, ema9, avgRange, avgVol, range, body, green, bottomingTail, toppingTail, volType, sideways } = data;
 
   for (let i = 3; i < bars.length; i++) {
     const ignitingIdx = i - 2;
@@ -231,6 +284,7 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
     const triggerIdx = i;
 
     if (ignitingIdx < 1) continue;
+    if (sideways[triggerIdx]) continue;
 
     const trendUp = ema9[triggerIdx] > ema21[triggerIdx];
     const trendDown = ema9[triggerIdx] < ema21[triggerIdx];
@@ -253,7 +307,14 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
       trendUp;
 
     if (isIgnitingLong && isRestingLong && isTriggerLong) {
-      signals.push({ index: triggerIdx, direction: "LONG", pattern: "3 Bar Play" });
+      const conf = [
+        volumeSurgeLong,
+        volType[triggerIdx] === "IGNITING",
+        bottomingTail[restingIdx],
+        bars[triggerIdx].close > ema9[triggerIdx],
+        body[triggerIdx] > 0.5 * range[triggerIdx],
+      ].filter(Boolean).length;
+      signals.push({ index: triggerIdx, direction: "LONG", pattern: "3 Bar Play", confluence: conf, volType: volType[triggerIdx] });
     }
 
     const isIgnitingShort = !green[ignitingIdx] &&
@@ -274,7 +335,14 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
       trendDown;
 
     if (isIgnitingShort && isRestingShort && isTriggerShort) {
-      signals.push({ index: triggerIdx, direction: "SHORT", pattern: "3 Bar Play" });
+      const conf = [
+        volumeSurgeShort,
+        volType[triggerIdx] === "IGNITING",
+        toppingTail[restingIdx],
+        bars[triggerIdx].close < ema9[triggerIdx],
+        body[triggerIdx] > 0.5 * range[triggerIdx],
+      ].filter(Boolean).length;
+      signals.push({ index: triggerIdx, direction: "SHORT", pattern: "3 Bar Play", confluence: conf, volType: volType[triggerIdx] });
     }
   }
   return signals;
@@ -282,9 +350,11 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
 
 function detectBuySetup(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
-  const { bars, ema21, ema9, avgVol, green } = data;
+  const { bars, ema21, ema9, avgVol, green, bottomingTail, toppingTail, volType, sideways, body, range } = data;
 
   for (let i = 4; i < bars.length; i++) {
+    if (sideways[i]) continue;
+
     const prevBars = [bars[i - 3], bars[i - 2], bars[i - 1]];
     const curr = bars[i];
     const trendUp = ema9[i] > ema21[i];
@@ -297,7 +367,15 @@ function detectBuySetup(data: ReturnType<typeof addIndicators>): Signal[] {
     const aboveEma = curr.close > ema9[i];
 
     if (pullbackCount >= 2 && nearEma && greenReversal && volSurge && aboveEma && trendUp) {
-      signals.push({ index: i, direction: "LONG", pattern: "Buy Setup" });
+      const hasTail = bottomingTail[i] || bottomingTail[i - 1];
+      const conf = [
+        volSurge,
+        volType[i] === "IGNITING",
+        hasTail,
+        body[i] > 0.5 * range[i],
+        curr.close > ema21[i],
+      ].filter(Boolean).length;
+      signals.push({ index: i, direction: "LONG", pattern: "Buy Setup", confluence: conf, volType: volType[i] });
     }
 
     const rallyCount = prevBars.filter(b => b.close > b.open).length;
@@ -306,7 +384,15 @@ function detectBuySetup(data: ReturnType<typeof addIndicators>): Signal[] {
     const belowEma = curr.close < ema9[i];
 
     if (rallyCount >= 2 && nearEmaShort && redReversal && volSurge && belowEma && trendDown) {
-      signals.push({ index: i, direction: "SHORT", pattern: "Sell Setup" });
+      const hasTail = toppingTail[i] || toppingTail[i - 1];
+      const conf = [
+        volSurge,
+        volType[i] === "IGNITING",
+        hasTail,
+        body[i] > 0.5 * range[i],
+        curr.close < ema21[i],
+      ].filter(Boolean).length;
+      signals.push({ index: i, direction: "SHORT", pattern: "Sell Setup", confluence: conf, volType: volType[i] });
     }
   }
   return signals;
@@ -314,9 +400,11 @@ function detectBuySetup(data: ReturnType<typeof addIndicators>): Signal[] {
 
 function detectBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
-  const { bars, ema21, avgRange, avgVol, green } = data;
+  const { bars, ema21, ema9, avgRange, avgVol, green, volType, sideways, body, range } = data;
 
   for (let i = 10; i < bars.length; i++) {
+    if (sideways[i]) continue;
+
     const lookback = bars.slice(i - 10, i);
     const rangeHigh = Math.max(...lookback.map(b => b.high));
     const rangeLow = Math.min(...lookback.map(b => b.low));
@@ -327,11 +415,25 @@ function detectBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
     if (!isConsolidation) continue;
 
     const curr = bars[i];
-    if (green[i] && curr.close > rangeHigh && curr.volume > avgVol[i] * 1.5 && curr.close > ema21[i]) {
-      signals.push({ index: i, direction: "LONG", pattern: "Breakout" });
+    const volSurge = curr.volume > avgVol[i] * 1.5;
+
+    if (green[i] && curr.close > rangeHigh && volSurge && curr.close > ema21[i] && ema9[i] > ema21[i]) {
+      const conf = [
+        volSurge,
+        volType[i] === "IGNITING",
+        body[i] > 0.6 * range[i],
+        curr.close > ema9[i],
+      ].filter(Boolean).length;
+      signals.push({ index: i, direction: "LONG", pattern: "Breakout", confluence: conf, volType: volType[i] });
     }
-    if (!green[i] && curr.close < rangeLow && curr.volume > avgVol[i] * 1.5 && curr.close < ema21[i]) {
-      signals.push({ index: i, direction: "SHORT", pattern: "Breakout" });
+    if (!green[i] && curr.close < rangeLow && volSurge && curr.close < ema21[i] && ema9[i] < ema21[i]) {
+      const conf = [
+        volSurge,
+        volType[i] === "IGNITING",
+        body[i] > 0.6 * range[i],
+        curr.close < ema9[i],
+      ].filter(Boolean).length;
+      signals.push({ index: i, direction: "SHORT", pattern: "Breakout", confluence: conf, volType: volType[i] });
     }
   }
   return signals;
@@ -339,7 +441,7 @@ function detectBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
 
 function detectClimaxReversal(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
-  const { bars, ema21, avgRange, avgVol, range, green } = data;
+  const { bars, ema21, avgRange, avgVol, range, green, bottomingTail, toppingTail, volType, body } = data;
 
   for (let i = 6; i < bars.length; i++) {
     const lookback = bars.slice(i - 5, i);
@@ -348,16 +450,29 @@ function detectClimaxReversal(data: ReturnType<typeof addIndicators>): Signal[] 
     const volumeSpike = bars[i - 1].volume > avgVol[i - 1] * 2;
     const distFromEma = Math.abs(bars[i - 1].close - ema21[i - 1]) / ema21[i - 1] > 0.02;
     const greenReversal = green[i] && bars[i].close > bars[i - 1].high;
+    const endingVol = volType[i - 1] === "ENDING";
 
     if (consecutiveDown && wideRangeBars && volumeSpike && distFromEma && greenReversal) {
-      signals.push({ index: i, direction: "LONG", pattern: "Climax Reversal" });
+      const conf = [
+        endingVol,
+        bottomingTail[i] || bottomingTail[i - 1],
+        body[i] > 0.5 * range[i],
+        bars[i].volume > avgVol[i],
+      ].filter(Boolean).length;
+      signals.push({ index: i, direction: "LONG", pattern: "Climax Reversal", confluence: conf, volType: volType[i - 1] });
     }
 
     const consecutiveUp = lookback.every(b => b.close > b.open);
     const redReversal = !green[i] && bars[i].close < bars[i - 1].low;
 
     if (consecutiveUp && wideRangeBars && volumeSpike && distFromEma && redReversal) {
-      signals.push({ index: i, direction: "SHORT", pattern: "Climax Reversal" });
+      const conf = [
+        endingVol,
+        toppingTail[i] || toppingTail[i - 1],
+        body[i] > 0.5 * range[i],
+        bars[i].volume > avgVol[i],
+      ].filter(Boolean).length;
+      signals.push({ index: i, direction: "SHORT", pattern: "Climax Reversal", confluence: conf, volType: volType[i - 1] });
     }
   }
   return signals;
@@ -420,6 +535,8 @@ function simulateTrades(data: ReturnType<typeof addIndicators>, signals: Signal[
       holdBars,
       pattern: sig.pattern,
       direction: sig.direction,
+      confluence: sig.confluence,
+      volType: sig.volType,
     });
   }
   return trades;

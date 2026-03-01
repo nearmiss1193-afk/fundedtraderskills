@@ -58,7 +58,7 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
   - **Configurable Risk:Reward**: Dropdown (1:1 through 1:5, default 1:2); TP = risk × R:R ratio; shown in stats panel
   - **Force Trading Mode**: Checkbox to override time window during development
   - **Moving Averages**: 9 EMA + 21 EMA + 200 SMA for trend confirmation and entry filtering
-  - **4 Core Patterns** (manual-approved only): 3 Bar Play (10-factor), Buy/Sell Setup (12-factor), Pivot Breakout (10-factor), Climax/Exhaustion Reversal (9-factor)
+  - **6 Core Patterns**: 3 Bar Play (10-factor), Buy/Sell Setup (12-factor), Pivot Breakout (10-factor), Climax/Exhaustion Reversal (9-factor), Cup & Handle (bullish continuation), Wedge Breakout (Rising Wedge bearish / Falling Wedge bullish)
   - **Granular Pattern Control**: 8 individual toggles for each pattern direction (3Bar Long, 3Bar Short, Buy Setup, Sell Setup, Breakout Long, Breakout Short, Climax Long, Climax Short)
   - **Strict Pre-Trade Checklist** (all 6 must pass before signal fires): HTF alignment (EMA9>EMA21 + price vs SMA200), volume >1.5× avg, MA confluence (near 9 or 21 EMA), R:R ≥ 1:2, no choppy market (bar ranges not all <50% avg), confluence ≥ 4
   - **Timeframe Control**: 6 individually toggleable timeframes (2min, 5min, 15min, 1hr, 4hr, Daily) persisted in settings
@@ -98,11 +98,16 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
   - **Optimize My Edge**: AI-generated recommendations (e.g. "Increase size on Buy Setup - 59% win rate")
   - **Pattern Library**: 8 cards covering all long + short patterns from the manual with entry/stop/target rules and confluence tips
   - **Filtered Analytics**: Edge Builder stats reflect only currently enabled patterns/timeframes from settings
-  - **Historical Backtester**: Test any of the 4 patterns against real Polygon historical data
+  - **Historical Backtester**: Test any of 6 patterns against real Polygon historical data
     - 16 symbols via ETF proxies (free Polygon tier): SPY→ES/MES, QQQ→NQ/MNQ, DIA→YM/MYM, IWM→RTY/M2K, USO→CL/MCL, GLD→GC/MGC, SLV→SI, TLT→ZB, IEF→ZN, CORN→ZC, SOYB→ZS, WEAT→ZW
+    - Patterns: 3bar, buysetup, breakout, climax, cuphandle, wedge, all
     - Configurable date range, R:R ratio (1:1.5 to 1:3), max hold bars (3-10)
     - Metrics: Win Rate, Profit Factor, Expectancy, Total P&L, Max Drawdown, Best/Worst Trade
-    - Shows last 50 trades with entry/SL/TP/exit/outcome
+    - Shows last 50 trades with entry/SL/TP/exit/outcome + **confluence score** + **volume type** per trade
+    - **Candlestick Analysis**: Bottoming tail (lower wick >50% range, small body, green) and topping tail detection as confluence boosters
+    - **Volume Type Classification**: Per-bar Igniting (vol>1.5× + range>1.5×), Ending (vol>2.5× + doji after 5 consecutive, exhaustion), Resting (vol<0.6× + narrow range)
+    - **Sideways Filter**: Rejects signals when EMA9 ≈ EMA21 (<0.2% divergence) — avoids choppy no-trend zones
+    - **Confluence Scoring**: Each signal scored 0-5 (volume surge, igniting vol type, candlestick tail, strong body, MA respect)
     - ATR-based stop loss and take profit calculation
     - Contract stitching available for Polygon futures subscription (falls back to ETF proxy)
   - API: GET `/api/journal/analytics?patterns=...&timeframes=...`
