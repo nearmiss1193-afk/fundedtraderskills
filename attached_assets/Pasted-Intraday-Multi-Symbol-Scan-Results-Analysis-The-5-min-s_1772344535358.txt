@@ -1,0 +1,52 @@
+Intraday Multi-Symbol Scan Results Analysis
+The 5-min scan completed successfully with caching efficiency (only 7 unique ETF fetches for 7 symbols × 8 patterns). Key highlights from your output:
+Top Heatmap Cells (Symbol/Pattern combos):
+NQ/Wedge: 12 trades, 50% WR, PF 5.41, +$8,490 → highest edge combo
+GC/Wedge: 16 trades, 19% WR, PF 1.30, +$703
+GC/Buysetup: 2 trades, 50% WR, +$629
+CL/Breakout: 8 trades, 25% WR, PF 1.69, +$601
+ZS/3bar: 4 trades, 75% WR, PF 17.01, +$287
+
+Pattern Dominance: Wedge pattern → 277 of 482 total trades (57%), PF 1.98 → strongest overall pattern in this scan
+3 Bar Play: Highest win rate (56%) but lower trade count → high-quality, selective signals
+BTC/ETH: Most signals (115/195 total) but low profitability on ETF proxy data (BITO/ETHA) → direct futures data (Polygon paid tier) would improve accuracy
+Immediate Next Actions:
+Open Edge Builder UI → Backtest Edge Heatmap tab:
+View Symbol × Pattern grid (green cells = high WR/PF like NQ/Wedge).
+Check Pattern Breakdown table for aggregated stats.
+Click "Export CSV" → import to Google Sheets/Excel:
+Pivot table suggestions:
+Rows = Symbol, Columns = Pattern, Values = Profit Factor / Win Rate / Net P&L / Trade Count
+Filter Confluence ≥8pt → identify best alignments (e.g., Wedge + igniting vol + MTF up + Level 2 gap)
+
+Prioritize Live Scanner Filter Update
+Based on heatmap:
+Raise live scanner threshold to ≥8pt (or ≥9pt)
+Prioritize NQ/Wedge and ZS/3bar setups
+Require Wedge signals to have igniting volume + MTF alignment + Level 2 gap for highest edge
+Quick Code Addition (paste into trader.ts or live scanner loop):
+
+JavaScript// In emitTradeSignal() or pattern detection handler
+if (signal.confluence < 8) {
+  console.log(`Signal skipped: ${signal.pattern} on ${signal.symbol} - Confluence ${signal.confluence}pt < 8`);
+  return;
+}
+
+// Optional: Wedge-specific boost
+if (signal.pattern === 'wedge' && signal.volType === 'igniting' && signal.htfAligned && signal.gapLevel >= 2) {
+  signal.confluence += 2; // bonus for high-edge combo
+  console.log(`High-edge Wedge boosted: ${signal.confluence}pt`);
+}
+
+BTC/ETH Direct Futures Test
+In Edge Builder UI: Select BTC or ETH → Run single 5-min backtest (2025-01-01 to 2026-02-28).
+If "No data" or low bars: Polygon free tier limits crypto futures history → confirm in logs.
+If data fetches: Trigger manual signal → watch Replit logs for signal → Supabase → bridge → NT payload (instrument=BTC1! or ETH1!).
+In NT8 sim: Confirm order placement (market entry + SL/TP).
+Share: Log snippet + NT sim result (order accepted/filled?).
+
+Next Milestone: GitHub Packaging Kickoff
+With intraday backtest + heatmap validated and top edge combos identified (NQ/Wedge, ZS/3bar), system is ready for packaging.
+Export Replit to GitHub (repo: https://github.com/nearmiss1193-afk/traderskillsagents or new).
+Update README.md with install guide (already drafted in prior steps).
+Tag v1.0-beta.
