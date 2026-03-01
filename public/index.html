@@ -1408,6 +1408,17 @@
             </div>
             <button class="bt-run-btn" id="bt-run-btn" onclick="runBacktestUI()" data-testid="button-run-backtest">Run Backtest</button>
             <button class="bt-run-btn" style="background:#6366f1;" id="bt-multi-btn" onclick="runMultiSymbolScan()" data-testid="button-multi-scan">Multi-Symbol Edge Scan</button>
+            <div style="margin-top:0.5rem;">
+              <label style="font-size:0.72rem;font-weight:600;color:#94a3b8;">Multi-Scan Timeframes (multi-scan only):</label>
+              <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.25rem;">
+                <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="1min" /><span class="check-dot"></span><span>1m</span></label>
+                <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="5min" checked /><span class="check-dot"></span><span>5m</span></label>
+                <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="15min" /><span class="check-dot"></span><span>15m</span></label>
+                <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="1hour" /><span class="check-dot"></span><span>1h</span></label>
+                <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="4hour" /><span class="check-dot"></span><span>4h</span></label>
+                <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="daily" /><span class="check-dot"></span><span>Daily</span></label>
+              </div>
+            </div>
             <button class="bt-run-btn" style="background:#059669;" id="bt-csv-btn" onclick="exportBacktestCSV()" data-testid="button-export-csv" disabled>Export CSV</button>
           </div>
           <div id="bt-results" data-testid="bt-results">
@@ -2506,7 +2517,6 @@
       const btn = document.getElementById('bt-multi-btn');
       const resultsDiv = document.getElementById('bt-results');
       const patternSel = document.getElementById('bt-pattern').value;
-      const timeframe = document.getElementById('bt-timeframe').value;
       const from = document.getElementById('bt-from').value;
       const to = document.getElementById('bt-to').value;
       const rrRatio = parseFloat(document.getElementById('bt-rr').value);
@@ -2516,15 +2526,20 @@
       const allPatterns = ["3bar","4bar","buysetup","retest","breakout","climax","cuphandle","inversecuphandle","doubletop","doublebottom","headshoulders","invheadshoulders","wedge"];
       const patterns = patternSel === 'all' ? allPatterns : [patternSel];
 
+      const multiTfChecks = document.querySelectorAll('input[name="multi-tf"]:checked');
+      const timeframes = Array.from(multiTfChecks).map(c => c.value);
+      if (timeframes.length === 0) timeframes.push(document.getElementById('bt-timeframe').value);
+      const tfLabel = timeframes.join(', ');
+
       btn.disabled = true;
       btn.textContent = 'Scanning...';
-      resultsDiv.innerHTML = '<div class="bt-status">Running multi-symbol edge scan (' + timeframe + ') across ' + symbols.length + ' symbols &times; ' + patterns.length + ' patterns... This may take a minute.</div>';
+      resultsDiv.innerHTML = '<div class="bt-status">Running multi-symbol edge scan (' + esc(tfLabel) + ') across ' + symbols.length + ' symbols &times; ' + patterns.length + ' patterns &times; ' + timeframes.length + ' timeframes... This may take a while.</div>';
 
       try {
         const resp = await fetch('/api/backtest/multi', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbols, patterns, from, to, rrRatio, maxHold, minConfluence, timeframe })
+          body: JSON.stringify({ symbols, patterns, from, to, rrRatio, maxHold, minConfluence, timeframes })
         });
         const d = await resp.json();
         if (!d.success) {

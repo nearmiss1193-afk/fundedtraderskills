@@ -449,7 +449,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/backtest/multi", async (req, res) => {
-    const { symbols, pattern, patterns, from, to, rrRatio, maxHold, minConfluence, startDate, endDate, timeframe } = req.body;
+    const { symbols, pattern, patterns, from, to, rrRatio, maxHold, minConfluence, startDate, endDate, timeframe, timeframes } = req.body;
     const symList: string[] = Array.isArray(symbols) ? symbols.slice(0, 25) : ["ES", "NQ", "CL", "GC", "ZS"];
     const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "headshoulders", "invheadshoulders", "wedge", "all"];
     const patternList: string[] = Array.isArray(patterns) ? patterns.filter((p: string) => validPatterns.includes(p)) : (pattern && validPatterns.includes(pattern) ? [pattern] : ["all"]);
@@ -459,7 +459,9 @@ export async function registerRoutes(
     const hold = Number(maxHold) || 5;
     const minConf = Number(minConfluence) || 0;
     const validTfList = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "1hour", "4hour", "week", "weekly"];
-    const tf = timeframe && validTfList.includes(timeframe) ? timeframe : "daily";
+    const tfList: string[] = Array.isArray(timeframes)
+      ? timeframes.filter((t: string) => validTfList.includes(t))
+      : (timeframe && validTfList.includes(timeframe) ? [timeframe] : ["daily"]);
 
     if (dateFrom && !/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
       return res.status(400).json({ success: false, error: "Invalid date format. Use YYYY-MM-DD." });
@@ -478,6 +480,7 @@ export async function registerRoutes(
       let symTrades = 0, symWins = 0, symLosses = 0, symPnl = 0, symPF = 0, symWR = 0;
       const symTradeList: any[] = [];
 
+      for (const tf of tfList) {
       for (const pat of patternList) {
         try {
           const r = await runBacktest({ symbol: symUpper, pattern: pat, from: dateFrom, to: dateTo, rrRatio: rr, maxHold: hold, minConfluence: minConf, timeframe: tf });
@@ -512,8 +515,9 @@ export async function registerRoutes(
             });
           }
         } catch (err: any) {
-          console.error(`[backtest/multi] ${symUpper}/${pat}: ${err.message}`);
+          console.error(`[backtest/multi] ${symUpper}/${pat}/${tf}: ${err.message}`);
         }
+      }
       }
 
       symWR = symTrades > 0 ? symWins / symTrades : 0;
