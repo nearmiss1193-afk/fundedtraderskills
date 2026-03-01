@@ -425,7 +425,7 @@ export async function registerRoutes(
     const validTimeframes = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "1hour", "4hour", "week", "weekly"];
     const tf = timeframe && validTimeframes.includes(timeframe) ? timeframe : "daily";
 
-    const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "wedge", "all"];
+    const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "headshoulders", "invheadshoulders", "wedge", "all"];
     if (pattern && !validPatterns.includes(pattern)) {
       return res.status(400).json({ success: false, error: `Invalid pattern: ${pattern}. Valid: ${validPatterns.join(", ")}` });
     }
@@ -451,7 +451,7 @@ export async function registerRoutes(
   app.post("/api/backtest/multi", async (req, res) => {
     const { symbols, pattern, patterns, from, to, rrRatio, maxHold, minConfluence, startDate, endDate, timeframe } = req.body;
     const symList: string[] = Array.isArray(symbols) ? symbols.slice(0, 25) : ["ES", "NQ", "CL", "GC", "ZS"];
-    const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "wedge", "all"];
+    const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "headshoulders", "invheadshoulders", "wedge", "all"];
     const patternList: string[] = Array.isArray(patterns) ? patterns.filter((p: string) => validPatterns.includes(p)) : (pattern && validPatterns.includes(pattern) ? [pattern] : ["all"]);
     const dateFrom = from || startDate || "2020-01-01";
     const dateTo = to || endDate || new Date().toISOString().slice(0, 10);

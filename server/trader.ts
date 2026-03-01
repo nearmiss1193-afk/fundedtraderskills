@@ -1426,6 +1426,118 @@ function detectDoubleTop(bars: Bar[], state: MarketState): { detected: boolean; 
   return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
 }
 
+function detectHeadAndShouldersShort(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 30) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const peaks = findLocalPeaks(highs, 3);
+
+  for (let pi = 2; pi < peaks.length; pi++) {
+    const ls = peaks[pi - 2];
+    const head = peaks[pi - 1];
+    const rs = peaks[pi];
+    if (head - ls < 6 || rs - head < 6 || rs - ls > 50) continue;
+    if (highs[head] <= highs[ls] || highs[head] <= highs[rs]) continue;
+    const shoulderDiff = Math.abs(highs[ls] - highs[rs]) / highs[head];
+    if (shoulderDiff > 0.08) continue;
+
+    const leftLow = Math.min(...lows.slice(ls, head + 1));
+    const rightLow = Math.min(...lows.slice(head, rs + 1));
+    const neckSlope = (rightLow - leftLow) / (rs - ls);
+    const neckAt = leftLow + neckSlope * (bars.length - 1 - ls);
+
+    const curr = bars[bars.length - 1];
+    if (curr.bullish || curr.close >= neckAt) continue;
+
+    const recentVol = recentAvgVolume(bars, 10);
+    const volSurge = curr.volume > recentVol * 1.5;
+    if (!volSurge) continue;
+
+    const belowEMA21 = curr.close < state.ema21;
+    const avgRange = getAvgRange(bars);
+    const headHeight = highs[head] - neckAt;
+
+    const factors = [
+      volSurge,
+      isIgnitingVolume(bars, state.avgVolume),
+      belowEMA21,
+      curr.close < state.ema9,
+      curr.close < state.sma200,
+      state.bias !== "UPTREND",
+      hasToppingTail(bars[bars.length - 2]) || hasToppingTail(curr),
+      isWideRangeBar(curr, avgRange),
+      isNearPivot(state.price, state.pivotHigh, state.price),
+      barFormationQuality(curr, "SHORT") >= 3,
+      headHeight / highs[head] >= 0.01,
+    ];
+    const conf = calcConfluence(factors);
+    const reasons: string[] = [`H&S breakdown (head height ${(headHeight / highs[head] * 100).toFixed(1)}%, neckline ${neckAt.toFixed(2)})`];
+    if (volSurge) reasons.push("vol surge on breakdown");
+    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+    if (belowEMA21) reasons.push("below 21 EMA");
+    if (isWideRangeBar(curr, avgRange)) reasons.push("wide range bar");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+  }
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+}
+
+function detectInverseHeadAndShouldersLong(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 30) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const troughs = findLocalTroughs(lows, 3);
+
+  for (let ti = 2; ti < troughs.length; ti++) {
+    const ls = troughs[ti - 2];
+    const head = troughs[ti - 1];
+    const rs = troughs[ti];
+    if (head - ls < 6 || rs - head < 6 || rs - ls > 50) continue;
+    if (lows[head] >= lows[ls] || lows[head] >= lows[rs]) continue;
+    const shoulderDiff = Math.abs(lows[ls] - lows[rs]) / lows[head];
+    if (shoulderDiff > 0.08) continue;
+
+    const leftHigh = Math.max(...highs.slice(ls, head + 1));
+    const rightHigh = Math.max(...highs.slice(head, rs + 1));
+    const neckSlope = (rightHigh - leftHigh) / (rs - ls);
+    const neckAt = leftHigh + neckSlope * (bars.length - 1 - ls);
+
+    const curr = bars[bars.length - 1];
+    if (!curr.bullish || curr.close <= neckAt) continue;
+
+    const recentVol = recentAvgVolume(bars, 10);
+    const volSurge = curr.volume > recentVol * 1.5;
+    if (!volSurge) continue;
+
+    const aboveEMA21 = curr.close > state.ema21;
+    const avgRange = getAvgRange(bars);
+    const headHeight = neckAt - lows[head];
+
+    const factors = [
+      volSurge,
+      isIgnitingVolume(bars, state.avgVolume),
+      aboveEMA21,
+      curr.close > state.ema9,
+      curr.close > state.sma200,
+      state.bias !== "DOWNTREND",
+      hasBottomingTail(bars[bars.length - 2]) || hasBottomingTail(curr),
+      isWideRangeBar(curr, avgRange),
+      isNearPivot(state.price, state.pivotLow, state.price),
+      barFormationQuality(curr, "LONG") >= 3,
+      headHeight / lows[head] >= 0.01,
+    ];
+    const conf = calcConfluence(factors);
+    const reasons: string[] = [`Inv H&S breakout (head height ${(headHeight / lows[head] * 100).toFixed(1)}%, neckline ${neckAt.toFixed(2)})`];
+    if (volSurge) reasons.push("vol surge on breakout");
+    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+    if (aboveEMA21) reasons.push("above 21 EMA");
+    if (isWideRangeBar(curr, avgRange)) reasons.push("wide range bar");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+  }
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+}
+
 function sentimentLabel(s: MarketState): string {
   if (s.sentiment === "BUYERS_CONTROL") return "GREED";
   if (s.sentiment === "SELLERS_CONTROL") return "FEAR";
@@ -1729,6 +1841,14 @@ async function simulateTick(session: TraderSession) {
         const r = detectDoubleTop(bars, state);
         if (r.detected) candidates.push({ pattern: "Double Top", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
       }
+      if (session.patterns.includes("headshoulders")) {
+        const r = detectHeadAndShouldersShort(bars, state);
+        if (r.detected) candidates.push({ pattern: "Head & Shoulders", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("invheadshoulders")) {
+        const r = detectInverseHeadAndShouldersLong(bars, state);
+        if (r.detected) candidates.push({ pattern: "Inverse H&S", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
 
       if (candidates.length > 0) {
         candidates.sort((a, b) => b.conf - a.conf);
@@ -1950,6 +2070,7 @@ export function startTrader(config: {
     "wedge_long": "Wedge Long", "wedge_short": "Wedge Short",
     "cuphandle_long": "Cup & Handle", "cuphandle_short": "Inverse Cup & Handle",
     "doublebottom": "Double Bottom", "doubletop": "Double Top",
+    "headshoulders": "Head & Shoulders", "invheadshoulders": "Inverse H&S",
   };
   const enabledNames = config.patterns.map(p => patternNames[p] || p).join(", ");
   const enabledTFs = config.timeframes.join(", ");

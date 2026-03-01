@@ -1232,6 +1232,82 @@ function detectDoubleTopBottom(data: ReturnType<typeof addIndicators>): Signal[]
   return signals;
 }
 
+function detectHeadAndShoulders(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema21, ema9, avgVol, green, volType, body, range, htfUp, htfDown, gapUp, gapDown, level2GapUp, level2GapDown, toppingTail, bottomingTail } = data;
+  const peakDist = 5;
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const peaks = findLocalPeaks(highs, peakDist);
+  const troughs = findLocalTroughs(lows, peakDist);
+
+  for (let pi = 2; pi < peaks.length; pi++) {
+    const ls = peaks[pi - 2];
+    const head = peaks[pi - 1];
+    const rs = peaks[pi];
+    if (head - ls < 8 || rs - head < 8 || rs - ls > 80) continue;
+    if (highs[head] <= highs[ls] || highs[head] <= highs[rs]) continue;
+    const shoulderDiff = Math.abs(highs[ls] - highs[rs]) / highs[head];
+    if (shoulderDiff > 0.08) continue;
+
+    const leftLow = Math.min(...lows.slice(ls, head + 1));
+    const rightLow = Math.min(...lows.slice(head, rs + 1));
+    const neckSlope = (rightLow - leftLow) / (rs - ls);
+
+    const breakEnd = Math.min(rs + Math.floor((rs - ls) * 0.3), bars.length - 1);
+    for (let h = rs + 1; h <= breakEnd; h++) {
+      const neckAt = leftLow + neckSlope * (h - ls);
+      if (!green[h] && bars[h].close < neckAt && bars[h].volume > 1.5 * avgVol[h] && bars[h].close < ema21[h]) {
+        const conf = [
+          bars[h].volume > 1.5 * avgVol[h],
+          volType[h] === "IGNITING",
+          body[h] > 0.5 * range[h],
+          htfDown[h],
+          gapDown[h],
+          level2GapDown[h],
+          toppingTail[h] || (h > 0 && toppingTail[h - 1]),
+        ].filter(Boolean).length;
+        signals.push({ index: h, direction: "SHORT", pattern: "Head & Shoulders", confluence: conf, volType: volType[h] });
+        break;
+      }
+    }
+  }
+
+  for (let ti = 2; ti < troughs.length; ti++) {
+    const ls = troughs[ti - 2];
+    const head = troughs[ti - 1];
+    const rs = troughs[ti];
+    if (head - ls < 8 || rs - head < 8 || rs - ls > 80) continue;
+    if (lows[head] >= lows[ls] || lows[head] >= lows[rs]) continue;
+    const shoulderDiff = Math.abs(lows[ls] - lows[rs]) / lows[head];
+    if (shoulderDiff > 0.08) continue;
+
+    const leftHigh = Math.max(...highs.slice(ls, head + 1));
+    const rightHigh = Math.max(...highs.slice(head, rs + 1));
+    const neckSlope = (rightHigh - leftHigh) / (rs - ls);
+
+    const breakEnd = Math.min(rs + Math.floor((rs - ls) * 0.3), bars.length - 1);
+    for (let h = rs + 1; h <= breakEnd; h++) {
+      const neckAt = leftHigh + neckSlope * (h - ls);
+      if (green[h] && bars[h].close > neckAt && bars[h].volume > 1.5 * avgVol[h] && bars[h].close > ema21[h]) {
+        const conf = [
+          bars[h].volume > 1.5 * avgVol[h],
+          volType[h] === "IGNITING",
+          body[h] > 0.5 * range[h],
+          htfUp[h],
+          gapUp[h],
+          level2GapUp[h],
+          bottomingTail[h] || (h > 0 && bottomingTail[h - 1]),
+        ].filter(Boolean).length;
+        signals.push({ index: h, direction: "LONG", pattern: "Inverse Head & Shoulders", confluence: conf, volType: volType[h] });
+        break;
+      }
+    }
+  }
+
+  return signals;
+}
+
 function detectWedgeBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
   const { bars, ema21, ema9, avgVol, avgRange, green, volType, body, range, htfUp, htfDown, gapUp, gapDown, level2GapUp, level2GapDown, toppingTail, bottomingTail } = data;
@@ -1318,6 +1394,8 @@ const PATTERN_DETECTORS: Record<string, (data: ReturnType<typeof addIndicators>)
   "inversecuphandle": detectInverseCupAndHandle,
   "doubletop": (data) => detectDoubleTopBottom(data).filter(s => s.direction === "SHORT"),
   "doublebottom": (data) => detectDoubleTopBottom(data).filter(s => s.direction === "LONG"),
+  "headshoulders": (data) => detectHeadAndShoulders(data).filter(s => s.direction === "SHORT"),
+  "invheadshoulders": (data) => detectHeadAndShoulders(data).filter(s => s.direction === "LONG"),
   "wedge": detectWedgeBreakout,
   "all": (data) => [
     ...detect3BarPlay(data),
@@ -1329,6 +1407,7 @@ const PATTERN_DETECTORS: Record<string, (data: ReturnType<typeof addIndicators>)
     ...detectCupAndHandle(data),
     ...detectInverseCupAndHandle(data),
     ...detectDoubleTopBottom(data),
+    ...detectHeadAndShoulders(data),
     ...detectWedgeBreakout(data),
   ],
 };
