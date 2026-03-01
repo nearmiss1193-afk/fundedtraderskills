@@ -1971,21 +1971,26 @@ async function simulateTick(session: TraderSession) {
       }
 
       if (detectedPattern && confluence > 0) {
-        const edgeBoostCombos: Record<string, string[]> = {
-          "NQ": ["Wedge Breakout"],
-          "MNQ": ["Wedge Breakout"],
-          "SI": ["Buy Setup", "Sell Setup", "Pivot Breakout", "3 Bar Play"],
-          "ZS": ["3 Bar Play"],
-          "ZW": ["3 Bar Play"],
-          "CL": ["Wedge Breakout"],
-          "MCL": ["Wedge Breakout"],
+        const edgeBoostCombos: Record<string, { patterns: string[]; boost: number }> = {
+          "NQ":  { patterns: ["Double Top"], boost: 2 },
+          "MNQ": { patterns: ["Double Top"], boost: 2 },
+          "SI":  { patterns: ["Inverse H&S", "Double Top", "Buy Setup", "Sell Setup", "Pivot Breakout", "3 Bar Play"], boost: 2 },
+          "RTY": { patterns: ["Head & Shoulders", "Double Top"], boost: 2 },
+          "M2K": { patterns: ["Head & Shoulders", "Double Top"], boost: 2 },
+          "CL":  { patterns: ["Double Bottom", "Inverse H&S"], boost: 1 },
+          "MCL": { patterns: ["Double Bottom", "Inverse H&S"], boost: 1 },
+          "HG":  { patterns: ["Buy Setup", "Cup & Handle"], boost: 1 },
+          "ES":  { patterns: ["Double Top"], boost: 1 },
+          "MES": { patterns: ["Double Top"], boost: 1 },
+          "YM":  { patterns: ["Double Top"], boost: 1 },
+          "MYM": { patterns: ["Double Top"], boost: 1 },
+          "ZC":  { patterns: ["Head & Shoulders"], boost: 1 },
         };
-        const boostPatterns = edgeBoostCombos[mk];
-        if (boostPatterns && boostPatterns.includes(detectedPattern)) {
-          const boost = (mk === "NQ" || mk === "MNQ" || mk === "SI") ? 2 : 1;
-          confluence += boost;
-          confluenceLabel = `${confluenceLabel} [EDGE+${boost}]`;
-          console.log(`[trader] Edge boost: ${mk}/${detectedPattern} +${boost}pt → ${confluence}pt`);
+        const boostEntry = edgeBoostCombos[mk];
+        if (boostEntry && boostEntry.patterns.includes(detectedPattern)) {
+          confluence += boostEntry.boost;
+          confluenceLabel = `${confluenceLabel} [EDGE+${boostEntry.boost}]`;
+          console.log(`[trader] Edge boost: ${mk}/${detectedPattern} +${boostEntry.boost}pt → ${confluence}pt`);
         }
       }
 

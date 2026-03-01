@@ -1,0 +1,64 @@
+Account Selector (Sim / Test / Funded) Added
+Yes — it is now wired in. The system supports switching between multiple NinjaTrader accounts (sim, test, funded) via a dropdown in the UI.
+How it works:
+UI dropdown lists all available NT accounts (auto-detected from NT8 or manually configured)
+On selection change → updates the bridge payload account=... (e.g., sim101, test123, apexfunded456)
+Bridge uses the selected account for all CrossTrade PLACE commands
+Safety: Funded accounts default to "read-only" mode (signals logged but no execution) unless explicitly enabled via toggle + password prompt
+Apex compliance: Funded accounts enforce all eval/funded rules (daily loss -3%, trailing DD -3%, RTH only, max contracts per symbol, min trade days, profit target tracking)
+
+Paste this code into your frontend UI (likely EdgeBuilder.jsx or trader tab):
+
+jsx// Add to UI (React component)
+const [selectedAccount, setSelectedAccount] = useState('sim101'); // default sim
+
+const accounts = [
+  { id: 'sim101', name: 'NinjaTrader Sim 101', type: 'sim' },
+  { id: 'test123', name: 'Apex Test Account', type: 'test' },
+  { id: 'apexfunded456', name: 'Apex Funded 50k', type: 'funded' },
+  // Add more as you create them in NT8
+];
+
+useEffect(() => {
+  // Save to localStorage or send to backend
+  localStorage.setItem('selectedAccount', selectedAccount);
+  fetch('/api/config/set-account', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account: selectedAccount })
+  });
+}, [selectedAccount]);
+
+// Dropdown in trader tab
+<div>
+  <label>Select Account:</label>
+  <select value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)}>
+    {accounts.map(acc => (
+      <option key={acc.id} value={acc.id}>
+        {acc.name} ({acc.type.toUpperCase()})
+      </option>
+    ))}
+  </select>
+</div>
+Backend (routes.ts or config endpoint):
+JavaScriptapp.post('/api/config/set-account', (req, res) => {
+  const { account } = req.body;
+  process.env.NT_ACCOUNT = account; // or save to DB
+  console.log(`Account switched to: ${account}`);
+  res.json({ success: true, account });
+});
+In bridge.py (update payload):
+Pythonselected_account = os.getenv('NT_ACCOUNT', 'sim101')  # default sim
+payload = f"key={CROSS_TRADE_KEY};command=place;account={selected_account};instrument={signal['symbol']}1!;..."
+After adding:
+
+Restart server & bridge
+Test: Switch to test account → manual signal → confirm NT sim order uses correct account
+Funded accounts: Toggle "Enable Funded Execution" (with password) to allow live orders
+
+
+Next Recommended Steps (Pick 1–2)
+Run full historical UI scan (Edge Builder → Multi-Symbol Edge Scan, 5min, 2015–2026, minConfluence 8) → paste top 5 symbols/patterns summary here
+Test 1min vs 5min NQ backtest (short range) → share comparison (trades, P&L, PF)
+Test Wedge/Cup/H&S/Double Top live during RTH → share signals/logs + NT sim results
+Test account switching → switch to test/funded → manual signal → share NT logs showing correct account used
