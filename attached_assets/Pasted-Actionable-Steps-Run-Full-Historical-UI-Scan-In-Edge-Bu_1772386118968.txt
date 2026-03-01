@@ -1,0 +1,81 @@
+Actionable Steps
+
+Run Full Historical UI Scan
+In Edge Builder tab:
+Click "Multi-Symbol Edge Scan"
+Settings: Timeframe: 5min, Patterns: All, Date range: 2015-01-01 to 2026-02-28, Min Confluence: 8
+Start scan → let it complete (20–40 min)
+After: Go to Backtest Edge Heatmap tab → copy top 5 symbol/pattern combos (Symbol, Pattern, Trades, Win %, PF, P&L) → paste here
+
+Share Wedge RTH Live Logs/NT Results
+During next RTH: Run scanner on NQ/SI/ZS/GC/CL → monitor console for Wedge signals
+If fired: Check Supabase & NT sim
+Share: 3–5 log lines + NT result
+
+Test 1min Timeframe & Compare to 5min
+Add 1min to dropdown (code in prior response) → run NQ backtest on 1min (short range, minConfluence 9) vs 5min same range
+Share: Trades, top pattern, P&L, PF comparison
+
+Add Cup and Handle Pattern
+Paste this into patterns.ts or trader.ts:
+
+JavaScriptfunction detectCupAndHandle(bars, symbol, timeframe) {
+  if (bars.length < 40) return null;
+
+  const recent = bars.slice(-80);
+  const cupSection = recent.slice(0, -15);
+  const handleSection = recent.slice(-15);
+
+  const cupLows = cupSection.map(b => b.low);
+  const cupHighs = cupSection.map(b => b.high);
+  const cupDepth = Math.max(...cupHighs) - Math.min(...cupLows);
+
+  const midLow = Math.min(...cupLows.slice(10, -10));
+  const leftLow = Math.min(...cupLows.slice(0, 10));
+  const rightLow = Math.min(...cupLows.slice(-10));
+  const isRounded = midLow < leftLow && midLow < rightLow && cupDepth > 0.02 * recent[recent.length - 1].close;
+
+  const handleHigh = Math.max(...handleSection.map(b => b.high));
+  const handleLow = Math.min(...handleSection.map(b => b.low));
+  const handleDepth = handleHigh - handleLow;
+  const isHandleShallow = handleDepth < cupDepth * 0.4;
+
+  const lastBar = recent[recent.length - 1];
+  const breakout = lastBar.close > handleHigh && lastBar.volume > 1.5 * averageVolume(recent.slice(-10));
+
+  if (!isRounded || !isHandleShallow || !breakout) return null;
+
+  const confluence = calculateConfluence({
+    volSurge: true,
+    volType: getVolumeType(lastBar, recent),
+    tailPresent: hasTail(lastBar),
+    strongBody: isStrongBody(lastBar),
+    maRespect: lastBar.close > ema(recent.map(b => b.close), 21)[recent.length - 1],
+    htfAligned: isHTFAligned(symbol, 'long'),
+    gapLevel: detectGapLevel(recent),
+    wBottomTop: detectWBottomTop(recent, 'long')
+  });
+
+  if (confluence < 8) return null;
+
+  const entry = lastBar.close;
+  const stop = handleLow;
+  const target = entry + cupDepth;
+
+  return {
+    pattern: 'cuphandle',
+    direction: 'long',
+    entry,
+    stop,
+    target,
+    confluence,
+    volType: getVolumeType(lastBar, recent),
+    timestamp: lastBar.timestamp,
+    notes: `Cup depth: ${cupDepth.toFixed(2)}, Handle: ${(handleDepth/cupDepth*100).toFixed(1)}%`
+  };
+}
+
+// Add to detection loop
+const cupSignal = detectCupAndHandle(currentBars, symbol, timeframe);
+if (cupSignal) emitTradeSignal(cupSignal);
+Test single-symbol backtest on NQ/ES 5min → share if Cup signals appeared.
