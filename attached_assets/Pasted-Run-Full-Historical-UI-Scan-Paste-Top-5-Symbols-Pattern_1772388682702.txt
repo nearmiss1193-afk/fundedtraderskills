@@ -1,0 +1,53 @@
+Run Full Historical UI Scan & Paste Top 5 Symbols/Patterns Summary
+This is the most important next step — it gives the long-term historical edge across all symbols, patterns, and timeframes.How to run it (copy-paste ready):
+Open Edge Builder tab in your UI
+Click Multi-Symbol Edge Scan button
+Set exactly:
+Timeframe: 5min (best for pattern reliability)
+Patterns: All (ensure all 13+ are selected)
+Date range: 2023-01-01 to 2026-02-28 (or max Polygon allows)
+Min Confluence: 8 (matches live scanner filter)
+Symbols: All (or at least include NQ, SI, ZS, GC, CL, ES, BTC, ETH if limited)
+
+Click Start → let it run to completion ( UI has no timeout)
+When finished:
+Go to Backtest Edge Heatmap tab
+Copy the top 5 symbol/pattern combos from the grid or pattern breakdown table
+Include columns: Symbol, Pattern, Trades, Win %, Profit Factor, Net P&L
+Paste them in your next message (also export CSV if you want deeper analysis later)
+
+Why this is critical:
+It reveals which combos (e.g., NQ/Wedge, SI/Double Top, ZS/3bar) are most consistent over 10+ years
+Helps prioritize live scanner filters (e.g., boost top 3 combos +2pt)
+Validates current ≥8pt threshold (compare WR/PF at 7 vs 8 vs 9)
+
+Share 1min vs 5min NQ Backtest Comparison
+After adding 1min to dropdown (if not already):
+In Edge Builder:
+Symbol: NQ
+Timeframe: 1min, Date: 2025-01-01 to 2025-01-15 (short to avoid 50k bar limit), Min Confluence: 9
+Run backtest → note trades, top pattern, P&L, PF
+Switch to 5min (same range/settings) → run again
+
+Share:
+1min: total trades, top pattern(s), net P&L, PF
+5min: total trades, top pattern(s), net P&L, PF
+Quick note (e.g., "1min ~8× more trades, lower PF due to noise")
+
+
+Share Live RTH Logs/NT Results for Wedge/Cup/H&S/Double Top
+During next RTH session (9:30–16:00 ET):
+Start live scanner on: NQ, SI, ZS, GC, CL
+Monitor Replit console for signals (look for Wedge, Cup & Handle, H&S, Double Top/Bottom)
+If any fire:
+Check Supabase trade_signals table (confluence, pattern, volType, notes)
+Verify NT sim account → Orders tab (instrument=NQ1! etc., SL/TP placed?)
+
+Share:
+3–5 console log lines (especially high-confluence or convergence examples)
+NT sim result (order placed? filled? rejected? screenshot/log snippet)
+
+
+Test Apex Rules in Backtest
+Run a long-range backtest (e.g., ES 5min, full 2025) → check server logs for Apex rule blocks (e.g., daily loss limit, RTH violation, size cap)
+Share: Any rule triggers? Apex Eval Status (daily P&L, trailing DD, trade days, profit target progress)
