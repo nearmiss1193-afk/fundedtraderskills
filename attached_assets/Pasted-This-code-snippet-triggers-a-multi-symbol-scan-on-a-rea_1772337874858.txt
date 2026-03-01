@@ -1,0 +1,72 @@
+This code snippet triggers a multi-symbol scan on a realistic set of Apex-supported futures (focus on high-liquidity first; add ags/crypto if Polygon data allows). Paste into a new file (e.g., multi-scan.js) or run via console after npm start.
+
+JavaScript// multi-scan.js - Run this in Replit console or as temp endpoint test
+const axios = require('axios');
+
+const BASE_URL = 'http://localhost:3000'; // or your Replit URL
+const symbols = [
+  'ES', 'MES', 'NQ', 'MNQ', 'YM', 'MYM', 'RTY', 'M2K', 
+  'CL', 'MCL', 'GC', 'MGC', 'BTC', 'ETH', 'ZS'  // Soybeans; add ZC, ZW if desired
+];
+
+const params = {
+  timeframe: '5min',          // test 5min, 15min, 60min separately
+  startDate: '2020-01-01',
+  endDate: '2026-02-28',
+  patterns: ['3bar', '4bar', 'buysetup', 'retest', 'breakout', 'climax'], // exclude cuphandle/wedge for speed
+  minConfluence: 7,           // start at 7pt; rerun with 8/9 later
+  riskPerTrade: 1             // contracts or $; adjust for micros
+};
+
+async function runMultiScan() {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/backtest/multi`, {
+      symbols,
+      ...params
+    });
+
+    console.log('Multi-Symbol Edge Scan Results:');
+    console.log('Total Symbols Scanned:', response.data.summary.symbolsScanned);
+    console.log('Total Trades:', response.data.summary.totalTrades);
+    console.log('Overall Profit Factor:', response.data.summary.profitFactor);
+    console.log('Overall Win Rate:', (response.data.summary.winRate * 100).toFixed(2) + '%');
+    console.log('Net P&L:', response.data.summary.netPnL.toFixed(2));
+
+    // Top 5 by P&L
+    console.log('\nTop Symbols by P&L:');
+    response.data.results
+      .sort((a, b) => b.totalPnL - a.totalPnL)
+      .slice(0, 5)
+      .forEach(r => {
+        console.log(`${r.symbol}: ${r.totalPnL.toFixed(2)} | Win%: ${(r.winRate * 100).toFixed(1)} | PF: ${r.profitFactor.toFixed(2)} | Trades: ${r.tradeCount}`);
+      });
+
+    // Save to CSV (already handled by UI button, but log path)
+    console.log('\nFull results available in Edge Builder UI → Export CSV');
+
+  } catch (err) {
+    console.error('Multi-scan failed:', err.message);
+  }
+}
+
+runMultiScan();
+
+Instructions:
+Paste and run in Replit console (after server running)
+Or add as temp route in routes.ts → test via Postman
+After run: open Edge Builder UI → click "Export CSV" → analyze in Google Sheets/Excel
+Repeat for different timeframes (change timeframe: '15min', '60min') and confluence thresholds (8, 9)
+
+
+
+Analyze Results (Manual Steps After Run)
+Most Profitable Symbols: Sort CSV by totalPnL or profitFactor — expect ES/NQ/CL top due to liquidity/volatility; micros (MES/MNQ/MCL) lower absolute P&L but similar % edge.
+Best Timeframes: Compare runs — 5-min usually highest trade count + edge for Live Traders patterns; 15-min balances noise; daily lowest frequency.
+Top Patterns: Pivot table on Pattern column → expect 4 Bar Play + Retest (W-Bottom) strong with high confluence.
+Confluence Alignment: Filter ≥9pt rows → calculate win rate/PF → strong correlation expected with igniting vol + MTF + Level 2 gap + tail.
+Factors: Group by VolType, htfAligned, gapLevel → igniting + htfUp + Level 2 gap often highest expectancy.
+
+Next Enhancements (After Results)
+Add dashboard tab: "Edge Heatmap" (symbol × timeframe × pattern) with color-coded PF/win rate.
+Auto-rank & save top setups to Supabase (e.g., daily cron job).
+Live scanner: prioritize ≥8pt on top-performing symbols/timeframes from backtest.

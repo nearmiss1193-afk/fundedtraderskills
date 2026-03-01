@@ -1346,6 +1346,18 @@
                 <option value="10">10 bars</option>
               </select>
             </div>
+            <div class="bt-field">
+              <label for="bt-minconf">Min Conf</label>
+              <select id="bt-minconf" data-testid="select-bt-minconf">
+                <option value="0" selected>Any</option>
+                <option value="4">4+ pt</option>
+                <option value="5">5+ pt</option>
+                <option value="6">6+ pt</option>
+                <option value="7">7+ pt</option>
+                <option value="8">8+ pt</option>
+                <option value="9">9+ pt</option>
+              </select>
+            </div>
             <button class="bt-run-btn" id="bt-run-btn" onclick="runBacktestUI()" data-testid="button-run-backtest">Run Backtest</button>
             <button class="bt-run-btn" style="background:#6366f1;" id="bt-multi-btn" onclick="runMultiSymbolScan()" data-testid="button-multi-scan">Multi-Symbol Edge Scan</button>
             <button class="bt-run-btn" style="background:#059669;" id="bt-csv-btn" onclick="exportBacktestCSV()" data-testid="button-export-csv" disabled>Export CSV</button>
@@ -2271,6 +2283,7 @@
       const to = document.getElementById('bt-to').value;
       const rrRatio = parseFloat(document.getElementById('bt-rr').value);
       const maxHold = parseInt(document.getElementById('bt-hold').value);
+      const minConfluence = parseInt(document.getElementById('bt-minconf').value) || 0;
 
       btn.disabled = true;
       btn.textContent = 'Running...';
@@ -2280,7 +2293,7 @@
         const resp = await fetch('/api/backtest/pattern', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol, pattern, from, to, rrRatio, maxHold })
+          body: JSON.stringify({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence })
         });
         const d = await resp.json();
 
@@ -2363,6 +2376,7 @@
       const to = document.getElementById('bt-to').value;
       const rrRatio = parseFloat(document.getElementById('bt-rr').value);
       const maxHold = parseInt(document.getElementById('bt-hold').value);
+      const minConfluence = parseInt(document.getElementById('bt-minconf').value) || 0;
       const symbols = ["ES","MES","NQ","MNQ","YM","MYM","RTY","M2K","CL","MCL","GC","MGC","SI","HG","BTC","ETH","ZB","ZN","ZC","ZS","ZW"];
 
       btn.disabled = true;
@@ -2373,7 +2387,7 @@
         const resp = await fetch('/api/backtest/multi', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbols, pattern, from, to, rrRatio, maxHold })
+          body: JSON.stringify({ symbols, pattern, from, to, rrRatio, maxHold, minConfluence })
         });
         const d = await resp.json();
         if (!d.success) {
@@ -2382,33 +2396,43 @@
         }
 
         let allTrades = [];
+        const s = d.summary || {};
         let html = '<div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;color:#e2e8f0;">Multi-Symbol Edge Report (' + esc(pattern) + ')</div>';
-        html += '<div class="bt-trades-wrap"><table class="bt-trades-table"><thead><tr><th>Symbol</th><th>Trades</th><th>Win Rate</th><th>PF</th><th>Total P&L</th><th>Expectancy</th><th>Max DD</th><th>Best</th><th>Worst</th></tr></thead><tbody>';
+        html += '<div class="bt-metrics" style="margin-bottom:0.8rem;">'
+          + '<div class="bt-metric"><div class="bt-label">Symbols</div><div class="bt-val">' + (s.symbolsScanned || '?') + '</div></div>'
+          + '<div class="bt-metric"><div class="bt-label">Total Trades</div><div class="bt-val">' + (s.totalTrades || 0) + '</div></div>'
+          + '<div class="bt-metric"><div class="bt-label">Win Rate</div><div class="bt-val ' + ((s.winRate||0) >= 50 ? 'pos' : 'neg') + '">' + (s.winRate || 0) + '%</div></div>'
+          + '<div class="bt-metric"><div class="bt-label">Profit Factor</div><div class="bt-val ' + ((s.profitFactor||0) >= 1.5 ? 'pos' : (s.profitFactor||0) < 1 ? 'neg' : '') + '">' + ((s.profitFactor||0) >= 99 ? '\u221E' : (s.profitFactor || 0)) + '</div></div>'
+          + '<div class="bt-metric"><div class="bt-label">Net P&L</div><div class="bt-val ' + ((s.netPnL||0) >= 0 ? 'pos' : 'neg') + '">' + ((s.netPnL||0) >= 0 ? '+' : '') + '$' + (s.netPnL || 0).toLocaleString() + '</div></div>'
+          + '<div class="bt-metric"><div class="bt-label">Min Conf</div><div class="bt-val">' + (s.minConfluence || 0) + 'pt</div></div>'
+          + '</div>';
 
-        const entries = Object.entries(d.results).sort((a, b) => (b[1].totalPnlDollars || 0) - (a[1].totalPnlDollars || 0));
-        for (const [sym, r] of entries) {
-          if (!r.success && r.error) {
-            html += '<tr><td>' + esc(sym) + '</td><td colspan="8" style="color:#ef4444">' + esc(r.error) + '</td></tr>';
+        html += '<div class="bt-trades-wrap"><table class="bt-trades-table"><thead><tr><th>Symbol</th><th>Trades</th><th>Win Rate</th><th>PF</th><th>Total P&L</th><th>Expectancy</th></tr></thead><tbody>';
+
+        const resultsList = Array.isArray(d.results) ? d.results : Object.entries(d.results).map(([k,v]) => ({symbol:k,...v}));
+        resultsList.sort((a, b) => (b.totalPnlDollars || b.totalPnL || 0) - (a.totalPnlDollars || a.totalPnL || 0));
+        for (const r of resultsList) {
+          const sym = r.symbol || '?';
+          const trades = r.tradeCount || r.totalTrades || 0;
+          const wr = r.winRate || 0;
+          const pf = r.profitFactor || 0;
+          const pnl = r.totalPnlDollars || r.totalPnL || 0;
+          const exp = r.expectancy || 0;
+          if (trades === 0) {
+            html += '<tr><td>' + esc(sym) + '</td><td>0</td><td colspan="4" style="color:#6b7280">No signals</td></tr>';
             continue;
           }
-          if (r.totalTrades === 0) {
-            html += '<tr><td>' + esc(sym) + '</td><td>0</td><td colspan="7" style="color:#6b7280">No signals</td></tr>';
-            continue;
-          }
-          const wrCls = r.winRate >= 50 ? 'pos' : 'neg';
-          const pfCls = r.profitFactor >= 1.5 ? 'pos' : r.profitFactor < 1 ? 'neg' : '';
-          const pnlCls = (r.totalPnlDollars || 0) >= 0 ? 'pos' : 'neg';
-          const pnlSign = (r.totalPnlDollars || 0) >= 0 ? '+' : '';
+          const wrCls = wr >= 50 ? 'pos' : 'neg';
+          const pfCls = pf >= 1.5 ? 'pos' : pf < 1 ? 'neg' : '';
+          const pnlCls = pnl >= 0 ? 'pos' : 'neg';
+          const pnlSign = pnl >= 0 ? '+' : '';
           html += '<tr>'
             + '<td style="font-weight:600">' + esc(sym) + '</td>'
-            + '<td>' + r.totalTrades + '</td>'
-            + '<td class="' + wrCls + '">' + r.winRate + '%</td>'
-            + '<td class="' + pfCls + '">' + (r.profitFactor >= 99 ? '\u221E' : r.profitFactor) + '</td>'
-            + '<td class="' + pnlCls + '">' + pnlSign + '$' + (r.totalPnlDollars || 0).toLocaleString() + '</td>'
-            + '<td>' + (r.expectancy >= 0 ? '+' : '') + '$' + (r.expectancy || 0).toFixed(2) + '</td>'
-            + '<td class="neg">' + (r.maxDrawdownPct || 0) + '%</td>'
-            + '<td class="pos">+$' + (r.bestTrade || 0).toLocaleString() + '</td>'
-            + '<td class="neg">$' + (r.worstTrade || 0).toLocaleString() + '</td>'
+            + '<td>' + trades + '</td>'
+            + '<td class="' + wrCls + '">' + wr + '%</td>'
+            + '<td class="' + pfCls + '">' + (pf >= 99 ? '\u221E' : pf) + '</td>'
+            + '<td class="' + pnlCls + '">' + pnlSign + '$' + pnl.toLocaleString() + '</td>'
+            + '<td>' + (exp >= 0 ? '+' : '') + '$' + exp.toFixed(2) + '</td>'
             + '</tr>';
           if (r.trades) {
             for (const t of r.trades) {

@@ -61,7 +61,7 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
 *   **Modularity:** Code is organized into distinct files for routes, trader logic, Supabase interaction, backtesting, journaling, and external API integrations.
 *   **Data Persistence:** Uses JSON files (`data/trade_journal.json`, `data/trader_settings.json`) for local data persistence.
 *   **Asynchronous Processing:** The AI Futures Trader operates as an asynchronous loop.
-*   **External Bridge (Local):** Employs a Python bridge for communication with NinjaTrader via TCP, enabling real-time order execution and acknowledgment.
+*   **Supabase Signal Queue:** Signals are inserted directly into the Supabase `trade_signals` table (status="NEW", source="replit", client_tag="v1"). ACK polling via `trade_acks` table returns accepted/rejected/pending status.
 
 ## External Dependencies
 
@@ -69,5 +69,5 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
 *   **Supabase:** Used as a message queue for trade signals and acknowledgments (`trade_signals` and `trade_acks` tables).
 *   **Tradovate API:** For paper trading and order execution with bracket orders (entry, stop loss, take profit).
 *   **CrossTrade Webhook:** Used to forward orders to NinjaTrader.
-*   **NinjaTrader 8 AddOn:** A custom C# AddOn (`SovereignBridgeAddon.cs`) to listen for trade signals from the local Python bridge and execute simulated orders.
-*   **Python (local-bridge/bridge.py):** A local script that polls Supabase and communicates with NinjaTrader via TCP.
+*   **NinjaTrader 8 AddOn:** A custom C# AddOn polls Supabase `trade_signals` for NEW signals and executes orders, writing ACKs back to `trade_acks`.
+*   **Python (local-bridge/bridge.py):** Optional local bridge that polls Supabase and forwards signals to NinjaTrader via TCP.

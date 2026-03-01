@@ -421,7 +421,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/backtest/pattern", async (req, res) => {
-    const { symbol, pattern, from, to, rrRatio, maxHold } = req.body;
+    const { symbol, pattern, from, to, rrRatio, maxHold, minConfluence } = req.body;
 
     const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "wedge", "all"];
     if (pattern && !validPatterns.includes(pattern)) {
@@ -435,7 +435,7 @@ export async function registerRoutes(
     }
 
     try {
-      const result = await runBacktest({ symbol, pattern, from, to, rrRatio, maxHold });
+      const result = await runBacktest({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence: Number(minConfluence) || 0 });
       if (result.error) {
         return res.status(400).json({ success: false, error: result.error });
       }
@@ -447,29 +447,92 @@ export async function registerRoutes(
   });
 
   app.post("/api/backtest/multi", async (req, res) => {
-    const { symbols, pattern, from, to, rrRatio, maxHold } = req.body;
+    const { symbols, pattern, patterns, from, to, rrRatio, maxHold, minConfluence, startDate, endDate } = req.body;
     const symList: string[] = Array.isArray(symbols) ? symbols.slice(0, 25) : ["ES", "NQ", "CL", "GC", "ZS"];
     const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "wedge", "all"];
-    if (pattern && !validPatterns.includes(pattern)) {
-      return res.status(400).json({ success: false, error: `Invalid pattern: ${pattern}` });
+    const patternList: string[] = Array.isArray(patterns) ? patterns.filter((p: string) => validPatterns.includes(p)) : (pattern && validPatterns.includes(pattern) ? [pattern] : ["all"]);
+    const dateFrom = from || startDate || "2020-01-01";
+    const dateTo = to || endDate || new Date().toISOString().slice(0, 10);
+    const rr = Number(rrRatio) || 2;
+    const hold = Number(maxHold) || 5;
+    const minConf = Number(minConfluence) || 0;
+
+    if (dateFrom && !/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
+      return res.status(400).json({ success: false, error: "Invalid date format. Use YYYY-MM-DD." });
     }
-    if (from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) {
-      return res.status(400).json({ success: false, error: "Invalid 'from' date format. Use YYYY-MM-DD." });
-    }
-    if (to && !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-      return res.status(400).json({ success: false, error: "Invalid 'to' date format. Use YYYY-MM-DD." });
+    if (dateTo && !/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
+      return res.status(400).json({ success: false, error: "Invalid date format. Use YYYY-MM-DD." });
     }
 
-    const results: Record<string, any> = {};
+    const results: any[] = [];
+    let totalTrades = 0, totalWins = 0, totalLosses = 0, totalPnl = 0, totalGrossWin = 0, totalGrossLoss = 0;
+
     for (const sym of symList) {
-      try {
-        const r = await runBacktest({ symbol: String(sym).toUpperCase(), pattern: pattern || "all", from, to, rrRatio: Number(rrRatio) || 2, maxHold: Number(maxHold) || 5 });
-        results[sym] = { success: !r.error, ...r };
-      } catch (err: any) {
-        results[sym] = { success: false, error: err.message, totalTrades: 0 };
+      const symUpper = String(sym).toUpperCase();
+      let symTrades = 0, symWins = 0, symLosses = 0, symPnl = 0, symPF = 0, symWR = 0;
+      const symTradeList: any[] = [];
+
+      for (const pat of patternList) {
+        try {
+          const r = await runBacktest({ symbol: symUpper, pattern: pat, from: dateFrom, to: dateTo, rrRatio: rr, maxHold: hold, minConfluence: minConf });
+          if (!r.error && r.totalTrades > 0) {
+            symTrades += r.totalTrades;
+            symWins += r.wins;
+            symLosses += r.losses;
+            symPnl += r.totalPnlDollars;
+            if (r.trades) symTradeList.push(...r.trades);
+          }
+        } catch (err: any) {
+          console.error(`[backtest/multi] ${symUpper}/${pat}: ${err.message}`);
+        }
       }
+
+      symWR = symTrades > 0 ? symWins / symTrades : 0;
+      const grossW = symTradeList.filter(t => t.pnlDollars > 0).reduce((s, t) => s + t.pnlDollars, 0);
+      const grossL = Math.abs(symTradeList.filter(t => t.pnlDollars < 0).reduce((s, t) => s + t.pnlDollars, 0));
+      symPF = grossL > 0 ? Math.round((grossW / grossL) * 100) / 100 : (grossW > 0 ? 99 : 0);
+
+      totalTrades += symTrades;
+      totalWins += symWins;
+      totalLosses += symLosses;
+      totalPnl += symPnl;
+      totalGrossWin += grossW;
+      totalGrossLoss += grossL;
+
+      results.push({
+        symbol: symUpper,
+        tradeCount: symTrades,
+        winRate: Math.round(symWR * 10000) / 100,
+        profitFactor: symPF,
+        totalPnL: Math.round(symPnl * 100) / 100,
+        totalPnlDollars: Math.round(symPnl * 100) / 100,
+        wins: symWins,
+        losses: symLosses,
+        expectancy: symTrades > 0 ? Math.round((symPnl / symTrades) * 100) / 100 : 0,
+        trades: symTradeList,
+        success: true,
+      });
     }
-    res.json({ success: true, results });
+
+    const overallWR = totalTrades > 0 ? totalWins / totalTrades : 0;
+    const overallPF = totalGrossLoss > 0 ? Math.round((totalGrossWin / totalGrossLoss) * 100) / 100 : (totalGrossWin > 0 ? 99 : 0);
+
+    res.json({
+      success: true,
+      summary: {
+        symbolsScanned: symList.length,
+        patternsUsed: patternList,
+        totalTrades,
+        totalWins,
+        totalLosses,
+        winRate: Math.round(overallWR * 10000) / 100,
+        profitFactor: overallPF,
+        netPnL: Math.round(totalPnl * 100) / 100,
+        minConfluence: minConf,
+        period: `${dateFrom} to ${dateTo}`,
+      },
+      results,
+    });
   });
 
   return httpServer;

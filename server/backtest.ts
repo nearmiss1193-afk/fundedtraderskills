@@ -1117,6 +1117,7 @@ export async function runBacktest(config: {
   to?: string;
   rrRatio?: number;
   maxHold?: number;
+  minConfluence?: number;
 }): Promise<BacktestResult> {
   const symbol = (config.symbol || "ES").toUpperCase();
   const patternKey = config.pattern || "3bar";
@@ -1124,9 +1125,10 @@ export async function runBacktest(config: {
   const to = config.to || new Date().toISOString().slice(0, 10);
   const rrRatio = config.rrRatio || 2;
   const maxHold = config.maxHold || 5;
+  const minConf = config.minConfluence || 0;
   const pointValue = POINT_VALUES[symbol] || 50;
 
-  console.log(`[backtest] Starting ${patternKey} backtest on ${symbol} from ${from} to ${to} (R:R ${rrRatio}, maxHold ${maxHold})`);
+  console.log(`[backtest] Starting ${patternKey} backtest on ${symbol} from ${from} to ${to} (R:R ${rrRatio}, maxHold ${maxHold}, minConf ${minConf})`);
 
   let bars: Bar[];
   if (ETF_PROXIES[symbol]) {
@@ -1150,9 +1152,10 @@ export async function runBacktest(config: {
   }
 
   const signals = detector(data);
-  console.log(`[backtest] Detected ${signals.length} ${patternKey} signals`);
+  const filteredSignals = minConf > 0 ? signals.filter(s => (s.confluence || 0) >= minConf) : signals;
+  console.log(`[backtest] Detected ${signals.length} ${patternKey} signals (${filteredSignals.length} with confluence >= ${minConf})`);
 
-  const trades = simulateTrades(data, signals, rrRatio, maxHold, pointValue);
+  const trades = simulateTrades(data, filteredSignals, rrRatio, maxHold, pointValue);
   const result = computeResults(trades, symbol, patternKey, `${from} to ${to}`, bars.length);
 
   console.log(`[backtest] Result: ${result.totalTrades} trades, ${result.winRate}% WR, $${result.totalPnlDollars} P&L, PF ${result.profitFactor}`);
