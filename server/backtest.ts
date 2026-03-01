@@ -1,6 +1,23 @@
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
 
+function parseTimeframe(tf: string): { multiplier: number; timespan: string } {
+  const map: Record<string, { multiplier: number; timespan: string }> = {
+    "1min": { multiplier: 1, timespan: "minute" },
+    "2min": { multiplier: 2, timespan: "minute" },
+    "5min": { multiplier: 5, timespan: "minute" },
+    "15min": { multiplier: 15, timespan: "minute" },
+    "30min": { multiplier: 30, timespan: "minute" },
+    "1hour": { multiplier: 1, timespan: "hour" },
+    "4hour": { multiplier: 4, timespan: "hour" },
+    "daily": { multiplier: 1, timespan: "day" },
+    "day": { multiplier: 1, timespan: "day" },
+    "week": { multiplier: 1, timespan: "week" },
+    "weekly": { multiplier: 1, timespan: "week" },
+  };
+  return map[tf.toLowerCase()] || { multiplier: 1, timespan: "day" };
+}
+
 const barCache: Map<string, { bars: Bar[]; fetchedAt: number }> = new Map();
 const BAR_CACHE_TTL = 300_000;
 
@@ -128,6 +145,9 @@ async function fetchPolygonAggs(ticker: string, from: string, to: string, multip
       if (!resp.ok) return [];
       const data = await resp.json();
       if (!data.results || data.results.length === 0) return [];
+      if (data.results.length >= 49999) {
+        console.log(`[backtest] WARNING: Polygon returned ${data.results.length} bars for ${ticker} — data may be truncated. Narrow date range or use a larger timeframe.`);
+      }
       return data.results.map((r: any) => ({
         open: r.o,
         high: r.h,
@@ -143,7 +163,7 @@ async function fetchPolygonAggs(ticker: string, from: string, to: string, multip
   return [];
 }
 
-async function fetchStitchedData(symbol: string, from: string, to: string): Promise<Bar[]> {
+async function fetchStitchedData(symbol: string, from: string, to: string, multiplier = 1, timespan = "day"): Promise<Bar[]> {
   const startYear = parseInt(from.slice(0, 4));
   const endYear = parseInt(to.slice(0, 4));
   const tickers = getContractTickers(symbol, startYear, endYear);
@@ -158,7 +178,7 @@ async function fetchStitchedData(symbol: string, from: string, to: string): Prom
       fetchedCount = 0;
     }
 
-    const bars = await fetchPolygonAggs(ticker, from, to);
+    const bars = await fetchPolygonAggs(ticker, from, to, multiplier, timespan);
     fetchedCount++;
     if (bars.length === 0) continue;
 
@@ -204,14 +224,14 @@ const ETF_PROXIES: Record<string, { etf: string; ratio: number }> = {
   ZW:  { etf: "WEAT", ratio: 25.0 },
 };
 
-async function fetchETFProxy(symbol: string, from: string, to: string): Promise<Bar[]> {
+async function fetchETFProxy(symbol: string, from: string, to: string, multiplier = 1, timespan = "day"): Promise<Bar[]> {
   const proxy = ETF_PROXIES[symbol];
   if (!proxy) return [];
 
-  const etfCacheKey = `ETF:${proxy.etf}:${from}:${to}`;
+  const etfCacheKey = `ETF:${proxy.etf}:${multiplier}${timespan}:${from}:${to}`;
   let rawBars = getCachedBars(etfCacheKey);
   if (!rawBars) {
-    rawBars = await fetchPolygonAggs(proxy.etf, from, to);
+    rawBars = await fetchPolygonAggs(proxy.etf, from, to, multiplier, timespan);
     if (rawBars.length > 0) setCachedBars(etfCacheKey, rawBars);
   } else {
     console.log(`[backtest] ETF cache hit: ${rawBars.length} bars for ${proxy.etf} (proxy for ${symbol})`);
@@ -1182,6 +1202,7 @@ export async function runBacktest(config: {
   rrRatio?: number;
   maxHold?: number;
   minConfluence?: number;
+  timeframe?: string;
 }): Promise<BacktestResult> {
   const symbol = (config.symbol || "ES").toUpperCase();
   const patternKey = config.pattern || "3bar";
@@ -1191,19 +1212,21 @@ export async function runBacktest(config: {
   const maxHold = config.maxHold || 5;
   const minConf = config.minConfluence || 0;
   const pointValue = POINT_VALUES[symbol] || 50;
+  const tf = config.timeframe || "daily";
+  const { multiplier, timespan } = parseTimeframe(tf);
 
-  console.log(`[backtest] Starting ${patternKey} backtest on ${symbol} from ${from} to ${to} (R:R ${rrRatio}, maxHold ${maxHold}, minConf ${minConf})`);
+  console.log(`[backtest] Starting ${patternKey} backtest on ${symbol} [${tf}] from ${from} to ${to} (R:R ${rrRatio}, maxHold ${maxHold}, minConf ${minConf})`);
 
-  const cacheKey = `${symbol}:${from}:${to}`;
+  const cacheKey = `${symbol}:${multiplier}${timespan}:${from}:${to}`;
   let bars: Bar[] | null = getCachedBars(cacheKey);
 
   if (bars) {
-    console.log(`[backtest] Cache hit: ${bars.length} bars for ${symbol}`);
+    console.log(`[backtest] Cache hit: ${bars.length} bars for ${symbol} [${tf}]`);
   } else {
     if (ETF_PROXIES[symbol]) {
-      bars = await fetchETFProxy(symbol, from, to);
+      bars = await fetchETFProxy(symbol, from, to, multiplier, timespan);
     } else {
-      bars = await fetchStitchedData(symbol, from, to);
+      bars = await fetchStitchedData(symbol, from, to, multiplier, timespan);
     }
     if (bars.length > 0) {
       setCachedBars(cacheKey, bars);

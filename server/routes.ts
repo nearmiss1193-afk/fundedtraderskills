@@ -421,7 +421,9 @@ export async function registerRoutes(
   });
 
   app.post("/api/backtest/pattern", async (req, res) => {
-    const { symbol, pattern, from, to, rrRatio, maxHold, minConfluence } = req.body;
+    const { symbol, pattern, from, to, rrRatio, maxHold, minConfluence, timeframe } = req.body;
+    const validTimeframes = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "1hour", "4hour", "week", "weekly"];
+    const tf = timeframe && validTimeframes.includes(timeframe) ? timeframe : "daily";
 
     const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "wedge", "all"];
     if (pattern && !validPatterns.includes(pattern)) {
@@ -435,7 +437,7 @@ export async function registerRoutes(
     }
 
     try {
-      const result = await runBacktest({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence: Number(minConfluence) || 0 });
+      const result = await runBacktest({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence: Number(minConfluence) || 0, timeframe: tf });
       if (result.error) {
         return res.status(400).json({ success: false, error: result.error });
       }
@@ -447,7 +449,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/backtest/multi", async (req, res) => {
-    const { symbols, pattern, patterns, from, to, rrRatio, maxHold, minConfluence, startDate, endDate } = req.body;
+    const { symbols, pattern, patterns, from, to, rrRatio, maxHold, minConfluence, startDate, endDate, timeframe } = req.body;
     const symList: string[] = Array.isArray(symbols) ? symbols.slice(0, 25) : ["ES", "NQ", "CL", "GC", "ZS"];
     const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "wedge", "all"];
     const patternList: string[] = Array.isArray(patterns) ? patterns.filter((p: string) => validPatterns.includes(p)) : (pattern && validPatterns.includes(pattern) ? [pattern] : ["all"]);
@@ -456,6 +458,8 @@ export async function registerRoutes(
     const rr = Number(rrRatio) || 2;
     const hold = Number(maxHold) || 5;
     const minConf = Number(minConfluence) || 0;
+    const validTfList = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "1hour", "4hour", "week", "weekly"];
+    const tf = timeframe && validTfList.includes(timeframe) ? timeframe : "daily";
 
     if (dateFrom && !/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
       return res.status(400).json({ success: false, error: "Invalid date format. Use YYYY-MM-DD." });
@@ -476,7 +480,7 @@ export async function registerRoutes(
 
       for (const pat of patternList) {
         try {
-          const r = await runBacktest({ symbol: symUpper, pattern: pat, from: dateFrom, to: dateTo, rrRatio: rr, maxHold: hold, minConfluence: minConf });
+          const r = await runBacktest({ symbol: symUpper, pattern: pat, from: dateFrom, to: dateTo, rrRatio: rr, maxHold: hold, minConfluence: minConf, timeframe: tf });
           if (!r.error && r.totalTrades > 0) {
             symTrades += r.totalTrades;
             symWins += r.wins;

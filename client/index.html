@@ -1321,6 +1321,16 @@
               </select>
             </div>
             <div class="bt-field">
+              <label for="bt-timeframe">Timeframe</label>
+              <select id="bt-timeframe" data-testid="select-bt-timeframe">
+                <option value="daily" selected>Daily</option>
+                <option value="5min">5 min</option>
+                <option value="15min">15 min</option>
+                <option value="1hour">1 hour</option>
+                <option value="4hour">4 hour</option>
+              </select>
+            </div>
+            <div class="bt-field">
               <label for="bt-from">From</label>
               <input type="date" id="bt-from" value="2023-01-01" data-testid="input-bt-from" />
             </div>
@@ -2303,6 +2313,7 @@
 
       const symbol = document.getElementById('bt-symbol').value;
       const pattern = document.getElementById('bt-pattern').value;
+      const timeframe = document.getElementById('bt-timeframe').value;
       const from = document.getElementById('bt-from').value;
       const to = document.getElementById('bt-to').value;
       const rrRatio = parseFloat(document.getElementById('bt-rr').value);
@@ -2311,13 +2322,13 @@
 
       btn.disabled = true;
       btn.textContent = 'Running...';
-      resultsDiv.innerHTML = '<div class="bt-status">Fetching historical data from Polygon and running backtest... This may take a moment.</div>';
+      resultsDiv.innerHTML = '<div class="bt-status">Fetching historical ' + timeframe + ' data from Polygon and running backtest... This may take a moment.</div>';
 
       try {
         const resp = await fetch('/api/backtest/pattern', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence })
+          body: JSON.stringify({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence, timeframe })
         });
         const d = await resp.json();
 
@@ -2457,6 +2468,7 @@
       const btn = document.getElementById('bt-multi-btn');
       const resultsDiv = document.getElementById('bt-results');
       const patternSel = document.getElementById('bt-pattern').value;
+      const timeframe = document.getElementById('bt-timeframe').value;
       const from = document.getElementById('bt-from').value;
       const to = document.getElementById('bt-to').value;
       const rrRatio = parseFloat(document.getElementById('bt-rr').value);
@@ -2468,13 +2480,13 @@
 
       btn.disabled = true;
       btn.textContent = 'Scanning...';
-      resultsDiv.innerHTML = '<div class="bt-status">Running multi-symbol edge scan across ' + symbols.length + ' symbols &times; ' + patterns.length + ' patterns... This may take a minute.</div>';
+      resultsDiv.innerHTML = '<div class="bt-status">Running multi-symbol edge scan (' + timeframe + ') across ' + symbols.length + ' symbols &times; ' + patterns.length + ' patterns... This may take a minute.</div>';
 
       try {
         const resp = await fetch('/api/backtest/multi', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbols, patterns, from, to, rrRatio, maxHold, minConfluence })
+          body: JSON.stringify({ symbols, patterns, from, to, rrRatio, maxHold, minConfluence, timeframe })
         });
         const d = await resp.json();
         if (!d.success) {

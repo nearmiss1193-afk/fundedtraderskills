@@ -1,0 +1,88 @@
+Actionable Steps
+
+Polygon Rate-Limit & Caching Fix Validation
+The changes are live and verified via logs:
+Cache hits for same symbol/pattern combo
+ETF proxy sharing (ES/MES → SPY, NQ/MNQ → QQQ)
+Only 2 API calls for 3 symbols × 2 patterns
+Proactive pause + 429 retry (30–65s backoff) prevent quota burn
+Zero trades on short daily range is expected — patterns (e.g., 3 Bar Play, Buy Setup) tuned for intraday momentum/volume surges, not daily ETF proxies where EMAs converge frequently and signals are rare. With 2 years daily data, 1 trade fired — alignment correct.
+
+Next Focus: Intraday Multi-Symbol Scan
+Switch to 5-min timeframe for realistic Live Traders pattern frequency. Paste this updated multi-scan prompt into Replit console (server running). It uses 5-min data, 1-year range (to avoid long Polygon fetches), and min 7pt confluence.
+
+JavaScript// Paste into Replit console and run
+const axios = require('axios');
+
+const BASE_URL = 'http://localhost:3000'; // your Replit URL
+
+const symbols = ['ES', 'NQ', 'CL', 'GC', 'BTC', 'ETH', 'ZS']; // high-liquidity Apex set
+
+const scanParams = {
+  timeframe: '5min',
+  startDate: '2025-01-01',
+  endDate: '2026-02-28',
+  patterns: ['3bar', '4bar', 'buysetup', 'retest', 'breakout', 'climax'],
+  minConfluence: 7
+};
+
+async function runIntradayMultiScan() {
+  console.log('Starting intraday multi-symbol scan...');
+  console.log('Timeframe: 5min | Min Confluence: 7pt');
+
+  try {
+    const res = await axios.post(`${BASE_URL}/api/backtest/multi`, {
+      symbols,
+      ...scanParams
+    });
+
+    const data = res.data;
+
+    console.log('\nSUMMARY');
+    console.log(`Symbols: ${data.summary.symbolsScanned}`);
+    console.log(`Total Trades: ${data.summary.totalTrades}`);
+    console.log(`Win Rate: ${(data.summary.winRate * 100).toFixed(1)}%`);
+    console.log(`Profit Factor: ${data.summary.profitFactor.toFixed(2)}`);
+    console.log(`Net P&L: ${data.summary.netPnL.toFixed(2)}`);
+
+    console.log('\nTOP 5 SYMBOLS BY P&L');
+    data.results
+      .sort((a, b) => b.totalPnL - a.totalPnL)
+      .slice(0, 5)
+      .forEach(r => {
+        console.log(`${r.symbol.padEnd(6)} | P&L: ${r.totalPnL.toFixed(2)} | WR: ${(r.winRate * 100).toFixed(1)}% | PF: ${r.profitFactor.toFixed(2)} | Trades: ${r.tradeCount}`);
+      });
+
+    console.log('\nPATTERN BREAKDOWN');
+    if (data.patternBreakdown) {
+      Object.entries(data.patternBreakdown)
+        .sort(([,a], [,b]) => b.pnl - a.pnl)
+        .slice(0, 5)
+        .forEach(([pat, s]) => {
+          console.log(`${pat.padEnd(12)} | P&L: ${s.pnl.toFixed(2)} | WR: ${(s.winRate * 100).toFixed(1)}% | PF: ${s.profitFactor.toFixed(2)} | Trades: ${s.count}`);
+        });
+    }
+
+    console.log('\nNext: Edge Builder → Backtest Edge Heatmap + Export CSV');
+
+  } catch (err) {
+    console.error('Error:', err.message);
+  }
+}
+
+runIntradayMultiScan();
+
+Expected: Higher trade count on 5-min (intraday patterns fire more). Cache keeps API calls low.
+After run: Paste top summary + top 5 symbols/patterns here. Then open Edge Builder UI → Backtest Edge Heatmap tab shows Symbol × Pattern grid (color-coded WR/PF).
+
+
+BTC/ETH NT Sim Test
+In Edge Builder: Select BTC or ETH → Run single backtest.
+If data fetches (cache or API), watch Replit logs for signal → Supabase → bridge → NT payload (instrument=BTC1! or ETH1!).
+In NT8 sim: Check Orders/Positions tab for entry/SL/TP.
+If "No data": Polygon free tier limits crypto depth — test proxy (add BITO/ETHA in ETF_PROXIES if needed). Share logs/NT result.
+
+Edge Heatmap Tab: Already live in UI. After scan:
+Grid: Symbol rows × Pattern columns, cells show WR/PF (green high, red low).
+Pattern breakdown table: Aggregated top performers.
+Use CSV export for pivot analysis (best combo: symbol/timeframe/pattern/confluence ≥8pt).

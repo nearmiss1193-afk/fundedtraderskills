@@ -41,7 +41,7 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
     *   **Pattern Library:** Detailed descriptions of trading patterns with rules and confluence tips.
 *   **Historical Backtester:**
     *   **Functionality:** Tests trading patterns against historical data from Polygon.io.
-    *   **Configuration:** Allows adjustable date ranges, R:R ratios, and max hold bars.
+    *   **Configuration:** Allows adjustable date ranges, R:R ratios, max hold bars, and timeframe selection (daily, 5min, 15min, 1hour, 4hour).
     *   **Multi-Symbol Edge Scan:** `POST /api/backtest/multi` accepts `symbols[]`, `patterns[]`, `minConfluence`, date range; runs batch backtests across up to 25 symbols × 8 patterns. Returns `summary`, `patternBreakdown` (aggregated by pattern), `heatmap` (Symbol × Pattern cells with winRate/PF/pnl/expectancy), and `results` ranked by P&L.
     *   **Backtest Edge Heatmap:** Color-coded Symbol × Pattern performance grid auto-populates after multi-scan. Includes Pattern Breakdown table, visual heatmap grid (green/yellow/red cells), and full sortable detail table.
     *   **CSV Export:** Download backtest results as CSV for external analysis (Google Sheets, Excel pivot tables).
