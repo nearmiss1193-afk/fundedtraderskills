@@ -1,0 +1,60 @@
+Phase 5 – Learning System & Backtesting Optimization (In Progress)
+Current Focus: All 5 Supabase migration tasks completed and verified. Signal flow is fully wired through Supabase (enqueueSignal → trade_signals table) with ACK polling (GET /api/trade-ack/:signalId) and UI toast feedback. Account selector enhanced with type badges (green SIM, red FUNDED) and safety warning for funded accounts. Everything is live and running cleanly.
+Next Steps (Prioritized & Actionable)
+
+Run Full Historical UI Scan (3-Year, minConfluence 8)
+Since your previous scan used minConfluence 0 (too noisy, max confluence in backtester is 7), rerun with minConfluence 8 to match live scanner filter and get realistic high-edge results.In Edge Builder UI:
+Click Multi-Symbol Edge Scan
+Settings:
+Timeframe: 5min (best balance for Live Traders patterns)
+Patterns: All (or at least include the 13 patterns: 3bar, 4bar, buysetup, retest, breakout, climax, cuphandle, wedge, headandshoulders, inverseheadandshoulders, doubletop, doublebottom, etc.)
+Date range: 2022-01-01 to 2025-02-28 (3 years — avoids excessive credit usage on Polygon)
+Min Confluence: 8 (critical — backtester tops at 7, so this will filter to highest-quality signals; live scanner reaches 11)
+
+Click Start → let it finish (expect 10–20 minutes for 15 symbols × 13 patterns with caching)
+After completion:
+Go to Backtest Edge Heatmap tab
+Copy the top 5 symbol/pattern combos from the grid or pattern breakdown table
+Include: Symbol, Pattern, Trades, Win %, Profit Factor, Net P&L
+Paste them in your next message (also export CSV if you want to analyze confluence/volType factors later)
+
+Why minConfluence 8 is important:
+Backtester max is 7 → minConf 8 will likely return few or zero trades (expected — shows live scoring is stricter and better)
+Use this to validate if live scanner needs tuning (e.g., if zero trades, lower to 7 temporarily for comparison)
+
+Share 1min vs 5min NQ Backtest Comparison
+In Edge Builder:
+Symbol: NQ
+Timeframe: 1min, Date: 2025-01-01 to 2025-01-15 (short range, avoids 50k bar limit), Min Confluence: 9 (noise filter) → run
+Switch to 5min (same range/settings) → run again
+
+Share:
+1min: total trades, top pattern(s), net P&L, Profit Factor
+5min: total trades, top pattern(s), net P&L, Profit Factor
+Quick note (e.g., "1min had ~8× more trades but lower PF due to noise")
+
+
+Share Live RTH Logs/NT Results for Wedge/Cup/H&S/Double Top
+During next RTH (9:30–16:00 ET):
+Run live scanner on priority symbols: NQ, SI, ZS, GC, CL
+Monitor Replit console for high-confluence signals (especially boosted combos like NQ Double Top, SI Inv H&S)
+If any fire:
+Check Supabase trade_signals table (confluence, pattern, volType, notes)
+Verify NT sim account → Orders tab (instrument=NQ1! etc., SL/TP placed?)
+
+Share:
+3–5 console log lines (pattern, confluence, notes, any convergence tags)
+NT sim result (order placed? filled? rejected? screenshot/log snippet if possible)
+
+
+Test Apex Rules in Backtest
+Run a long-range backtest (e.g., ES 5min, full 2025) → check server logs for Apex rule blocks (daily loss limit, RTH violation, size cap)
+Share: Any rule triggers? Apex Eval Status (daily P&L, trailing DD, trade days, profit target progress)
+
+
+Recommended Execution Order (do them in this sequence for fastest progress):
+
+Add 1min dropdown (if not already) → run & share 1min vs 5min NQ backtest comparison (quick 5-minute task)
+Run full historical UI scan (20–40 min) → paste top 5 symbols/patterns summary (highest insight value)
+Run live scanner during next RTH → collect & share Wedge/Cup/H&S/Double Top logs + NT results
+Test Apex rules in backtest → share rule triggers & eval status

@@ -1979,7 +1979,6 @@ async function simulateTick(session: TraderSession) {
           "M2K": { patterns: ["Head & Shoulders", "Double Top"], boost: 2 },
           "CL":  { patterns: ["Double Bottom", "Inverse H&S"], boost: 1 },
           "MCL": { patterns: ["Double Bottom", "Inverse H&S"], boost: 1 },
-          "HG":  { patterns: ["Buy Setup", "Cup & Handle"], boost: 1 },
           "ES":  { patterns: ["Double Top"], boost: 1 },
           "MES": { patterns: ["Double Top"], boost: 1 },
           "YM":  { patterns: ["Double Top"], boost: 1 },
@@ -1991,6 +1990,24 @@ async function simulateTick(session: TraderSession) {
           confluence += boostEntry.boost;
           confluenceLabel = `${confluenceLabel} [EDGE+${boostEntry.boost}]`;
           console.log(`[trader] Edge boost: ${mk}/${detectedPattern} +${boostEntry.boost}pt → ${confluence}pt`);
+        }
+
+        if (detectedPattern === "Double Top" && !boostEntry?.patterns.includes("Double Top")) {
+          confluence += 1;
+          confluenceLabel = `${confluenceLabel} [DT EDGE+1]`;
+          console.log(`[trader] Global Double Top boost: ${mk} +1pt → ${confluence}pt`);
+        }
+
+        if (detectedPattern === "Wedge Breakout") {
+          confluence -= 1;
+          confluenceLabel = `${confluenceLabel} [WEDGE EDGE-1]`;
+          console.log(`[trader] Wedge penalty: ${mk} -1pt → ${confluence}pt`);
+        }
+
+        if (mk === "HG") {
+          confluence -= 2;
+          confluenceLabel = `${confluenceLabel} [HG PENALTY-2]`;
+          console.log(`[trader] HG penalty: ${mk}/${detectedPattern} -2pt → ${confluence}pt`);
         }
       }
 
