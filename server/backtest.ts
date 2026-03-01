@@ -180,6 +180,10 @@ function addIndicators(bars: Bar[]): {
   toppingTail: boolean[];
   volType: VolType[];
   sideways: boolean[];
+  htfUp: boolean[];
+  htfDown: boolean[];
+  pivotHighs: number[];
+  pivotLows: number[];
 } {
   const ema21: number[] = [];
   const ema9: number[] = [];
@@ -195,9 +199,22 @@ function addIndicators(bars: Bar[]): {
   const toppingTail: boolean[] = [];
   const volType: VolType[] = [];
   const sideways: boolean[] = [];
+  const htfUp: boolean[] = [];
+  const htfDown: boolean[] = [];
+  const pivotHighs: number[] = [];
+  const pivotLows: number[] = [];
 
   const ema21k = 2 / 22;
   const ema9k = 2 / 10;
+
+  let rollingPivotHigh = 0;
+  let rollingPivotLow = Infinity;
+  let prevPivotHigh = 0;
+  let prevPivotLow = Infinity;
+  let hph = 0;
+  let hpl = 0;
+  let lph = 0;
+  let lpl = 0;
 
   for (let i = 0; i < bars.length; i++) {
     const b = bars[i];
@@ -241,7 +258,32 @@ function addIndicators(bars: Bar[]): {
 
     const avgP = ema21[i] || b.close;
     const emaDiffPct = avgP > 0 ? Math.abs(ema9[i] - ema21[i]) / avgP : 0;
-    sideways.push(emaDiffPct < 0.002);
+    sideways.push(emaDiffPct < 0.003);
+
+    if (i >= 3 && i % 3 === 0) {
+      const lb2 = bars[i - 2];
+      const lb1 = bars[i - 1];
+      if (b.high > rollingPivotHigh) {
+        if (rollingPivotHigh > prevPivotHigh) hph++;
+        else lph++;
+        prevPivotHigh = rollingPivotHigh;
+        rollingPivotHigh = b.high;
+      }
+      if (b.low < rollingPivotLow) {
+        if (rollingPivotLow < prevPivotLow) lpl++;
+        else hpl++;
+        prevPivotLow = rollingPivotLow;
+        rollingPivotLow = b.low;
+      }
+    }
+    pivotHighs.push(rollingPivotHigh);
+    pivotLows.push(rollingPivotLow);
+
+    const trendScore = (hph + hpl) - (lph + lpl);
+    const isHTFUp = trendScore >= 2 && ema9[i] > ema21[i] && b.close > ema21[i];
+    const isHTFDown = trendScore <= -2 && ema9[i] < ema21[i] && b.close < ema21[i];
+    htfUp.push(isHTFUp);
+    htfDown.push(isHTFDown);
 
     if (i < 5) {
       volType.push("NORMAL");
@@ -263,7 +305,7 @@ function addIndicators(bars: Bar[]): {
     }
   }
 
-  return { bars, ema21, ema9, avgRange, avgVol, atr, range, body, green, tail, wick, bottomingTail, toppingTail, volType, sideways };
+  return { bars, ema21, ema9, avgRange, avgVol, atr, range, body, green, tail, wick, bottomingTail, toppingTail, volType, sideways, htfUp, htfDown, pivotHighs, pivotLows };
 }
 
 interface Signal {
@@ -276,7 +318,7 @@ interface Signal {
 
 function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
-  const { bars, ema21, ema9, avgRange, avgVol, range, body, green, bottomingTail, toppingTail, volType, sideways } = data;
+  const { bars, ema21, ema9, avgRange, avgVol, range, body, green, bottomingTail, toppingTail, volType, sideways, htfUp, htfDown } = data;
 
   for (let i = 3; i < bars.length; i++) {
     const ignitingIdx = i - 2;
@@ -313,6 +355,8 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
         bottomingTail[restingIdx],
         bars[triggerIdx].close > ema9[triggerIdx],
         body[triggerIdx] > 0.5 * range[triggerIdx],
+        htfUp[triggerIdx],
+        tail[triggerIdx] > 0.3 * range[triggerIdx],
       ].filter(Boolean).length;
       signals.push({ index: triggerIdx, direction: "LONG", pattern: "3 Bar Play", confluence: conf, volType: volType[triggerIdx] });
     }
@@ -341,6 +385,8 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
         toppingTail[restingIdx],
         bars[triggerIdx].close < ema9[triggerIdx],
         body[triggerIdx] > 0.5 * range[triggerIdx],
+        htfDown[triggerIdx],
+        wick[triggerIdx] > 0.3 * range[triggerIdx],
       ].filter(Boolean).length;
       signals.push({ index: triggerIdx, direction: "SHORT", pattern: "3 Bar Play", confluence: conf, volType: volType[triggerIdx] });
     }
@@ -348,9 +394,94 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
   return signals;
 }
 
+function detect4BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema21, ema9, avgRange, avgVol, range, body, green, bottomingTail, toppingTail, volType, sideways, htfUp, htfDown, tail, wick } = data;
+
+  for (let i = 4; i < bars.length; i++) {
+    const ignitingIdx = i - 3;
+    const resting1Idx = i - 2;
+    const resting2Idx = i - 1;
+    const triggerIdx = i;
+
+    if (ignitingIdx < 1) continue;
+    if (sideways[triggerIdx]) continue;
+
+    const trendUp = ema9[triggerIdx] > ema21[triggerIdx];
+    const trendDown = ema9[triggerIdx] < ema21[triggerIdx];
+
+    const isIgnitingLong = green[ignitingIdx] &&
+      range[ignitingIdx] > 1.5 * avgRange[ignitingIdx] &&
+      bars[ignitingIdx].volume > 1.5 * avgVol[ignitingIdx] &&
+      body[ignitingIdx] > 0.5 * range[ignitingIdx];
+
+    const isResting1Long = range[resting1Idx] < 0.5 * range[ignitingIdx] &&
+      bars[resting1Idx].low > bars[ignitingIdx].low - 0.1 * range[ignitingIdx];
+    const isResting2Long = range[resting2Idx] < 0.5 * range[ignitingIdx] &&
+      bars[resting2Idx].low > bars[ignitingIdx].low - 0.1 * range[ignitingIdx];
+
+    const volumeSurgeLong = bars[triggerIdx].volume > 1.5 * avgVol[triggerIdx] &&
+      bars[triggerIdx].volume > Math.max(bars[resting1Idx].volume, bars[resting2Idx].volume);
+
+    const restingHigh = Math.max(bars[resting1Idx].high, bars[resting2Idx].high);
+    const isTriggerLong = green[triggerIdx] &&
+      bars[triggerIdx].close > restingHigh &&
+      volumeSurgeLong &&
+      bars[triggerIdx].close > ema21[triggerIdx] &&
+      trendUp;
+
+    if (isIgnitingLong && isResting1Long && isResting2Long && isTriggerLong) {
+      const conf = [
+        volumeSurgeLong,
+        volType[triggerIdx] === "IGNITING",
+        bottomingTail[resting1Idx] || bottomingTail[resting2Idx],
+        bars[triggerIdx].close > ema9[triggerIdx],
+        body[triggerIdx] > 0.5 * range[triggerIdx],
+        htfUp[triggerIdx],
+        true,
+      ].filter(Boolean).length;
+      signals.push({ index: triggerIdx, direction: "LONG", pattern: "4 Bar Play", confluence: conf, volType: volType[triggerIdx] });
+    }
+
+    const isIgnitingShort = !green[ignitingIdx] &&
+      range[ignitingIdx] > 1.5 * avgRange[ignitingIdx] &&
+      bars[ignitingIdx].volume > 1.5 * avgVol[ignitingIdx] &&
+      body[ignitingIdx] > 0.5 * range[ignitingIdx];
+
+    const isResting1Short = range[resting1Idx] < 0.5 * range[ignitingIdx] &&
+      bars[resting1Idx].high < bars[ignitingIdx].high + 0.1 * range[ignitingIdx];
+    const isResting2Short = range[resting2Idx] < 0.5 * range[ignitingIdx] &&
+      bars[resting2Idx].high < bars[ignitingIdx].high + 0.1 * range[ignitingIdx];
+
+    const volumeSurgeShort = bars[triggerIdx].volume > 1.5 * avgVol[triggerIdx] &&
+      bars[triggerIdx].volume > Math.max(bars[resting1Idx].volume, bars[resting2Idx].volume);
+
+    const restingLow = Math.min(bars[resting1Idx].low, bars[resting2Idx].low);
+    const isTriggerShort = !green[triggerIdx] &&
+      bars[triggerIdx].close < restingLow &&
+      volumeSurgeShort &&
+      bars[triggerIdx].close < ema21[triggerIdx] &&
+      trendDown;
+
+    if (isIgnitingShort && isResting1Short && isResting2Short && isTriggerShort) {
+      const conf = [
+        volumeSurgeShort,
+        volType[triggerIdx] === "IGNITING",
+        toppingTail[resting1Idx] || toppingTail[resting2Idx],
+        bars[triggerIdx].close < ema9[triggerIdx],
+        body[triggerIdx] > 0.5 * range[triggerIdx],
+        htfDown[triggerIdx],
+        true,
+      ].filter(Boolean).length;
+      signals.push({ index: triggerIdx, direction: "SHORT", pattern: "4 Bar Play", confluence: conf, volType: volType[triggerIdx] });
+    }
+  }
+  return signals;
+}
+
 function detectBuySetup(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
-  const { bars, ema21, ema9, avgVol, green, bottomingTail, toppingTail, volType, sideways, body, range } = data;
+  const { bars, ema21, ema9, avgVol, green, bottomingTail, toppingTail, volType, sideways, body, range, htfUp, htfDown, tail, wick } = data;
 
   for (let i = 4; i < bars.length; i++) {
     if (sideways[i]) continue;
@@ -374,6 +505,8 @@ function detectBuySetup(data: ReturnType<typeof addIndicators>): Signal[] {
         hasTail,
         body[i] > 0.5 * range[i],
         curr.close > ema21[i],
+        htfUp[i],
+        tail[i] > 0.3 * range[i],
       ].filter(Boolean).length;
       signals.push({ index: i, direction: "LONG", pattern: "Buy Setup", confluence: conf, volType: volType[i] });
     }
@@ -391,6 +524,8 @@ function detectBuySetup(data: ReturnType<typeof addIndicators>): Signal[] {
         hasTail,
         body[i] > 0.5 * range[i],
         curr.close < ema21[i],
+        htfDown[i],
+        wick[i] > 0.3 * range[i],
       ].filter(Boolean).length;
       signals.push({ index: i, direction: "SHORT", pattern: "Sell Setup", confluence: conf, volType: volType[i] });
     }
@@ -398,9 +533,69 @@ function detectBuySetup(data: ReturnType<typeof addIndicators>): Signal[] {
   return signals;
 }
 
+function detectRetestSetup(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema21, ema9, avgVol, green, bottomingTail, toppingTail, volType, sideways, body, range, htfUp, htfDown, tail, wick, pivotHighs, pivotLows } = data;
+
+  for (let i = 15; i < bars.length; i++) {
+    if (sideways[i]) continue;
+
+    const curr = bars[i];
+    const trendUp = ema9[i] > ema21[i];
+    const trendDown = ema9[i] < ema21[i];
+
+    const lookback = bars.slice(Math.max(0, i - 20), i);
+    const priorHigh = Math.max(...lookback.map(b => b.high));
+    const priorLow = Math.min(...lookback.map(b => b.low));
+    const avgPrice = ema21[i] || curr.close;
+    const nearPriorLow = Math.abs(curr.low - priorLow) / avgPrice < 0.005;
+    const nearPriorHigh = Math.abs(curr.high - priorHigh) / avgPrice < 0.005;
+
+    const pullback = bars.slice(i - 3, i);
+    const pullbackDown = pullback.filter(b => b.close < b.open).length >= 2;
+    const pullbackUp = pullback.filter(b => b.close > b.open).length >= 2;
+    const volSurge = curr.volume > avgVol[i] * 1.2;
+
+    if (nearPriorLow && pullbackDown && green[i] && curr.close > bars[i - 1].high && trendUp) {
+      const nearMA = Math.abs(curr.close - ema21[i]) / avgPrice < 0.005;
+      const hasTail = bottomingTail[i] || bottomingTail[i - 1];
+      const conf = [
+        volSurge,
+        hasTail,
+        nearMA,
+        body[i] > 0.4 * range[i],
+        curr.close > ema9[i],
+        htfUp[i],
+        volType[i] === "IGNITING" || volType[i] === "NORMAL",
+      ].filter(Boolean).length;
+      if (conf >= 3) {
+        signals.push({ index: i, direction: "LONG", pattern: "Retest Buy", confluence: conf, volType: volType[i] });
+      }
+    }
+
+    if (nearPriorHigh && pullbackUp && !green[i] && curr.close < bars[i - 1].low && trendDown) {
+      const nearMA = Math.abs(curr.close - ema21[i]) / avgPrice < 0.005;
+      const hasTail = toppingTail[i] || toppingTail[i - 1];
+      const conf = [
+        volSurge,
+        hasTail,
+        nearMA,
+        body[i] > 0.4 * range[i],
+        curr.close < ema9[i],
+        htfDown[i],
+        volType[i] === "IGNITING" || volType[i] === "NORMAL",
+      ].filter(Boolean).length;
+      if (conf >= 3) {
+        signals.push({ index: i, direction: "SHORT", pattern: "Retest Sell", confluence: conf, volType: volType[i] });
+      }
+    }
+  }
+  return signals;
+}
+
 function detectBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
-  const { bars, ema21, ema9, avgRange, avgVol, green, volType, sideways, body, range } = data;
+  const { bars, ema21, ema9, avgRange, avgVol, green, volType, sideways, body, range, htfUp, htfDown } = data;
 
   for (let i = 10; i < bars.length; i++) {
     if (sideways[i]) continue;
@@ -423,6 +618,7 @@ function detectBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
         volType[i] === "IGNITING",
         body[i] > 0.6 * range[i],
         curr.close > ema9[i],
+        htfUp[i],
       ].filter(Boolean).length;
       signals.push({ index: i, direction: "LONG", pattern: "Breakout", confluence: conf, volType: volType[i] });
     }
@@ -432,6 +628,7 @@ function detectBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
         volType[i] === "IGNITING",
         body[i] > 0.6 * range[i],
         curr.close < ema9[i],
+        htfDown[i],
       ].filter(Boolean).length;
       signals.push({ index: i, direction: "SHORT", pattern: "Breakout", confluence: conf, volType: volType[i] });
     }
@@ -441,7 +638,7 @@ function detectBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
 
 function detectClimaxReversal(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
-  const { bars, ema21, avgRange, avgVol, range, green, bottomingTail, toppingTail, volType, body } = data;
+  const { bars, ema21, avgRange, avgVol, range, green, bottomingTail, toppingTail, volType, body, tail, wick } = data;
 
   for (let i = 6; i < bars.length; i++) {
     const lookback = bars.slice(i - 5, i);
@@ -458,6 +655,7 @@ function detectClimaxReversal(data: ReturnType<typeof addIndicators>): Signal[] 
         bottomingTail[i] || bottomingTail[i - 1],
         body[i] > 0.5 * range[i],
         bars[i].volume > avgVol[i],
+        tail[i] > 0.3 * range[i],
       ].filter(Boolean).length;
       signals.push({ index: i, direction: "LONG", pattern: "Climax Reversal", confluence: conf, volType: volType[i - 1] });
     }
@@ -471,6 +669,7 @@ function detectClimaxReversal(data: ReturnType<typeof addIndicators>): Signal[] 
         toppingTail[i] || toppingTail[i - 1],
         body[i] > 0.5 * range[i],
         bars[i].volume > avgVol[i],
+        wick[i] > 0.3 * range[i],
       ].filter(Boolean).length;
       signals.push({ index: i, direction: "SHORT", pattern: "Climax Reversal", confluence: conf, volType: volType[i - 1] });
     }
@@ -765,14 +964,18 @@ function detectWedgeBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
 
 const PATTERN_DETECTORS: Record<string, (data: ReturnType<typeof addIndicators>) => Signal[]> = {
   "3bar": detect3BarPlay,
+  "4bar": detect4BarPlay,
   "buysetup": detectBuySetup,
+  "retest": detectRetestSetup,
   "breakout": detectBreakout,
   "climax": detectClimaxReversal,
   "cuphandle": detectCupAndHandle,
   "wedge": detectWedgeBreakout,
   "all": (data) => [
     ...detect3BarPlay(data),
+    ...detect4BarPlay(data),
     ...detectBuySetup(data),
+    ...detectRetestSetup(data),
     ...detectBreakout(data),
     ...detectClimaxReversal(data),
     ...detectCupAndHandle(data),

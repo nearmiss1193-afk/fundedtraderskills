@@ -58,7 +58,7 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
   - **Configurable Risk:Reward**: Dropdown (1:1 through 1:5, default 1:2); TP = risk × R:R ratio; shown in stats panel
   - **Force Trading Mode**: Checkbox to override time window during development
   - **Moving Averages**: 9 EMA + 21 EMA + 200 SMA for trend confirmation and entry filtering
-  - **6 Core Patterns**: 3 Bar Play (10-factor), Buy/Sell Setup (12-factor), Pivot Breakout (10-factor), Climax/Exhaustion Reversal (9-factor), Cup & Handle (bullish continuation), Wedge Breakout (Rising Wedge bearish / Falling Wedge bullish)
+  - **8 Backtest Patterns**: 3 Bar Play, 4 Bar Play (2 resting bars), Buy/Sell Setup, Retest Buy/Sell (pullback to prior pivot), Pivot Breakout, Climax/Exhaustion Reversal, Cup & Handle (bullish continuation), Wedge Breakout (Rising/Falling)
   - **Granular Pattern Control**: 8 individual toggles for each pattern direction (3Bar Long, 3Bar Short, Buy Setup, Sell Setup, Breakout Long, Breakout Short, Climax Long, Climax Short)
   - **Strict Pre-Trade Checklist** (all 6 must pass before signal fires): HTF alignment (EMA9>EMA21 + price vs SMA200), volume >1.5× avg, MA confluence (near 9 or 21 EMA), R:R ≥ 1:2, no choppy market (bar ranges not all <50% avg), confluence ≥ 4
   - **Timeframe Control**: 6 individually toggleable timeframes (2min, 5min, 15min, 1hr, 4hr, Daily) persisted in settings
@@ -98,16 +98,19 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
   - **Optimize My Edge**: AI-generated recommendations (e.g. "Increase size on Buy Setup - 59% win rate")
   - **Pattern Library**: 8 cards covering all long + short patterns from the manual with entry/stop/target rules and confluence tips
   - **Filtered Analytics**: Edge Builder stats reflect only currently enabled patterns/timeframes from settings
-  - **Historical Backtester**: Test any of 6 patterns against real Polygon historical data
+  - **Historical Backtester**: Test any of 8 patterns against real Polygon historical data
     - 16 symbols via ETF proxies (free Polygon tier): SPY→ES/MES, QQQ→NQ/MNQ, DIA→YM/MYM, IWM→RTY/M2K, USO→CL/MCL, GLD→GC/MGC, SLV→SI, TLT→ZB, IEF→ZN, CORN→ZC, SOYB→ZS, WEAT→ZW
-    - Patterns: 3bar, buysetup, breakout, climax, cuphandle, wedge, all
+    - Patterns: 3bar, 4bar, buysetup, retest, breakout, climax, cuphandle, wedge, all
     - Configurable date range, R:R ratio (1:1.5 to 1:3), max hold bars (3-10)
     - Metrics: Win Rate, Profit Factor, Expectancy, Total P&L, Max Drawdown, Best/Worst Trade
     - Shows last 50 trades with entry/SL/TP/exit/outcome + **confluence score** + **volume type** per trade
     - **Candlestick Analysis**: Bottoming tail (lower wick >50% range, small body, green) and topping tail detection as confluence boosters
     - **Volume Type Classification**: Per-bar Igniting (vol>1.5× + range>1.5×), Ending (vol>2.5× + doji after 5 consecutive, exhaustion), Resting (vol<0.6× + narrow range)
-    - **Sideways Filter**: Rejects signals when EMA9 ≈ EMA21 (<0.2% divergence) — avoids choppy no-trend zones
-    - **Confluence Scoring**: Each signal scored 0-5 (volume surge, igniting vol type, candlestick tail, strong body, MA respect)
+    - **Sideways Filter**: Rejects signals when EMA9 ≈ EMA21 (<0.3% divergence) — avoids choppy no-trend zones
+    - **MTF Alignment**: Higher-timeframe trend via rolling pivot tracking (HPH/HPL vs LPH/LPL + EMA crossover + price vs EMA21); +1 confluence when HTF aligned
+    - **Confluence Scoring**: Each signal scored 0-7 (volume surge, igniting vol type, candlestick tail on key bar, strong body, MA respect, HTF alignment, tail/wick quality)
+    - **4 Bar Play**: Extension of 3 Bar Play with 2 resting bars for stronger setups — automatically gets +1 confluence bonus for double consolidation
+    - **Retest Buy/Sell**: Pullback to prior 20-bar high/low within 0.5% + reversal bar + trend alignment + tail + vol support; requires min 3 confluence to fire
     - ATR-based stop loss and take profit calculation
     - Contract stitching available for Polygon futures subscription (falls back to ETF proxy)
   - API: GET `/api/journal/analytics?patterns=...&timeframes=...`

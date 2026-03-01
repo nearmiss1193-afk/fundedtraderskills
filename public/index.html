@@ -1301,7 +1301,9 @@
               <label for="bt-pattern">Pattern</label>
               <select id="bt-pattern" data-testid="select-bt-pattern">
                 <option value="3bar" selected>3 Bar Play</option>
+                <option value="4bar">4 Bar Play</option>
                 <option value="buysetup">Buy/Sell Setup</option>
+                <option value="retest">Retest Setup</option>
                 <option value="breakout">Breakout</option>
                 <option value="climax">Climax Reversal</option>
                 <option value="cuphandle">Cup &amp; Handle</option>
@@ -2307,7 +2309,7 @@
             const cls = t.outcome === 'WIN' ? 'bt-win' : t.outcome === 'LOSS' ? 'bt-loss' : 'bt-timeout';
             const dcls = t.direction === 'LONG' ? 'dir-long' : 'dir-short';
             const pSign = t.pnlDollars >= 0 ? '+' : '';
-            const confLabel = t.confluence != null ? `${t.confluence}/5` : '—';
+            const confLabel = t.confluence != null ? `${t.confluence}/7` : '—';
             const vtLabel = t.volType || '—';
             html += `<tr>
               <td>${esc(t.date)}</td>
