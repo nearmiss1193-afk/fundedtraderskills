@@ -1165,6 +1165,73 @@ function detectInverseCupAndHandle(data: ReturnType<typeof addIndicators>): Sign
   return signals;
 }
 
+function detectDoubleTopBottom(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema21, ema9, avgVol, green, volType, body, range, htfUp, htfDown, gapUp, gapDown, level2GapUp, level2GapDown, toppingTail, bottomingTail } = data;
+  const peakDist = 5;
+
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const peaks = findLocalPeaks(highs, peakDist);
+  const troughs = findLocalTroughs(lows, peakDist);
+
+  for (let pi = 0; pi < peaks.length - 1; pi++) {
+    const left = peaks[pi];
+    const right = peaks[pi + 1];
+    const dist = right - left;
+    if (dist < 10 || dist > 60) continue;
+    const diffPct = Math.abs(highs[left] - highs[right]) / highs[left];
+    if (diffPct > 0.03) continue;
+
+    const neckline = Math.min(...lows.slice(left, right + 1));
+    const handleEnd = Math.min(right + Math.floor(dist * 0.3), bars.length - 1);
+    for (let h = right + 1; h <= handleEnd; h++) {
+      if (!green[h] && bars[h].close < neckline && bars[h].volume > 1.5 * avgVol[h] && bars[h].close < ema21[h]) {
+        const conf = [
+          bars[h].volume > 1.5 * avgVol[h],
+          volType[h] === "IGNITING",
+          body[h] > 0.5 * range[h],
+          htfDown[h],
+          gapDown[h],
+          level2GapDown[h],
+          toppingTail[h] || (h > 0 && toppingTail[h - 1]),
+        ].filter(Boolean).length;
+        signals.push({ index: h, direction: "SHORT", pattern: "Double Top", confluence: conf, volType: volType[h] });
+        break;
+      }
+    }
+  }
+
+  for (let ti = 0; ti < troughs.length - 1; ti++) {
+    const left = troughs[ti];
+    const right = troughs[ti + 1];
+    const dist = right - left;
+    if (dist < 10 || dist > 60) continue;
+    const diffPct = Math.abs(lows[left] - lows[right]) / lows[left];
+    if (diffPct > 0.03) continue;
+
+    const neckline = Math.max(...highs.slice(left, right + 1));
+    const handleEnd = Math.min(right + Math.floor(dist * 0.3), bars.length - 1);
+    for (let h = right + 1; h <= handleEnd; h++) {
+      if (green[h] && bars[h].close > neckline && bars[h].volume > 1.5 * avgVol[h] && bars[h].close > ema21[h]) {
+        const conf = [
+          bars[h].volume > 1.5 * avgVol[h],
+          volType[h] === "IGNITING",
+          body[h] > 0.5 * range[h],
+          htfUp[h],
+          gapUp[h],
+          level2GapUp[h],
+          bottomingTail[h] || (h > 0 && bottomingTail[h - 1]),
+        ].filter(Boolean).length;
+        signals.push({ index: h, direction: "LONG", pattern: "Double Bottom", confluence: conf, volType: volType[h] });
+        break;
+      }
+    }
+  }
+
+  return signals;
+}
+
 function detectWedgeBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
   const { bars, ema21, ema9, avgVol, avgRange, green, volType, body, range, htfUp, htfDown, gapUp, gapDown, level2GapUp, level2GapDown, toppingTail, bottomingTail } = data;
@@ -1248,6 +1315,9 @@ const PATTERN_DETECTORS: Record<string, (data: ReturnType<typeof addIndicators>)
   "breakout": detectBreakout,
   "climax": detectClimaxReversal,
   "cuphandle": detectCupAndHandle,
+  "inversecuphandle": detectInverseCupAndHandle,
+  "doubletop": (data) => detectDoubleTopBottom(data).filter(s => s.direction === "SHORT"),
+  "doublebottom": (data) => detectDoubleTopBottom(data).filter(s => s.direction === "LONG"),
   "wedge": detectWedgeBreakout,
   "all": (data) => [
     ...detect3BarPlay(data),
@@ -1257,6 +1327,8 @@ const PATTERN_DETECTORS: Record<string, (data: ReturnType<typeof addIndicators>)
     ...detectBreakout(data),
     ...detectClimaxReversal(data),
     ...detectCupAndHandle(data),
+    ...detectInverseCupAndHandle(data),
+    ...detectDoubleTopBottom(data),
     ...detectWedgeBreakout(data),
   ],
 };

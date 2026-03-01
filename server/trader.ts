@@ -1318,6 +1318,114 @@ function detectInverseCupAndHandleShort(bars: Bar[], state: MarketState): { dete
   return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
 }
 
+function detectDoubleBottom(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 25) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const troughs = findLocalTroughs(lows, 3);
+
+  for (let ti = 0; ti < troughs.length - 1; ti++) {
+    const left = troughs[ti];
+    const right = troughs[ti + 1];
+    const dist = right - left;
+    if (dist < 8 || dist > 50) continue;
+    const diffPct = Math.abs(lows[left] - lows[right]) / lows[left];
+    if (diffPct > 0.03) continue;
+
+    const neckline = Math.max(...highs.slice(left, right + 1));
+    const patternHeight = neckline - Math.min(lows[left], lows[right]);
+    const avgPrice = (lows[left] + lows[right]) / 2;
+    if (patternHeight / avgPrice < 0.005) continue;
+
+    const curr = bars[bars.length - 1];
+    if (!curr.bullish || curr.close <= neckline) continue;
+
+    const recentVol = recentAvgVolume(bars, 10);
+    const volSurge = curr.volume > recentVol * 1.5;
+    if (!volSurge) continue;
+
+    const aboveEMA21 = curr.close > state.ema21;
+    const avgRange = getAvgRange(bars);
+
+    const factors = [
+      volSurge,
+      isIgnitingVolume(bars, state.avgVolume),
+      aboveEMA21,
+      curr.close > state.ema9,
+      curr.close > state.sma200,
+      state.bias !== "DOWNTREND",
+      hasBottomingTail(bars[bars.length - 2]) || hasBottomingTail(curr),
+      isWideRangeBar(curr, avgRange),
+      isNearPivot(state.price, state.pivotLow, state.price) || isNearPivot(state.price, state.priorPivotLow, state.price),
+      barFormationQuality(curr, "LONG") >= 3,
+      patternHeight / avgPrice >= 0.01,
+    ];
+    const conf = calcConfluence(factors);
+    const reasons: string[] = [`double bottom breakout (height ${(patternHeight / avgPrice * 100).toFixed(1)}%, neckline ${neckline.toFixed(2)})`];
+    if (volSurge) reasons.push("vol surge on breakout");
+    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+    if (aboveEMA21) reasons.push("above 21 EMA");
+    if (isWideRangeBar(curr, avgRange)) reasons.push("wide range bar");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+  }
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+}
+
+function detectDoubleTop(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 25) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const peaks = findLocalPeaks(highs, 3);
+
+  for (let pi = 0; pi < peaks.length - 1; pi++) {
+    const left = peaks[pi];
+    const right = peaks[pi + 1];
+    const dist = right - left;
+    if (dist < 8 || dist > 50) continue;
+    const diffPct = Math.abs(highs[left] - highs[right]) / highs[left];
+    if (diffPct > 0.03) continue;
+
+    const neckline = Math.min(...lows.slice(left, right + 1));
+    const patternHeight = Math.max(highs[left], highs[right]) - neckline;
+    const avgPrice = (highs[left] + highs[right]) / 2;
+    if (patternHeight / avgPrice < 0.005) continue;
+
+    const curr = bars[bars.length - 1];
+    if (curr.bullish || curr.close >= neckline) continue;
+
+    const recentVol = recentAvgVolume(bars, 10);
+    const volSurge = curr.volume > recentVol * 1.5;
+    if (!volSurge) continue;
+
+    const belowEMA21 = curr.close < state.ema21;
+    const avgRange = getAvgRange(bars);
+
+    const factors = [
+      volSurge,
+      isIgnitingVolume(bars, state.avgVolume),
+      belowEMA21,
+      curr.close < state.ema9,
+      curr.close < state.sma200,
+      state.bias !== "UPTREND",
+      hasToppingTail(bars[bars.length - 2]) || hasToppingTail(curr),
+      isWideRangeBar(curr, avgRange),
+      isNearPivot(state.price, state.pivotHigh, state.price) || isNearPivot(state.price, state.priorPivotHigh, state.price),
+      barFormationQuality(curr, "SHORT") >= 3,
+      patternHeight / avgPrice >= 0.01,
+    ];
+    const conf = calcConfluence(factors);
+    const reasons: string[] = [`double top breakdown (height ${(patternHeight / avgPrice * 100).toFixed(1)}%, neckline ${neckline.toFixed(2)})`];
+    if (volSurge) reasons.push("vol surge on breakdown");
+    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+    if (belowEMA21) reasons.push("below 21 EMA");
+    if (isWideRangeBar(curr, avgRange)) reasons.push("wide range bar");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+  }
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+}
+
 function sentimentLabel(s: MarketState): string {
   if (s.sentiment === "BUYERS_CONTROL") return "GREED";
   if (s.sentiment === "SELLERS_CONTROL") return "FEAR";
@@ -1613,6 +1721,14 @@ async function simulateTick(session: TraderSession) {
         const r = detectInverseCupAndHandleShort(bars, state);
         if (r.detected) candidates.push({ pattern: "Inverse Cup & Handle", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
       }
+      if (session.patterns.includes("doublebottom")) {
+        const r = detectDoubleBottom(bars, state);
+        if (r.detected) candidates.push({ pattern: "Double Bottom", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("doubletop")) {
+        const r = detectDoubleTop(bars, state);
+        if (r.detected) candidates.push({ pattern: "Double Top", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
 
       if (candidates.length > 0) {
         candidates.sort((a, b) => b.conf - a.conf);
@@ -1833,6 +1949,7 @@ export function startTrader(config: {
     "climax_long": "Climax Long", "climax_short": "Climax Short",
     "wedge_long": "Wedge Long", "wedge_short": "Wedge Short",
     "cuphandle_long": "Cup & Handle", "cuphandle_short": "Inverse Cup & Handle",
+    "doublebottom": "Double Bottom", "doubletop": "Double Top",
   };
   const enabledNames = config.patterns.map(p => patternNames[p] || p).join(", ");
   const enabledTFs = config.timeframes.join(", ");

@@ -1011,6 +1011,10 @@
             <label class="check-label"><input type="checkbox" name="pattern" value="cuphandle_long" checked /><span class="check-dot"></span><span>Cup &amp; Handle Long</span></label>
             <label class="check-label"><input type="checkbox" name="pattern" value="cuphandle_short" checked /><span class="check-dot"></span><span>Inverse Cup &amp; Handle Short</span></label>
           </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="doublebottom" checked /><span class="check-dot"></span><span>Double Bottom Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="doubletop" checked /><span class="check-dot"></span><span>Double Top Short</span></label>
+          </div>
         </div>
 
         <label for="customCondition">Custom Buy Condition (optional)</label>
@@ -1204,6 +1208,10 @@
               <label class="check-label"><input type="checkbox" name="set-pattern" value="cuphandle_long" checked /><span class="check-dot"></span><span>Cup &amp; Handle Long</span></label>
               <label class="check-label"><input type="checkbox" name="set-pattern" value="cuphandle_short" checked /><span class="check-dot"></span><span>Inverse Cup &amp; Handle Short</span></label>
             </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="doublebottom" checked /><span class="check-dot"></span><span>Double Bottom Long</span></label>
+              <label class="check-label"><input type="checkbox" name="set-pattern" value="doubletop" checked /><span class="check-dot"></span><span>Double Top Short</span></label>
+            </div>
           </div>
 
           <label style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:0.4rem;display:block;">Enabled Timeframes</label>
@@ -1333,6 +1341,8 @@
                 <option value="climax">Climax Reversal</option>
                 <option value="cuphandle">Cup &amp; Handle</option>
                 <option value="inversecuphandle">Inverse Cup &amp; Handle</option>
+                <option value="doubletop">Double Top</option>
+                <option value="doublebottom">Double Bottom</option>
                 <option value="wedge">Wedge Breakout</option>
                 <option value="all">All Patterns</option>
               </select>
@@ -2431,7 +2441,7 @@
 
       const pbBody = document.getElementById('bt-pattern-breakdown-body');
       if (data.patternBreakdown && Object.keys(data.patternBreakdown).length > 0) {
-        const patNames = { '3bar': '3 Bar Play', '4bar': '4 Bar Play', 'buysetup': 'Buy Setup', 'retest': 'Retest', 'breakout': 'Breakout', 'climax': 'Climax Reversal', 'cuphandle': 'Cup & Handle', 'inversecuphandle': 'Inv Cup & Handle', 'wedge': 'Wedge', 'all': 'All Patterns' };
+        const patNames = { '3bar': '3 Bar Play', '4bar': '4 Bar Play', 'buysetup': 'Buy Setup', 'retest': 'Retest', 'breakout': 'Breakout', 'climax': 'Climax Reversal', 'cuphandle': 'Cup & Handle', 'inversecuphandle': 'Inv Cup & Handle', 'doubletop': 'Double Top', 'doublebottom': 'Double Bottom', 'wedge': 'Wedge', 'all': 'All Patterns' };
         const sorted = Object.entries(data.patternBreakdown).sort((a, b) => b[1].pnl - a[1].pnl);
         pbBody.innerHTML = sorted.map(([key, s]) => {
           const wrCls = s.winRate >= 55 ? 'wr-high' : s.winRate < 40 ? 'wr-low' : '';
@@ -2456,7 +2466,7 @@
       const cells = data.heatmap.sort((a, b) => b.pnl - a.pnl);
       grid.innerHTML = cells.map(c => {
         const cls = c.winRate >= 60 ? 'hm-hot' : c.winRate >= 45 ? 'hm-warm' : c.trades === 0 ? 'hm-neutral' : 'hm-cold';
-        const patNames = { '3bar': '3Bar', '4bar': '4Bar', 'buysetup': 'BuySetup', 'retest': 'Retest', 'breakout': 'Breakout', 'climax': 'Climax', 'cuphandle': 'Cup&Handle', 'inversecuphandle': 'InvCup&Handle', 'wedge': 'Wedge', 'all': 'All' };
+        const patNames = { '3bar': '3Bar', '4bar': '4Bar', 'buysetup': 'BuySetup', 'retest': 'Retest', 'breakout': 'Breakout', 'climax': 'Climax', 'cuphandle': 'Cup&Handle', 'inversecuphandle': 'InvCup&Handle', 'doubletop': 'DblTop', 'doublebottom': 'DblBottom', 'wedge': 'Wedge', 'all': 'All' };
         return '<div class="hm-cell ' + cls + '" data-testid="heatmap-bt-' + esc(c.symbol) + '-' + esc(c.pattern) + '">'
           + '<div class="hm-name">' + esc(c.symbol) + ' / ' + esc(patNames[c.pattern] || c.pattern) + '</div>'
           + '<div class="hm-wr">' + c.winRate + '%</div>'
@@ -2493,7 +2503,7 @@
       const maxHold = parseInt(document.getElementById('bt-hold').value);
       const minConfluence = parseInt(document.getElementById('bt-minconf').value) || 0;
       const symbols = ["ES","MES","NQ","MNQ","YM","MYM","RTY","M2K","CL","MCL","GC","MGC","SI","HG","BTC","ETH","ZB","ZN","ZC","ZS","ZW"];
-      const allPatterns = ["3bar","4bar","buysetup","retest","breakout","climax","cuphandle","inversecuphandle","wedge"];
+      const allPatterns = ["3bar","4bar","buysetup","retest","breakout","climax","cuphandle","inversecuphandle","doubletop","doublebottom","wedge"];
       const patterns = patternSel === 'all' ? allPatterns : [patternSel];
 
       btn.disabled = true;
