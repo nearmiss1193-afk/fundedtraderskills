@@ -5,6 +5,7 @@ function parseTimeframe(tf: string): { multiplier: number; timespan: string } {
   const map: Record<string, { multiplier: number; timespan: string }> = {
     "1min": { multiplier: 1, timespan: "minute" },
     "2min": { multiplier: 2, timespan: "minute" },
+    "3min": { multiplier: 3, timespan: "minute" },
     "5min": { multiplier: 5, timespan: "minute" },
     "15min": { multiplier: 15, timespan: "minute" },
     "30min": { multiplier: 30, timespan: "minute" },

@@ -1225,6 +1225,7 @@
           <label style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:0.4rem;display:block;">Enabled Timeframes</label>
           <div class="check-group" style="margin-bottom:1rem;">
             <label class="check-label"><input type="checkbox" name="set-tf" value="2min" checked /><span class="check-dot"></span><span>2 min</span></label>
+            <label class="check-label"><input type="checkbox" name="set-tf" value="3min" /><span class="check-dot"></span><span>3 min</span></label>
             <label class="check-label"><input type="checkbox" name="set-tf" value="5min" checked /><span class="check-dot"></span><span>5 min</span></label>
             <label class="check-label"><input type="checkbox" name="set-tf" value="15min" checked /><span class="check-dot"></span><span>15 min</span></label>
             <label class="check-label"><input type="checkbox" name="set-tf" value="1hour" checked /><span class="check-dot"></span><span>1 hour</span></label>
@@ -1362,6 +1363,8 @@
               <select id="bt-timeframe" data-testid="select-bt-timeframe">
                 <option value="daily" selected>Daily</option>
                 <option value="1min">1 min</option>
+                <option value="2min">2 min</option>
+                <option value="3min">3 min</option>
                 <option value="5min">5 min</option>
                 <option value="15min">15 min</option>
                 <option value="1hour">1 hour</option>
@@ -1412,6 +1415,8 @@
               <label style="font-size:0.72rem;font-weight:600;color:#94a3b8;">Multi-Scan Timeframes (multi-scan only):</label>
               <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.25rem;">
                 <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="1min" /><span class="check-dot"></span><span>1m</span></label>
+                <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="2min" /><span class="check-dot"></span><span>2m</span></label>
+                <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="3min" /><span class="check-dot"></span><span>3m</span></label>
                 <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="5min" checked /><span class="check-dot"></span><span>5m</span></label>
                 <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="15min" /><span class="check-dot"></span><span>15m</span></label>
                 <label class="check-label" style="font-size:0.7rem;"><input type="checkbox" name="multi-tf" value="1hour" /><span class="check-dot"></span><span>1h</span></label>

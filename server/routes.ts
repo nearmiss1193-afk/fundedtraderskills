@@ -422,7 +422,7 @@ export async function registerRoutes(
 
   app.post("/api/backtest/pattern", async (req, res) => {
     const { symbol, pattern, from, to, rrRatio, maxHold, minConfluence, timeframe } = req.body;
-    const validTimeframes = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "1hour", "4hour", "week", "weekly"];
+    const validTimeframes = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "3min", "1hour", "4hour", "week", "weekly"];
     const tf = timeframe && validTimeframes.includes(timeframe) ? timeframe : "daily";
 
     const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "headshoulders", "invheadshoulders", "wedge", "all"];
@@ -458,7 +458,7 @@ export async function registerRoutes(
     const rr = Number(rrRatio) || 2;
     const hold = Number(maxHold) || 5;
     const minConf = Number(minConfluence) || 0;
-    const validTfList = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "1hour", "4hour", "week", "weekly"];
+    const validTfList = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "3min", "1hour", "4hour", "week", "weekly"];
     const tfList: string[] = Array.isArray(timeframes)
       ? timeframes.filter((t: string) => validTfList.includes(t))
       : (timeframe && validTfList.includes(timeframe) ? [timeframe] : ["daily"]);
