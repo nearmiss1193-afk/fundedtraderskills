@@ -1241,6 +1241,83 @@ function detectCupAndHandleLong(bars: Bar[], state: MarketState): { detected: bo
   return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
 }
 
+function detectInverseCupAndHandleShort(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 25) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const peaks = findLocalPeaks(highs, 3);
+  const troughs = findLocalTroughs(lows, 3);
+
+  for (let ti = 0; ti < troughs.length - 1; ti++) {
+    const leftRim = troughs[ti];
+    const rightRim = troughs[ti + 1];
+    const cupWidth = rightRim - leftRim;
+    if (cupWidth < 10 || cupWidth > 50) continue;
+
+    const rimDiffPct = Math.abs(lows[leftRim] - lows[rightRim]) / lows[leftRim];
+    if (rimDiffPct > 0.02) continue;
+
+    const cupPeaks = peaks.filter(p => p > leftRim && p < rightRim);
+    if (cupPeaks.length === 0) continue;
+    const cupTop = cupPeaks.reduce((a, b) => highs[a] > highs[b] ? a : b);
+
+    const cupDepth = highs[cupTop] - Math.max(lows[leftRim], lows[rightRim]);
+    const avgPrice = (lows[leftRim] + lows[rightRim]) / 2;
+    if (cupDepth / avgPrice < 0.005) continue;
+
+    const leftHalf = bars.slice(leftRim, cupTop + 1);
+    const rightHalf = bars.slice(cupTop, rightRim + 1);
+    const leftSlope = linearRegressionSlope(leftHalf.map(b => b.close));
+    const rightSlope = linearRegressionSlope(rightHalf.map(b => b.close));
+    if (leftSlope < 0 || rightSlope > 0) continue;
+
+    const rimLow = Math.min(lows[leftRim], lows[rightRim]);
+    const handleEnd = Math.min(rightRim + Math.floor(cupWidth * 0.4), bars.length - 1);
+
+    let handleHigh = -Infinity;
+    for (let h = rightRim + 1; h <= handleEnd; h++) {
+      if (bars[h].high > handleHigh) handleHigh = bars[h].high;
+      const handleRetrace = handleHigh - rimLow;
+      if (handleRetrace > cupDepth * 0.5) break;
+    }
+
+    const curr = bars[bars.length - 1];
+    if (curr.bullish || curr.close >= rimLow) continue;
+
+    const recentVol = recentAvgVolume(bars, 10);
+    const volSurge = curr.volume > recentVol * 1.5;
+    if (!volSurge) continue;
+
+    const belowEMA21 = curr.close < state.ema21;
+    const avgRange = getAvgRange(bars);
+
+    const factors = [
+      volSurge,
+      isIgnitingVolume(bars, state.avgVolume),
+      belowEMA21,
+      curr.close < state.ema9,
+      curr.close < state.sma200,
+      state.bias !== "UPTREND",
+      hasToppingTail(bars[bars.length - 2]) || hasToppingTail(curr),
+      isWideRangeBar(curr, avgRange),
+      isNearPivot(state.price, state.pivotHigh, state.price) || isNearPivot(state.price, state.priorPivotHigh, state.price),
+      barFormationQuality(curr, "SHORT") >= 3,
+      cupDepth / avgPrice >= 0.01,
+    ];
+    const conf = calcConfluence(factors);
+    const handlePct = handleHigh > -Infinity ? ((handleHigh - rimLow) / cupDepth * 100).toFixed(0) : "n/a";
+    const reasons: string[] = [`inverse cup&handle breakdown (depth ${(cupDepth / avgPrice * 100).toFixed(1)}%, handle ${handlePct}%)`];
+    if (volSurge) reasons.push("vol surge on breakdown");
+    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+    if (belowEMA21) reasons.push("below 21 EMA");
+    if (isWideRangeBar(curr, avgRange)) reasons.push("wide range bar");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+  }
+
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+}
+
 function sentimentLabel(s: MarketState): string {
   if (s.sentiment === "BUYERS_CONTROL") return "GREED";
   if (s.sentiment === "SELLERS_CONTROL") return "FEAR";
@@ -1528,6 +1605,14 @@ async function simulateTick(session: TraderSession) {
         const r = detectWedgeShort(bars, state);
         if (r.detected) candidates.push({ pattern: "Wedge Breakout", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
       }
+      if (session.patterns.includes("cuphandle_long")) {
+        const r = detectCupAndHandleLong(bars, state);
+        if (r.detected) candidates.push({ pattern: "Cup & Handle", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("cuphandle_short")) {
+        const r = detectInverseCupAndHandleShort(bars, state);
+        if (r.detected) candidates.push({ pattern: "Inverse Cup & Handle", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
 
       if (candidates.length > 0) {
         candidates.sort((a, b) => b.conf - a.conf);
@@ -1747,6 +1832,7 @@ export function startTrader(config: {
     "breakout_long": "Breakout Long", "breakout_short": "Breakout Short",
     "climax_long": "Climax Long", "climax_short": "Climax Short",
     "wedge_long": "Wedge Long", "wedge_short": "Wedge Short",
+    "cuphandle_long": "Cup & Handle", "cuphandle_short": "Inverse Cup & Handle",
   };
   const enabledNames = config.patterns.map(p => patternNames[p] || p).join(", ");
   const enabledTFs = config.timeframes.join(", ");

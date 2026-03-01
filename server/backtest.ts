@@ -1094,6 +1094,77 @@ function detectCupAndHandle(data: ReturnType<typeof addIndicators>): Signal[] {
   return signals;
 }
 
+function detectInverseCupAndHandle(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema21, ema9, avgVol, green, volType, body, range, htfDown, gapDown, level2GapDown, toppingTail } = data;
+  const cupMin = 15;
+  const cupMax = 60;
+  const peakDist = 5;
+
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const peaks = findLocalPeaks(highs, peakDist);
+  const troughs = findLocalTroughs(lows, peakDist);
+
+  for (let ti = 0; ti < troughs.length - 1; ti++) {
+    const leftRim = troughs[ti];
+    const rightRim = troughs[ti + 1];
+    const cupWidth = rightRim - leftRim;
+    if (cupWidth < cupMin || cupWidth > cupMax) continue;
+
+    const rimDiffPct = Math.abs(lows[leftRim] - lows[rightRim]) / lows[leftRim];
+    if (rimDiffPct > 0.02) continue;
+
+    const cupPeaks = peaks.filter(p => p > leftRim && p < rightRim);
+    if (cupPeaks.length === 0) continue;
+    const cupTop = cupPeaks.reduce((a, b) => highs[a] > highs[b] ? a : b);
+
+    const cupDepth = highs[cupTop] - Math.max(lows[leftRim], lows[rightRim]);
+    const avgPrice = (lows[leftRim] + lows[rightRim]) / 2;
+    if (cupDepth / avgPrice < 0.01) continue;
+
+    const leftHalf = bars.slice(leftRim, cupTop + 1);
+    const rightHalf = bars.slice(cupTop, rightRim + 1);
+    const leftSlope = linregSlope(leftHalf.map(b => b.close));
+    const rightSlope = linregSlope(rightHalf.map(b => b.close));
+    if (leftSlope < 0 || rightSlope > 0) continue;
+
+    const rimLow = Math.min(lows[leftRim], lows[rightRim]);
+    const handleMaxBars = Math.min(Math.floor(cupWidth * 0.4), 15);
+    const handleEnd = Math.min(rightRim + handleMaxBars, bars.length - 2);
+
+    let handleHigh = -Infinity;
+    let handleFound = false;
+    for (let h = rightRim + 1; h <= handleEnd; h++) {
+      if (bars[h].high > handleHigh) handleHigh = bars[h].high;
+      const handleRetrace = handleHigh - rimLow;
+      if (handleRetrace > cupDepth * 0.5) break;
+
+      if (h > rightRim + 2 &&
+          !green[h] &&
+          bars[h].close < rimLow &&
+          bars[h].volume > 1.5 * avgVol[h] &&
+          bars[h].close < ema21[h] &&
+          ema9[h] < ema21[h]) {
+        handleFound = true;
+        const conf = [
+          bars[h].volume > 1.5 * avgVol[h],
+          volType[h] === "IGNITING",
+          body[h] > 0.5 * range[h],
+          htfDown[h],
+          gapDown[h],
+          level2GapDown[h],
+          toppingTail[h] || (h > 0 && toppingTail[h - 1]),
+        ].filter(Boolean).length;
+        signals.push({ index: h, direction: "SHORT", pattern: "Inverse Cup & Handle", confluence: conf, volType: volType[h] });
+        break;
+      }
+    }
+  }
+
+  return signals;
+}
+
 function detectWedgeBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
   const { bars, ema21, ema9, avgVol, avgRange, green, volType, body, range, htfUp, htfDown, gapUp, gapDown, level2GapUp, level2GapDown, toppingTail, bottomingTail } = data;

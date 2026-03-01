@@ -1,0 +1,100 @@
+Here is the complete, symmetric Inverse Head and Shoulders detection function that mirrors the bearish Head and Shoulders logic you already have. Paste this directly into your pattern detection module (e.g., patterns.ts, trader.ts for live scanning, or backtest logic).
+JavaScript// Inverse Head and Shoulders (Bullish Reversal) - complete mirror of Head & Shoulders
+function detectInverseHeadAndShoulders(bars, symbol, timeframe) {
+  if (bars.length < 50) return null;
+
+  const recent = bars.slice(-100);
+
+  // Find troughs (shoulders & head) - we look for local lows
+  const troughs = [];
+  for (let i = 5; i < recent.length - 5; i++) {
+    if (
+      recent[i].low < recent[i-5].low &&
+      recent[i].low < recent[i+5].low
+    ) {
+      troughs.push({ idx: i, low: recent[i].low });
+    }
+  }
+
+  if (troughs.length < 3) return null;
+
+  // Last three troughs: left shoulder, head, right shoulder
+  const ls = troughs[troughs.length - 3];   // left shoulder
+  const head = troughs[troughs.length - 2]; // head (lowest point)
+  const rs = troughs[troughs.length - 1];   // right shoulder
+
+  const isInvHAndS =
+    head.low < ls.low && head.low < rs.low &&
+    Math.abs(ls.low - rs.low) / head.low < 0.08; // shoulders similar depth (±8%)
+
+  // Neckline: connect highs between shoulders and head
+  const leftHigh = Math.max(...recent.slice(ls.idx, head.idx).map(b => b.high));
+  const rightHigh = Math.max(...recent.slice(head.idx, rs.idx).map(b => b.high));
+  const necklineSlope = (rightHigh - leftHigh) / (rs.idx - ls.idx);
+  const currentNeck = leftHigh + necklineSlope * (recent.length - 1 - ls.idx);
+
+  const lastBar = recent[recent.length - 1];
+  const breakout = lastBar.close > currentNeck && lastBar.volume > 1.5 * averageVolume(recent.slice(-10));
+
+  if (!isInvHAndS || !breakout) return null;
+
+  // Confluence calculation (same as other patterns)
+  const confluence = calculateConfluence({
+    volSurge: true,
+    volType: getVolumeType(lastBar, recent),
+    tailPresent: hasTail(lastBar),                // bottoming tail on breakout ideal
+    strongBody: isStrongBody(lastBar),
+    maRespect: lastBar.close > ema(recent.map(b => b.close), 21)[recent.length - 1],
+    htfAligned: isHTFAligned(symbol, 'long'),
+    gapLevel: detectGapLevel(recent),
+    wBottomTop: detectWBottomTop(recent, 'long')
+  });
+
+  if (confluence < 8) return null; // enforce live threshold
+
+  const entry = lastBar.close;
+  const stop = Math.min(ls.low, rs.low, head.low) * 0.99; // below right shoulder low
+  const patternHeight = currentNeck - head.low;
+  const target = entry + patternHeight; // classic measured move upward
+
+  return {
+    pattern: 'inverseheadandshoulders',
+    direction: 'long',
+    entry,
+    stop,
+    target,
+    confluence,
+    volType: getVolumeType(lastBar, recent),
+    timestamp: lastBar.timestamp,
+    notes: `Head depth: ${patternHeight.toFixed(2)}, Neckline: ${currentNeck.toFixed(2)}`
+  };
+}
+
+// Add to your main pattern detection loop (same place you call detectHeadAndShoulders)
+const invHsSignal = detectInverseHeadAndShoulders(currentBars, symbol, timeframe);
+if (invHsSignal) {
+  console.log(`Inverse H&S detected: long on ${symbol} - ${invHsSignal.confluence}pt`);
+  emitTradeSignal(invHsSignal);
+}
+Quick Integration Checklist
+
+Make sure these helper functions already exist in your codebase (used by other patterns):
+calculateConfluence({ ... })
+getVolumeType(bar, recentBars)
+hasTail(bar)
+isStrongBody(bar)
+ema(prices, period)
+averageVolume(bars)
+isHTFAligned(symbol, direction)
+detectGapLevel(recent)
+detectWBottomTop(recent, direction)
+If any are missing, let me know — I can provide stubs or full implementations.
+After adding:
+Save → restart Replit server
+Test in backtester: Run a single-symbol backtest on NQ or ES (5min, 2025 range) → look for inverseheadandshoulders in results
+Test live: Run scanner during RTH → watch console for Inverse H&S logs (e.g., "Inverse H&S detected: long on ES – 9pt")
+
+Next recommended actions (pick one or more):
+Run a quick single-symbol backtest (NQ/ES 5min) after adding Inverse H&S → share if any signals appeared (pattern, confluence, P&L impact)
+Run full historical UI scan (Edge Builder → Multi-Symbol Edge Scan, 5min, 2015–2026, minConfluence 8) → paste top 5 symbol/pattern combos summary here
+During next RTH: Run live scanner → share any Wedge / Cup & Handle / Inverse H&S logs + NT sim order results
