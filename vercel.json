@@ -1,1 +1,1 @@
-{"rewrites": [{"source": "/api/:path*","destination": "https://your-replit-project-name.replit.app/api/:path*"}]}
+{"rewrites": [{"source": "/api/(.*)", "destination": "https://skill-hub-server.replit.app/api/$1"}]}
