@@ -1368,6 +1368,30 @@
         </div>
       </div>
 
+      <div class="edge-card" id="bt-heatmap-card" style="display:none;">
+        <h3><span class="edge-icon">&#128293;</span> Backtest Edge Heatmap &mdash; Symbol &times; Pattern</h3>
+        <p class="edge-sub">Color-coded performance grid from your last multi-symbol scan. Green = profitable, Red = losing, Yellow = marginal.</p>
+
+        <div class="edge-section-title"><span class="est">&#127919;</span> Pattern Breakdown (All Symbols)</div>
+        <div style="overflow-x:auto;border:1px solid #e8e5f0;border-radius:8px;margin-bottom:1rem;">
+          <table class="edge-group-table" id="bt-pattern-breakdown" data-testid="table-bt-pattern-breakdown">
+            <thead><tr><th>Pattern</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Profit Factor</th><th>Total P&amp;L</th><th>Expectancy</th></tr></thead>
+            <tbody id="bt-pattern-breakdown-body"></tbody>
+          </table>
+        </div>
+
+        <div class="edge-section-title"><span class="est">&#128200;</span> Heatmap Grid</div>
+        <div class="edge-heatmap" id="bt-heatmap-grid" data-testid="bt-heatmap-grid"></div>
+
+        <div class="edge-section-title" style="margin-top:1rem;"><span class="est">&#128202;</span> Full Heatmap Table</div>
+        <div style="overflow-x:auto;border:1px solid #e8e5f0;border-radius:8px;">
+          <table class="bt-trades-table" id="bt-heatmap-table" data-testid="table-bt-heatmap">
+            <thead><tr><th>Symbol</th><th>Pattern</th><th>Trades</th><th>Wins</th><th>Win %</th><th>PF</th><th>P&amp;L</th><th>Expectancy</th></tr></thead>
+            <tbody id="bt-heatmap-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="edge-card">
         <h3><span class="edge-icon">&#128218;</span> Pattern Library &mdash; Live Traders Manual</h3>
         <p class="edge-sub">Master these setups from Jared Wesley's "Trading With An Edge." Every pattern has clear rules for entry, stop, and target.</p>
@@ -2368,26 +2392,89 @@
       }
     }
 
+    function renderBacktestHeatmap(data) {
+      const card = document.getElementById('bt-heatmap-card');
+      if (!data || !data.heatmap || data.heatmap.length === 0) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = '';
+
+      const pbBody = document.getElementById('bt-pattern-breakdown-body');
+      if (data.patternBreakdown && Object.keys(data.patternBreakdown).length > 0) {
+        const patNames = { '3bar': '3 Bar Play', '4bar': '4 Bar Play', 'buysetup': 'Buy Setup', 'retest': 'Retest', 'breakout': 'Breakout', 'climax': 'Climax Reversal', 'cuphandle': 'Cup & Handle', 'wedge': 'Wedge', 'all': 'All Patterns' };
+        const sorted = Object.entries(data.patternBreakdown).sort((a, b) => b[1].pnl - a[1].pnl);
+        pbBody.innerHTML = sorted.map(([key, s]) => {
+          const wrCls = s.winRate >= 55 ? 'wr-high' : s.winRate < 40 ? 'wr-low' : '';
+          const pnlCls = s.pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+          const pfStr = s.profitFactor >= 99 ? '\u221E' : s.profitFactor;
+          const expSign = s.expectancy >= 0 ? '+' : '';
+          return '<tr data-testid="row-pb-' + esc(key) + '">'
+            + '<td><b>' + esc(patNames[key] || key) + '</b></td>'
+            + '<td>' + s.count + '</td>'
+            + '<td>' + s.wins + '</td>'
+            + '<td class="' + wrCls + '">' + s.winRate + '%</td>'
+            + '<td>' + pfStr + '</td>'
+            + '<td class="' + pnlCls + '">' + (s.pnl >= 0 ? '+' : '') + '$' + s.pnl.toLocaleString() + '</td>'
+            + '<td>' + expSign + '$' + s.expectancy.toFixed(2) + '</td>'
+            + '</tr>';
+        }).join('');
+      } else {
+        pbBody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:1rem;">No pattern data</td></tr>';
+      }
+
+      const grid = document.getElementById('bt-heatmap-grid');
+      const cells = data.heatmap.sort((a, b) => b.pnl - a.pnl);
+      grid.innerHTML = cells.map(c => {
+        const cls = c.winRate >= 60 ? 'hm-hot' : c.winRate >= 45 ? 'hm-warm' : c.trades === 0 ? 'hm-neutral' : 'hm-cold';
+        const patNames = { '3bar': '3Bar', '4bar': '4Bar', 'buysetup': 'BuySetup', 'retest': 'Retest', 'breakout': 'Breakout', 'climax': 'Climax', 'cuphandle': 'Cup&Handle', 'wedge': 'Wedge', 'all': 'All' };
+        return '<div class="hm-cell ' + cls + '" data-testid="heatmap-bt-' + esc(c.symbol) + '-' + esc(c.pattern) + '">'
+          + '<div class="hm-name">' + esc(c.symbol) + ' / ' + esc(patNames[c.pattern] || c.pattern) + '</div>'
+          + '<div class="hm-wr">' + c.winRate + '%</div>'
+          + '<div class="hm-pnl">' + (c.pnl >= 0 ? '+' : '') + '$' + c.pnl.toLocaleString() + ' | ' + c.trades + ' trades | PF ' + (c.pf >= 99 ? '\u221E' : c.pf) + '</div>'
+          + '</div>';
+      }).join('');
+
+      const tbody = document.getElementById('bt-heatmap-table-body');
+      tbody.innerHTML = cells.map(c => {
+        const wrCls = c.winRate >= 55 ? 'pos' : c.winRate < 40 ? 'neg' : '';
+        const pfCls = c.pf >= 1.5 ? 'pos' : c.pf < 1 ? 'neg' : '';
+        const pnlCls = c.pnl >= 0 ? 'pos' : 'neg';
+        return '<tr>'
+          + '<td style="font-weight:600">' + esc(c.symbol) + '</td>'
+          + '<td>' + esc(c.pattern) + '</td>'
+          + '<td>' + c.trades + '</td>'
+          + '<td>' + c.wins + '</td>'
+          + '<td class="' + wrCls + '">' + c.winRate + '%</td>'
+          + '<td class="' + pfCls + '">' + (c.pf >= 99 ? '\u221E' : c.pf) + '</td>'
+          + '<td class="' + pnlCls + '">' + (c.pnl >= 0 ? '+' : '') + '$' + c.pnl.toLocaleString() + '</td>'
+          + '<td>' + (c.expectancy >= 0 ? '+' : '') + '$' + c.expectancy.toFixed(2) + '</td>'
+          + '</tr>';
+      }).join('');
+    }
+
     async function runMultiSymbolScan() {
       const btn = document.getElementById('bt-multi-btn');
       const resultsDiv = document.getElementById('bt-results');
-      const pattern = document.getElementById('bt-pattern').value;
+      const patternSel = document.getElementById('bt-pattern').value;
       const from = document.getElementById('bt-from').value;
       const to = document.getElementById('bt-to').value;
       const rrRatio = parseFloat(document.getElementById('bt-rr').value);
       const maxHold = parseInt(document.getElementById('bt-hold').value);
       const minConfluence = parseInt(document.getElementById('bt-minconf').value) || 0;
       const symbols = ["ES","MES","NQ","MNQ","YM","MYM","RTY","M2K","CL","MCL","GC","MGC","SI","HG","BTC","ETH","ZB","ZN","ZC","ZS","ZW"];
+      const allPatterns = ["3bar","4bar","buysetup","retest","breakout","climax","cuphandle","wedge"];
+      const patterns = patternSel === 'all' ? allPatterns : [patternSel];
 
       btn.disabled = true;
       btn.textContent = 'Scanning...';
-      resultsDiv.innerHTML = '<div class="bt-status">Running multi-symbol edge scan across ' + symbols.length + ' symbols... This may take a minute.</div>';
+      resultsDiv.innerHTML = '<div class="bt-status">Running multi-symbol edge scan across ' + symbols.length + ' symbols &times; ' + patterns.length + ' patterns... This may take a minute.</div>';
 
       try {
         const resp = await fetch('/api/backtest/multi', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbols, pattern, from, to, rrRatio, maxHold, minConfluence })
+          body: JSON.stringify({ symbols, patterns, from, to, rrRatio, maxHold, minConfluence })
         });
         const d = await resp.json();
         if (!d.success) {
@@ -2397,7 +2484,8 @@
 
         let allTrades = [];
         const s = d.summary || {};
-        let html = '<div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;color:#e2e8f0;">Multi-Symbol Edge Report (' + esc(pattern) + ')</div>';
+        const patLabel = patterns.length === 1 ? patterns[0] : patterns.length + ' patterns';
+        let html = '<div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;color:#e2e8f0;">Multi-Symbol Edge Report (' + esc(patLabel) + ')</div>';
         html += '<div class="bt-metrics" style="margin-bottom:0.8rem;">'
           + '<div class="bt-metric"><div class="bt-label">Symbols</div><div class="bt-val">' + (s.symbolsScanned || '?') + '</div></div>'
           + '<div class="bt-metric"><div class="bt-label">Total Trades</div><div class="bt-val">' + (s.totalTrades || 0) + '</div></div>'
@@ -2458,6 +2546,7 @@
         lastBacktestTrades = allTrades;
         document.getElementById('bt-csv-btn').disabled = false;
         resultsDiv.innerHTML = html;
+        renderBacktestHeatmap(d);
       } catch (err) {
         resultsDiv.innerHTML = '<div class="bt-status" style="color:#ef4444">Error: ' + esc(err.message || 'Network error') + '</div>';
       } finally {

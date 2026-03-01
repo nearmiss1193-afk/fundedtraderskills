@@ -466,6 +466,8 @@ export async function registerRoutes(
 
     const results: any[] = [];
     let totalTrades = 0, totalWins = 0, totalLosses = 0, totalPnl = 0, totalGrossWin = 0, totalGrossLoss = 0;
+    const patternAgg: Record<string, { trades: number; wins: number; losses: number; pnl: number; grossWin: number; grossLoss: number }> = {};
+    const heatmapCells: { symbol: string; pattern: string; trades: number; wins: number; winRate: number; pf: number; pnl: number; expectancy: number }[] = [];
 
     for (const sym of symList) {
       const symUpper = String(sym).toUpperCase();
@@ -481,6 +483,29 @@ export async function registerRoutes(
             symLosses += r.losses;
             symPnl += r.totalPnlDollars;
             if (r.trades) symTradeList.push(...r.trades);
+
+            if (!patternAgg[pat]) patternAgg[pat] = { trades: 0, wins: 0, losses: 0, pnl: 0, grossWin: 0, grossLoss: 0 };
+            patternAgg[pat].trades += r.totalTrades;
+            patternAgg[pat].wins += r.wins;
+            patternAgg[pat].losses += r.losses;
+            patternAgg[pat].pnl += r.totalPnlDollars;
+            const patGW = (r.trades || []).filter((t: any) => t.pnlDollars > 0).reduce((s: number, t: any) => s + t.pnlDollars, 0);
+            const patGL = Math.abs((r.trades || []).filter((t: any) => t.pnlDollars < 0).reduce((s: number, t: any) => s + t.pnlDollars, 0));
+            patternAgg[pat].grossWin += patGW;
+            patternAgg[pat].grossLoss += patGL;
+
+            const cellWR = r.totalTrades > 0 ? Math.round((r.wins / r.totalTrades) * 10000) / 100 : 0;
+            const cellPF = patGL > 0 ? Math.round((patGW / patGL) * 100) / 100 : (patGW > 0 ? 99 : 0);
+            heatmapCells.push({
+              symbol: symUpper,
+              pattern: pat,
+              trades: r.totalTrades,
+              wins: r.wins,
+              winRate: cellWR,
+              pf: cellPF,
+              pnl: Math.round(r.totalPnlDollars * 100) / 100,
+              expectancy: r.totalTrades > 0 ? Math.round((r.totalPnlDollars / r.totalTrades) * 100) / 100 : 0,
+            });
           }
         } catch (err: any) {
           console.error(`[backtest/multi] ${symUpper}/${pat}: ${err.message}`);
@@ -517,6 +542,20 @@ export async function registerRoutes(
     const overallWR = totalTrades > 0 ? totalWins / totalTrades : 0;
     const overallPF = totalGrossLoss > 0 ? Math.round((totalGrossWin / totalGrossLoss) * 100) / 100 : (totalGrossWin > 0 ? 99 : 0);
 
+    const patternBreakdown: Record<string, { count: number; wins: number; winRate: number; profitFactor: number; pnl: number; expectancy: number }> = {};
+    for (const [pat, agg] of Object.entries(patternAgg)) {
+      const wr = agg.trades > 0 ? Math.round((agg.wins / agg.trades) * 10000) / 100 : 0;
+      const pf = agg.grossLoss > 0 ? Math.round((agg.grossWin / agg.grossLoss) * 100) / 100 : (agg.grossWin > 0 ? 99 : 0);
+      patternBreakdown[pat] = {
+        count: agg.trades,
+        wins: agg.wins,
+        winRate: wr,
+        profitFactor: pf,
+        pnl: Math.round(agg.pnl * 100) / 100,
+        expectancy: agg.trades > 0 ? Math.round((agg.pnl / agg.trades) * 100) / 100 : 0,
+      };
+    }
+
     res.json({
       success: true,
       summary: {
@@ -531,6 +570,8 @@ export async function registerRoutes(
         minConfluence: minConf,
         period: `${dateFrom} to ${dateTo}`,
       },
+      patternBreakdown,
+      heatmap: heatmapCells,
       results,
     });
   });
