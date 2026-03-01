@@ -223,7 +223,7 @@ interface Signal {
 
 function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
   const signals: Signal[] = [];
-  const { bars, ema21, avgRange, avgVol, range, body, green } = data;
+  const { bars, ema21, ema9, avgRange, avgVol, range, body, green } = data;
 
   for (let i = 3; i < bars.length; i++) {
     const ignitingIdx = i - 2;
@@ -231,6 +231,9 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
     const triggerIdx = i;
 
     if (ignitingIdx < 1) continue;
+
+    const trendUp = ema9[triggerIdx] > ema21[triggerIdx];
+    const trendDown = ema9[triggerIdx] < ema21[triggerIdx];
 
     const isIgnitingLong = green[ignitingIdx] &&
       range[ignitingIdx] > 1.5 * avgRange[ignitingIdx] &&
@@ -240,10 +243,14 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
     const isRestingLong = range[restingIdx] < 0.5 * range[ignitingIdx] &&
       bars[restingIdx].low > bars[ignitingIdx].low - 0.1 * range[ignitingIdx];
 
+    const volumeSurgeLong = bars[triggerIdx].volume > 1.5 * avgVol[triggerIdx] &&
+      bars[triggerIdx].volume > bars[restingIdx].volume;
+
     const isTriggerLong = green[triggerIdx] &&
       bars[triggerIdx].close > bars[restingIdx].high &&
-      bars[triggerIdx].volume > bars[restingIdx].volume &&
-      bars[triggerIdx].close > ema21[triggerIdx];
+      volumeSurgeLong &&
+      bars[triggerIdx].close > ema21[triggerIdx] &&
+      trendUp;
 
     if (isIgnitingLong && isRestingLong && isTriggerLong) {
       signals.push({ index: triggerIdx, direction: "LONG", pattern: "3 Bar Play" });
@@ -257,10 +264,14 @@ function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
     const isRestingShort = range[restingIdx] < 0.5 * range[ignitingIdx] &&
       bars[restingIdx].high < bars[ignitingIdx].high + 0.1 * range[ignitingIdx];
 
+    const volumeSurgeShort = bars[triggerIdx].volume > 1.5 * avgVol[triggerIdx] &&
+      bars[triggerIdx].volume > bars[restingIdx].volume;
+
     const isTriggerShort = !green[triggerIdx] &&
       bars[triggerIdx].close < bars[restingIdx].low &&
-      bars[triggerIdx].volume > bars[restingIdx].volume &&
-      bars[triggerIdx].close < ema21[triggerIdx];
+      volumeSurgeShort &&
+      bars[triggerIdx].close < ema21[triggerIdx] &&
+      trendDown;
 
     if (isIgnitingShort && isRestingShort && isTriggerShort) {
       signals.push({ index: triggerIdx, direction: "SHORT", pattern: "3 Bar Play" });
@@ -276,15 +287,16 @@ function detectBuySetup(data: ReturnType<typeof addIndicators>): Signal[] {
   for (let i = 4; i < bars.length; i++) {
     const prevBars = [bars[i - 3], bars[i - 2], bars[i - 1]];
     const curr = bars[i];
+    const trendUp = ema9[i] > ema21[i];
+    const trendDown = ema9[i] < ema21[i];
 
     const pullbackCount = prevBars.filter(b => b.close < b.open).length;
     const nearEma = Math.abs(bars[i - 1].low - ema21[i - 1]) / ema21[i - 1] < 0.005;
     const greenReversal = green[i] && curr.close > bars[i - 1].high;
-    const volConfirm = curr.volume > avgVol[i] * 1.2;
+    const volSurge = curr.volume > avgVol[i] * 1.5;
     const aboveEma = curr.close > ema9[i];
-    const bottomTail = (Math.min(curr.open, curr.close) - curr.low) > 0.3 * (curr.high - curr.low);
 
-    if (pullbackCount >= 2 && nearEma && greenReversal && volConfirm && aboveEma) {
+    if (pullbackCount >= 2 && nearEma && greenReversal && volSurge && aboveEma && trendUp) {
       signals.push({ index: i, direction: "LONG", pattern: "Buy Setup" });
     }
 
@@ -293,7 +305,7 @@ function detectBuySetup(data: ReturnType<typeof addIndicators>): Signal[] {
     const redReversal = !green[i] && curr.close < bars[i - 1].low;
     const belowEma = curr.close < ema9[i];
 
-    if (rallyCount >= 2 && nearEmaShort && redReversal && volConfirm && belowEma) {
+    if (rallyCount >= 2 && nearEmaShort && redReversal && volSurge && belowEma && trendDown) {
       signals.push({ index: i, direction: "SHORT", pattern: "Sell Setup" });
     }
   }
