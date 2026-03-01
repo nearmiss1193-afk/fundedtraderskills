@@ -446,5 +446,31 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/backtest/multi", async (req, res) => {
+    const { symbols, pattern, from, to, rrRatio, maxHold } = req.body;
+    const symList: string[] = Array.isArray(symbols) ? symbols.slice(0, 25) : ["ES", "NQ", "CL", "GC", "ZS"];
+    const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "wedge", "all"];
+    if (pattern && !validPatterns.includes(pattern)) {
+      return res.status(400).json({ success: false, error: `Invalid pattern: ${pattern}` });
+    }
+    if (from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+      return res.status(400).json({ success: false, error: "Invalid 'from' date format. Use YYYY-MM-DD." });
+    }
+    if (to && !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return res.status(400).json({ success: false, error: "Invalid 'to' date format. Use YYYY-MM-DD." });
+    }
+
+    const results: Record<string, any> = {};
+    for (const sym of symList) {
+      try {
+        const r = await runBacktest({ symbol: String(sym).toUpperCase(), pattern: pattern || "all", from, to, rrRatio: Number(rrRatio) || 2, maxHold: Number(maxHold) || 5 });
+        results[sym] = { success: !r.error, ...r };
+      } catch (err: any) {
+        results[sym] = { success: false, error: err.message, totalTrades: 0 };
+      }
+    }
+    res.json({ success: true, results });
+  });
+
   return httpServer;
 }

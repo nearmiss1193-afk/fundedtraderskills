@@ -190,7 +190,14 @@ function getNTInstrument(symbol: string): string {
   let contractYear = year;
   if (contractMonth <= month + 1) contractYear = year + 1;
   const mm = String(contractMonth).padStart(2, "0");
-  return `${symbol} ${mm}-${contractYear}`;
+  const specific = `${symbol} ${mm}-${contractYear}`;
+  const continuous = `${symbol} 1!`;
+  const useContinuous = process.env.NT_USE_CONTINUOUS === "true";
+  return useContinuous ? continuous : specific;
+}
+
+function getNTInstrumentContinuous(symbol: string): string {
+  return `${symbol} 1!`;
 }
 
 export { getNTInstrument };

@@ -142,6 +142,19 @@ The bridge polls Supabase `trade_signals` for NEW entries and forwards them to N
 4. Set date range (YYYY-MM-DD), R:R ratio, max hold bars
 5. Results show individual trades with confluence scores, volume types, and P&L
 
+## NinjaTrader Instrument Format
+
+The system maps symbol roots to NinjaTrader-compatible instrument names:
+
+| Mode | Format | Example | Usage |
+|------|--------|---------|-------|
+| Specific Contract | `{SYMBOL} {MM}-{YY}` | `ES 06-26` | Default (auto-rolls quarterly/monthly) |
+| Continuous | `{SYMBOL} 1!` | `ES 1!` | Set `NT_USE_CONTINUOUS=true` env var |
+
+Supported symbols: ES, MES, NQ, MNQ, YM, MYM, RTY, M2K, CL, MCL, GC, MGC, SI, HG, PL, PA, BTC, ETH, ZB, ZN, ZT, ZF, ZC, ZS, ZW.
+
+For Apex Trader Funding accounts, use continuous contracts (`ES 1!`, `NQ 1!`, `CL 1!`, `GC 1!`).
+
 ## Safety
 
 - **Paper/sim mode only** — non-SIM accounts are blocked unless `ALLOW_LIVE_TRADES=true` is set
@@ -164,6 +177,7 @@ No live trading until you fully understand the risks. This system is designed fo
 | POST | `/api/signal/test` | Send test signal through pipeline |
 | GET | `/api/trade-ack/:signalId` | Poll for signal ACK status |
 | POST | `/api/backtest/pattern` | Run historical backtest |
+| POST | `/api/backtest/multi` | Multi-symbol batch backtest |
 | GET | `/api/journal` | Load trade journal |
 | GET | `/api/journal/stats` | Journal summary statistics |
 | GET | `/api/journal/analytics` | Advanced analytics (grouped) |

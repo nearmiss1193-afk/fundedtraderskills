@@ -1277,14 +1277,23 @@
                   <option value="NQ">NQ (E-mini Nasdaq)</option>
                   <option value="MNQ">MNQ (Micro Nasdaq)</option>
                   <option value="YM">YM (E-mini Dow)</option>
+                  <option value="MYM">MYM (Micro Dow)</option>
                   <option value="RTY">RTY (Russell 2000)</option>
+                  <option value="M2K">M2K (Micro Russell)</option>
                 </optgroup>
                 <optgroup label="Energy">
                   <option value="CL">CL (Crude Oil)</option>
+                  <option value="MCL">MCL (Micro Crude)</option>
                 </optgroup>
                 <optgroup label="Metals">
                   <option value="GC">GC (Gold)</option>
+                  <option value="MGC">MGC (Micro Gold)</option>
                   <option value="SI">SI (Silver)</option>
+                  <option value="HG">HG (Copper)</option>
+                </optgroup>
+                <optgroup label="Crypto">
+                  <option value="BTC">BTC (Bitcoin)</option>
+                  <option value="ETH">ETH (Ethereum)</option>
                 </optgroup>
                 <optgroup label="Treasury">
                   <option value="ZB">ZB (30Y Bond)</option>
@@ -1338,6 +1347,8 @@
               </select>
             </div>
             <button class="bt-run-btn" id="bt-run-btn" onclick="runBacktestUI()" data-testid="button-run-backtest">Run Backtest</button>
+            <button class="bt-run-btn" style="background:#6366f1;" id="bt-multi-btn" onclick="runMultiSymbolScan()" data-testid="button-multi-scan">Multi-Symbol Edge Scan</button>
+            <button class="bt-run-btn" style="background:#059669;" id="bt-csv-btn" onclick="exportBacktestCSV()" data-testid="button-export-csv" disabled>Export CSV</button>
           </div>
           <div id="bt-results" data-testid="bt-results">
             <div class="bt-status" id="bt-status">Select parameters and click Run Backtest to analyze historical pattern performance.</div>
@@ -2247,6 +2258,8 @@
 
     document.getElementById('bt-to').value = new Date().toISOString().slice(0, 10);
 
+    let lastBacktestTrades = [];
+
     async function runBacktestUI() {
       const btn = document.getElementById('bt-run-btn');
       const resultsDiv = document.getElementById('bt-results');
@@ -2330,12 +2343,128 @@
         }
 
         resultsDiv.innerHTML = html;
+        if (d.trades && d.trades.length > 0) {
+          lastBacktestTrades = d.trades.map(t => ({ ...t, symbol }));
+          document.getElementById('bt-csv-btn').disabled = false;
+        }
       } catch (err) {
         resultsDiv.innerHTML = `<div class="bt-status" style="color:#ef4444">Error: ${esc(err.message || 'Network error')}</div>`;
       } finally {
         btn.disabled = false;
         btn.textContent = 'Run Backtest';
       }
+    }
+
+    async function runMultiSymbolScan() {
+      const btn = document.getElementById('bt-multi-btn');
+      const resultsDiv = document.getElementById('bt-results');
+      const pattern = document.getElementById('bt-pattern').value;
+      const from = document.getElementById('bt-from').value;
+      const to = document.getElementById('bt-to').value;
+      const rrRatio = parseFloat(document.getElementById('bt-rr').value);
+      const maxHold = parseInt(document.getElementById('bt-hold').value);
+      const symbols = ["ES","MES","NQ","MNQ","YM","MYM","RTY","M2K","CL","MCL","GC","MGC","SI","HG","BTC","ETH","ZB","ZN","ZC","ZS","ZW"];
+
+      btn.disabled = true;
+      btn.textContent = 'Scanning...';
+      resultsDiv.innerHTML = '<div class="bt-status">Running multi-symbol edge scan across ' + symbols.length + ' symbols... This may take a minute.</div>';
+
+      try {
+        const resp = await fetch('/api/backtest/multi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbols, pattern, from, to, rrRatio, maxHold })
+        });
+        const d = await resp.json();
+        if (!d.success) {
+          resultsDiv.innerHTML = '<div class="bt-status" style="color:#ef4444">Multi-scan failed: ' + esc(d.error || 'Unknown') + '</div>';
+          return;
+        }
+
+        let allTrades = [];
+        let html = '<div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;color:#e2e8f0;">Multi-Symbol Edge Report (' + esc(pattern) + ')</div>';
+        html += '<div class="bt-trades-wrap"><table class="bt-trades-table"><thead><tr><th>Symbol</th><th>Trades</th><th>Win Rate</th><th>PF</th><th>Total P&L</th><th>Expectancy</th><th>Max DD</th><th>Best</th><th>Worst</th></tr></thead><tbody>';
+
+        const entries = Object.entries(d.results).sort((a, b) => (b[1].totalPnlDollars || 0) - (a[1].totalPnlDollars || 0));
+        for (const [sym, r] of entries) {
+          if (!r.success && r.error) {
+            html += '<tr><td>' + esc(sym) + '</td><td colspan="8" style="color:#ef4444">' + esc(r.error) + '</td></tr>';
+            continue;
+          }
+          if (r.totalTrades === 0) {
+            html += '<tr><td>' + esc(sym) + '</td><td>0</td><td colspan="7" style="color:#6b7280">No signals</td></tr>';
+            continue;
+          }
+          const wrCls = r.winRate >= 50 ? 'pos' : 'neg';
+          const pfCls = r.profitFactor >= 1.5 ? 'pos' : r.profitFactor < 1 ? 'neg' : '';
+          const pnlCls = (r.totalPnlDollars || 0) >= 0 ? 'pos' : 'neg';
+          const pnlSign = (r.totalPnlDollars || 0) >= 0 ? '+' : '';
+          html += '<tr>'
+            + '<td style="font-weight:600">' + esc(sym) + '</td>'
+            + '<td>' + r.totalTrades + '</td>'
+            + '<td class="' + wrCls + '">' + r.winRate + '%</td>'
+            + '<td class="' + pfCls + '">' + (r.profitFactor >= 99 ? '\u221E' : r.profitFactor) + '</td>'
+            + '<td class="' + pnlCls + '">' + pnlSign + '$' + (r.totalPnlDollars || 0).toLocaleString() + '</td>'
+            + '<td>' + (r.expectancy >= 0 ? '+' : '') + '$' + (r.expectancy || 0).toFixed(2) + '</td>'
+            + '<td class="neg">' + (r.maxDrawdownPct || 0) + '%</td>'
+            + '<td class="pos">+$' + (r.bestTrade || 0).toLocaleString() + '</td>'
+            + '<td class="neg">$' + (r.worstTrade || 0).toLocaleString() + '</td>'
+            + '</tr>';
+          if (r.trades) {
+            for (const t of r.trades) {
+              allTrades.push({ ...t, symbol: sym });
+            }
+          }
+        }
+        html += '</tbody></table></div>';
+
+        if (allTrades.length > 0) {
+          html += '<div style="font-size:0.72rem;color:#6b7280;margin:0.5rem 0 0.3rem;">All ' + allTrades.length + ' trades across symbols:</div>';
+          html += '<div class="bt-trades-wrap"><table class="bt-trades-table"><thead><tr><th>Symbol</th><th>Date</th><th>Dir</th><th>Pattern</th><th>Entry</th><th>P&L</th><th>Result</th><th>Conf</th><th>Vol</th></tr></thead><tbody>';
+          allTrades.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+          for (const t of allTrades) {
+            const cls = t.outcome === 'WIN' ? 'bt-win' : t.outcome === 'LOSS' ? 'bt-loss' : 'bt-timeout';
+            const dcls = t.direction === 'LONG' ? 'dir-long' : 'dir-short';
+            const pSign = t.pnlDollars >= 0 ? '+' : '';
+            html += '<tr><td>' + esc(t.symbol) + '</td><td>' + esc(t.date) + '</td><td class="' + dcls + '">' + t.direction + '</td><td>' + esc(t.pattern) + '</td><td>' + t.entry + '</td><td class="' + cls + '">' + pSign + '$' + t.pnlDollars.toFixed(2) + '</td><td class="' + cls + '">' + t.outcome + '</td><td>' + (t.confluence != null ? t.confluence + 'pt' : '-') + '</td><td>' + (t.volType || '-') + '</td></tr>';
+          }
+          html += '</tbody></table></div>';
+        }
+
+        lastBacktestTrades = allTrades;
+        document.getElementById('bt-csv-btn').disabled = false;
+        resultsDiv.innerHTML = html;
+      } catch (err) {
+        resultsDiv.innerHTML = '<div class="bt-status" style="color:#ef4444">Error: ' + esc(err.message || 'Network error') + '</div>';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Multi-Symbol Edge Scan';
+      }
+    }
+
+    function exportBacktestCSV() {
+      const trades = lastBacktestTrades.length > 0 ? lastBacktestTrades : [];
+      if (trades.length === 0) {
+        alert('Run a backtest first to have data to export.');
+        return;
+      }
+      const headers = ['Symbol','Date','Direction','Pattern','Entry','Stop','Target','Exit','P&L','Result','HoldBars','Confluence','VolType'];
+      let csv = headers.join(',') + '\n';
+      for (const t of trades) {
+        csv += [
+          t.symbol || '', t.date || '', t.direction || '', '"' + (t.pattern || '') + '"',
+          t.entry || '', t.stop || '', t.target || '', t.exit || '',
+          t.pnlDollars != null ? t.pnlDollars.toFixed(2) : '', t.outcome || '',
+          t.holdBars || '', t.confluence != null ? t.confluence : '', t.volType || ''
+        ].join(',') + '\n';
+      }
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'backtest_results_' + new Date().toISOString().slice(0,10) + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     loadJournalData();

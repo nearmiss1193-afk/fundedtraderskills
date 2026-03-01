@@ -42,6 +42,8 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
 *   **Historical Backtester:**
     *   **Functionality:** Tests trading patterns against historical data from Polygon.io.
     *   **Configuration:** Allows adjustable date ranges, R:R ratios, and max hold bars.
+    *   **Multi-Symbol Edge Scan:** `POST /api/backtest/multi` runs batch backtests across 12 symbols (ES, NQ, CL, GC, SI, ZB, ZN, ZC, ZS, ZW, YM, RTY), displaying ranked edge report with all trades.
+    *   **CSV Export:** Download backtest results as CSV for external analysis (Google Sheets, Excel pivot tables).
     *   **Metrics:** Calculates detailed performance metrics (Win Rate, Profit Factor, Max Drawdown).
     *   **Advanced Filters:** Sideways filter (EMA9≈EMA21 <0.3%), MTF pivot alignment, gap detection (Level 1: 0.5%, Level 2/3: 1%), parabolic filter (7+ consecutive bars >3% from EMA), W-Bottom/W-Top detection (2+ touches within 0.3% + bottoming/topping tail), and enhanced pattern recognition (Double Bottom/Top Retest, W-Bottom Retest, 4 Bar Play).
     *   **Output:** Shows individual trade details with confluence scores and volume types.
