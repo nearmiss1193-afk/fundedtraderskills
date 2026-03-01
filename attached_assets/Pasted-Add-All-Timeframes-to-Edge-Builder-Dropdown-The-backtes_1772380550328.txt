@@ -1,0 +1,53 @@
+Add All Timeframes to Edge Builder Dropdown
+The backtester already supports 1min–daily internally via parseTimeframe(). Just expose them all in the UI dropdown.Paste this HTML snippet into your <select id="timeframe"> element (likely in public/index.html or EdgeBuilder UI section):
+
+HTML<select id="timeframe">
+  <option value="1min">1 Minute</option>
+  <option value="5min">5 Minutes</option>
+  <option value="15min">15 Minutes</option>
+  <option value="1hour">1 Hour</option>
+  <option value="4hour">4 Hours</option>
+  <option value="daily" selected>Daily</option>
+</select>
+Restart server → refresh UI → confirm all options appear.
+Test: Run single-symbol backtest on NQ with 1min (short range, e.g., 2025-01-01 to 2025-01-31) → share trades count vs 5min on same range.
+
+Enable Multi-Signal Convergence on Same Bar (Manual Alignment)
+To capture the manual's "multiple concept convergence" (multiple patterns/factors aligning = higher edge), add this convergence check + bonus.Paste into trader.ts (signal emission or post-detection block):
+
+JavaScript// After detecting all patterns for current bar
+const barSignals = detectedSignals.filter(s => s.timestamp === currentBar.timestamp && s.symbol === currentSymbol);
+
+if (barSignals.length >= 2) {
+  const bonus = (barSignals.length - 1) * 1.5; // +1.5pt per extra pattern
+  barSignals.forEach(signal => {
+    signal.confluence += bonus;
+    signal.notes = `Convergence detected: ${barSignals.map(s => s.pattern).join(', ')} (+${bonus.toFixed(1)}pt)`;
+    console.log(`[CONVERGENCE] ${signal.symbol} @ ${signal.timestamp}: ${signal.notes}`);
+  });
+}
+This boosts any signal when ≥2 patterns fire on the same bar (e.g., Wedge + 3bar or Buy Setup + Retest). Test during next RTH.
+
+Run Full Historical UI Scan (get top 5 summary)
+In Edge Builder tab:
+Click Multi-Symbol Edge Scan
+Settings:
+Timeframe: 5min
+Patterns: All
+Date range: 2015-01-01 to 2026-02-28 (or farthest Polygon allows)
+Min Confluence: 8 (matches live filter)
+Let it run (20–40 min).
+After finish:
+
+Go to Backtest Edge Heatmap tab
+Copy the top 5 symbol/pattern combos (trades, WR, PF, P&L) from the grid or pattern breakdown table
+Paste them here (also export CSV if you want to analyze confluence factors later)
+
+Test Wedge Live During Next RTH
+Start live scanner during RTH on priority symbols: NQ, SI, ZS, GC, CL
+Watch Replit console for Wedge logs (look for "[EDGE+2]" on NQ, "[EDGE+1]" on CL)
+If signal fires:
+Check Supabase trade_signals (confluence ≥8, volType, notes)
+Confirm NT sim order placement (instrument=NQ1! etc., SL/TP attached)
+
+Share: 3–5 console lines showing Wedge detection + confluence + any convergence notes, plus NT sim order result (placed? filled? rejected?)
