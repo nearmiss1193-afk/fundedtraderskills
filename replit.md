@@ -47,6 +47,7 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
     *   **CSV Export:** Download backtest results as CSV for external analysis (Google Sheets, Excel pivot tables).
     *   **Metrics:** Calculates detailed performance metrics (Win Rate, Profit Factor, Max Drawdown).
     *   **Advanced Filters:** Sideways filter (EMA9≈EMA21 <0.3%), MTF pivot alignment, gap detection (Level 1: 0.5%, Level 2/3: 1%), parabolic filter (7+ consecutive bars >3% from EMA), W-Bottom/W-Top detection (2+ touches within 0.3% + bottoming/topping tail), and enhanced pattern recognition (Double Bottom/Top Retest, W-Bottom Retest, 4 Bar Play).
+    *   **Bar Caching Layer:** In-memory cache with 5-min TTL reduces Polygon API calls. ETF proxy deduplication (ES/MES share SPY, NQ/MNQ share QQQ, etc.) means ~12 unique fetches for 18 ETF-proxied symbols. Rate limit guard (4 calls/min proactive pause) + 429 retry with 30-65s backoff (3 attempts).
     *   **Output:** Shows individual trade details with confluence scores and volume types.
 *   **Risk Management:** Implements fixed dollar risk per trade, strict R:R adherence (no trailing stops affecting final P&L), and a configurable maximum number of open trades.
 *   **Safety Guardrails:**
