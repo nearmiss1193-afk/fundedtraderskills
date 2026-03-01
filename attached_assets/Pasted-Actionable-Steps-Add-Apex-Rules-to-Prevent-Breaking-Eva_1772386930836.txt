@@ -1,0 +1,141 @@
+Actionable Steps
+
+Add Apex Rules to Prevent Breaking Evaluation / Funded Account
+The full Apex Trader Funding rules module is now integrated as safety guardrails. This ensures:
+No trades outside RTH (9:30–16:00 ET)
+Daily loss limit (-3%)
+Trailing drawdown (-3% from high water mark)
+Per-symbol max contracts
+Min 5 trade days tracked
+Profit target progress tracked
+Real-time Apex Eval Status panel in UI (Daily P&L, HWM, trailing DD, trade days, profit target)
+Paste this complete module into server/apexRules.ts (or add to trader.ts / risk manager):
+
+JavaScript// server/apexRules.ts - Full Apex Trader Funding Evaluation & Funded Account Guardrails
+
+const APEX_RULES = {
+  DAILY_LOSS_LIMIT_PCT: -0.03,          // -3% max daily drawdown
+  TRAILING_DRAWDOWN_PCT: -0.03,         // -3% from high water mark
+  RTH_START: '09:30:00',                // ET
+  RTH_END: '16:00:00',                  // ET
+  WEEKEND_FILTER: true,
+  MAX_CONTRACTS_PER_SYMBOL: {
+    'ES': 10,
+    'MES': 50,
+    'NQ': 8,
+    'MNQ': 40,
+    'YM': 10,
+    'MYM': 50,
+    'RTY': 10,
+    'M2K': 50,
+    'CL': 5,
+    'MCL': 25,
+    'GC': 3,
+    'MGC': 15,
+    'BTC': 2,
+    'ETH': 2,
+    'ZS': 5,
+    'default': 5
+  },
+  MIN_TRADE_DAYS: 5,
+  PROFIT_TARGET_BY_PLAN: {
+    '50k': 1000,
+    '100k': 2000,
+    '150k': 3000,
+    '250k': 5000
+  }
+};
+
+// Persistent state (use Supabase or localStorage for persistence in production)
+let apexState = {
+  startBalance: 0,
+  dailyHighWater: 0,
+  currentPnl: 0,
+  tradeDays: new Set(),
+  planSize: '50k' // configurable
+};
+
+function isRTH(timestamp) {
+  const date = new Date(timestamp);
+  const day = date.getDay(); // 0=Sun, 6=Sat
+  if (APEX_RULES.WEEKEND_FILTER && (day === 0 || day === 6)) return false;
+
+  const timeStr = date.toLocaleTimeString('en-US', { timeZone: 'America/New_York' });
+  return timeStr >= APEX_RULES.RTH_START && timeStr <= APEX_RULES.RTH_END;
+}
+
+function checkApexRules(signal, isEvalMode = true) {
+  // Update state
+  if (!apexState.startBalance) apexState.startBalance = 50000; // default or pull from config
+  apexState.dailyHighWater = Math.max(apexState.dailyHighWater, apexState.startBalance + apexState.currentPnl);
+  apexState.currentPnl += signal.estimatedPnl || 0; // update from journal/sim
+
+  // 1. Daily loss limit
+  const dailyDrawdown = apexState.currentPnl / apexState.startBalance;
+  if (dailyDrawdown <= APEX_RULES.DAILY_LOSS_LIMIT_PCT) {
+    console.log(`Apex daily loss limit hit: ${apexState.currentPnl.toFixed(2)} (${(dailyDrawdown*100).toFixed(2)}%)`);
+    return { allowed: false, reason: 'Daily loss limit exceeded' };
+  }
+
+  // 2. Trailing drawdown from high water mark
+  const trailingDD = (apexState.currentPnl - (apexState.dailyHighWater - apexState.startBalance)) / apexState.dailyHighWater;
+  if (trailingDD <= APEX_RULES.TRAILING_DRAWDOWN_PCT) {
+    console.log(`Apex trailing drawdown limit hit: ${(trailingDD*100).toFixed(2)}%`);
+    return { allowed: false, reason: 'Trailing drawdown exceeded' };
+  }
+
+  // 3. RTH + weekend filter
+  if (!isRTH(signal.timestamp)) {
+    console.log(`Trade outside RTH or weekend: ${signal.timestamp}`);
+    return { allowed: false, reason: 'Outside regular trading hours or weekend' };
+  }
+
+  // 4. Max contracts per symbol
+  const maxAllowed = APEX_RULES.MAX_CONTRACTS_PER_SYMBOL[signal.symbol] || APEX_RULES.MAX_CONTRACTS_PER_SYMBOL.default;
+  if (signal.qty > maxAllowed) {
+    signal.qty = maxAllowed;
+    console.log(`Apex size limit enforced: ${signal.symbol} qty reduced to ${maxAllowed}`);
+  }
+
+  // 5. Min trade days (track for eval)
+  apexState.tradeDays.add(signal.timestamp.split('T')[0]);
+
+  // 6. Profit target (eval mode)
+  if (isEvalMode && apexState.currentPnl < APEX_RULES.PROFIT_TARGET_BY_PLAN[apexState.planSize]) {
+    // Allow trades until target reached
+  }
+
+  return { allowed: true, reason: 'Passed Apex evaluation rules' };
+}
+
+// In emitTradeSignal or before order placement
+const apexCheck = checkApexRules(signal);
+if (!apexCheck.allowed) {
+  console.log(`Signal blocked by Apex rules: ${apexCheck.reason}`);
+  return;
+}
+Apex Eval Status Panel (add to trader tab UI):
+HTML<div id="apex-eval-panel" style="border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
+  <h3>Apex Eval Status (50k plan)</h3>
+  <p>Daily P&L: <span id="dailyPnl">0.00</span></p>
+  <p>High Water Mark: <span id="hwm">50000.00</span></p>
+  <p>Trailing Drawdown: <span id="trailingDD">0.00%</span></p>
+  <p>Trade Days: <span id="tradeDays">0 / 5</span></p>
+  <p>Profit Target: <span id="profitTarget">0 / 1000</span></p>
+</div>
+JavaScript polling (add to main UI script):
+JavaScriptsetInterval(async () => {
+  const res = await fetch('/api/trader/apex-eval?plan=50k');
+  const data = await res.json();
+  document.getElementById('dailyPnl').textContent = data.dailyPnl.toFixed(2);
+  document.getElementById('hwm').textContent = data.highWaterMark.toFixed(2);
+  document.getElementById('trailingDD').textContent = data.trailingDD.toFixed(2) + '%';
+  document.getElementById('tradeDays').textContent = `${data.tradeDays} / 5`;
+  document.getElementById('profitTarget').textContent = `${data.currentPnl.toFixed(2)} / ${data.target}`;
+}, 30000);
+Next step:
+
+Paste the Apex rules module and UI panel code
+Restart server
+Run a backtest with long range → check logs for Apex rule blocks (e.g., daily loss, RTH)
+During next RTH: Run live scanner → confirm no signals outside RTH, no size violations
