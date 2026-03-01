@@ -7,6 +7,42 @@ import { randomBytes } from "crypto";
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
 
+const LIVE_CONFLUENCE_MIN = 8;
+const MAX_RISK_PCT = 0.01;
+const DAILY_LOSS_LIMIT_PCT = -0.03;
+const DEFAULT_ACCOUNT_SIZE = 50000;
+
+let dailyPnlTracker = 0;
+let dailyPnlDate = new Date().toDateString();
+
+function resetDailyPnlIfNeeded() {
+  const today = new Date().toDateString();
+  if (today !== dailyPnlDate) {
+    dailyPnlTracker = 0;
+    dailyPnlDate = today;
+    console.log("[safety] Daily P&L tracker reset for new trading day");
+  }
+}
+
+function isDailyLossLimitHit(accountSize: number = DEFAULT_ACCOUNT_SIZE): boolean {
+  resetDailyPnlIfNeeded();
+  const limitDollars = accountSize * DAILY_LOSS_LIMIT_PCT;
+  if (dailyPnlTracker <= limitDollars) {
+    console.log(`[safety] DAILY LOSS LIMIT HIT: $${dailyPnlTracker.toFixed(2)} <= ${(DAILY_LOSS_LIMIT_PCT * 100).toFixed(1)}% of $${accountSize} ($${limitDollars.toFixed(2)})`);
+    return true;
+  }
+  return false;
+}
+
+function isRiskTooHigh(riskDollars: number, accountSize: number = DEFAULT_ACCOUNT_SIZE): boolean {
+  const maxRiskDollars = accountSize * MAX_RISK_PCT;
+  if (riskDollars > maxRiskDollars) {
+    console.log(`[safety] RISK TOO HIGH: $${riskDollars.toFixed(2)} > ${(MAX_RISK_PCT * 100).toFixed(1)}% of $${accountSize} ($${maxRiskDollars.toFixed(2)})`);
+    return true;
+  }
+  return false;
+}
+
 function generateSignalId(): string {
   return `sig-${Date.now()}-${randomBytes(3).toString("hex")}`;
 }
@@ -32,7 +68,11 @@ export function forwardSignalToSupabase(payload: { symbol: string; direction: st
   });
 }
 
-function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string, account: string) {
+function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string, account: string): void {
+  if (!account.toUpperCase().startsWith("SIM") && process.env.ALLOW_LIVE_TRADES !== "true") {
+    console.warn(`[safety] BLOCKED: Non-SIM account "${account}" requires ALLOW_LIVE_TRADES=true`);
+    return;
+  }
   const signalId = generateSignalId();
   const dir = direction === "LONG" ? "BUY" : "SELL";
   const instrument = getNTInstrument(symbol);
@@ -1115,6 +1155,7 @@ async function simulateTick(session: TraderSession) {
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
+          dailyPnlTracker = r2(dailyPnlTracker + pnl);
           recordTrade(session, t, exitPrice, pnl, ts, dataSource);
           delete session.openTrades[tradeKey]; hit = true;
         } else if (bar.high >= t.target) {
@@ -1128,6 +1169,7 @@ async function simulateTick(session: TraderSession) {
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
+          dailyPnlTracker = r2(dailyPnlTracker + pnl);
           recordTrade(session, t, t.target, pnl, ts, dataSource);
           delete session.openTrades[tradeKey]; hit = true;
         }
@@ -1144,6 +1186,7 @@ async function simulateTick(session: TraderSession) {
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
+          dailyPnlTracker = r2(dailyPnlTracker + pnl);
           recordTrade(session, t, exitPrice, pnl, ts, dataSource);
           delete session.openTrades[tradeKey]; hit = true;
         } else if (bar.low <= t.target) {
@@ -1157,6 +1200,7 @@ async function simulateTick(session: TraderSession) {
             pnl, cumPnl: session.cumPnl, volume: bar.volume, bias: state.bias,
             sentiment: sentimentLabel(state), dataSource,
           }));
+          dailyPnlTracker = r2(dailyPnlTracker + pnl);
           recordTrade(session, t, t.target, pnl, ts, dataSource);
           delete session.openTrades[tradeKey]; hit = true;
         }
@@ -1264,7 +1308,7 @@ async function simulateTick(session: TraderSession) {
           const isChoppy = recentRanges.every(r => r < avgRange * 0.5);
           const noOverlap = !isChoppy;
 
-          const confluencePass = confluence >= 4;
+          const confluencePass = confluence >= LIVE_CONFLUENCE_MIN;
 
           const preTradeChecklist = {
             htfAligned,
@@ -1275,9 +1319,12 @@ async function simulateTick(session: TraderSession) {
             confluencePass,
           };
 
-          const allPassed = htfAligned && volumeConfirmed && maConfluence && rrValid && noOverlap && confluencePass;
+          const riskSafe = !isRiskTooHigh(session.riskDollars);
+          const dailySafe = !isDailyLossLimitHit();
 
-          console.log(`[trader] Checklist result for ${mk} ${direction} ${detectedPattern}: ${JSON.stringify(preTradeChecklist)} | allPassed=${allPassed}`);
+          const allPassed = htfAligned && volumeConfirmed && maConfluence && rrValid && noOverlap && confluencePass && riskSafe && dailySafe;
+
+          console.log(`[trader] Checklist result for ${mk} ${direction} ${detectedPattern}: ${JSON.stringify({...preTradeChecklist, riskSafe, dailySafe, confluenceMin: LIVE_CONFLUENCE_MIN})} | allPassed=${allPassed}`);
 
           const checklist = {
             patternMatch: true,
@@ -1471,6 +1518,18 @@ export function isTradingOpen(): boolean { return isTradingHours(); }
 
 export function isForceTradeActive(): boolean {
   return Object.values(sessions).some(s => s.running && s.forceTrading);
+}
+
+export function getSafetyStatus(): { dailyPnl: number; dailyLossLimit: number; maxRiskPct: number; confluenceMin: number; accountSize: number; dailyLimitHit: boolean } {
+  resetDailyPnlIfNeeded();
+  return {
+    dailyPnl: dailyPnlTracker,
+    dailyLossLimit: DAILY_LOSS_LIMIT_PCT,
+    maxRiskPct: MAX_RISK_PCT,
+    confluenceMin: LIVE_CONFLUENCE_MIN,
+    accountSize: DEFAULT_ACCOUNT_SIZE,
+    dailyLimitHit: isDailyLossLimitHit(),
+  };
 }
 
 export { connectTradovate, getTradovateStatus, isTradovateConnected } from "./tradovate";

@@ -1,0 +1,101 @@
+Run Live Scanner Test Session (RTH ES/NQ 5-min)
+Activate high-confluence filter (≥8pt) in Replit live scanner (trader.ts or main loop).
+Run during next RTH session (9:30–16:00 ET) or simulate via historical replay if NT8 has replay mode.
+Expected flow:
+Scanner detects pattern → emitTradeSignal() → enqueueSignal() → Supabase insert → sendToCrossTrade() → NT sim order (if ≥8pt)
+Bridge logs payload & response
+Frontend polls /api/trade-ack/:signalId → shows status
+Collect:
+Console logs from Replit (signals fired, pt score, pattern name, vol type)
+Supabase trade_signals table entries (status, confluence, timestamp)
+NT8 sim order log (accepted/rejected, fill price, SL/TP)
+Any missed/false positives (pattern visible on chart but not fired?)
+Share the key log excerpts here (copy-paste 5–10 relevant lines).
+
+Add Hardcoded Safety Guardrails (if not already present)
+In sendToCrossTrade() or bridge:
+Max risk per trade: 1% of account (hardcode or read from NT account info if possible)
+Daily loss limit: stop scanning if realized + unrealized ≤ -3% today
+Quick code addition (Node.js example in trader.ts or bridge):
+
+
+JavaScript// In trade signal handler or bridge
+const MAX_RISK_PCT = 0.01;
+const DAILY_LOSS_LIMIT_PCT = -0.03;
+
+let dailyPnl = 0; // Track from journal or NT feedback
+
+if (signal.confluence < 8) return; // high filter
+
+// Risk check (simplified - assumes position size 1 contract ES ~$50/point)
+const riskDollars = 50 * signal.stopDistancePoints; // from pattern SL
+const accountSize = 50000; // example; pull from config or NT
+if (riskDollars / accountSize > MAX_RISK_PCT) {
+  console.log(`Risk too high: $${riskDollars} > 1% of $${accountSize}`);
+  return;
+}
+
+// Daily loss check
+if (dailyPnl <= accountSize * DAILY_LOSS_LIMIT_PCT) {
+  console.log(`Daily loss limit reached: ${dailyPnl.toFixed(2)}`);
+  // pause scanner or flag
+}
+
+Start GitHub Packaging Deliverable
+Export current Replit to GitHub (https://github.com/nearmiss1193-afk/traderskillsagents or new repo)
+Structure folders as suggested
+Draft README.md (copy-paste ready version below)
+
+
+Markdown# Sovereign Skill Hub AI Futures Trader
+
+Modular AI-driven futures trading system using Live Traders patterns, Polygon data, Supabase journal, Python bridge to NinjaTrader sim.
+
+## Features
+- 8+ patterns: 3/4 Bar Play, Buy/Sell Setup, Retest (W-Bottom/Top), Breakout, Climactic, Cup & Handle, Wedge
+- Advanced confluence (0–11pt), volume types, tails, gaps (L1/L2/L3), MTF alignment, sideways filter
+- Backtesting + live scanning (5-min/15-min ES/NQ)
+- Supabase trade journal + ACK polling
+- NinjaTrader sim execution via CrossTrade webhook
+- Safety: paper only, 1% max risk, 3% daily loss limit
+
+## Setup
+
+1. **Clone repo**
+   ```bash
+   git clone https://github.com/nearmiss1193-afk/traderskillsagents.git
+   cd traderskillsagents
+
+Replit Backend
+Import project into Replit
+Add secrets:
+POLYGON_API_KEY
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+CROSS_TRADE_KEY (if used)
+
+Run: npm start (or Replit run button)
+
+Python Bridge
+Run bridge.py locally or in separate Replit
+python bridge.py
+
+NinjaTrader 8
+Enable Add-Ons → ATI
+Load sim account
+Connect CrossTrade add-on (configure webhook to bridge URL)
+
+Vercel Dashboard
+Deploy /vercel-dashboard folder to Vercel
+Set env: REPLIT_URL = https://your-replit-name.replit.app
+Vercel.json proxies /api to Replit
+
+Test
+Trigger manual signal in UI
+Watch Replit logs → Supabase → NT sim order
+
+
+Safety
+Paper/sim mode only. No live trading until you fully understand risks.
+v1.0-beta – February 2026
+text

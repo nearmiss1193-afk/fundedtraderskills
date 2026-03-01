@@ -1,0 +1,13 @@
+Apex Trader Funding supports NinjaTrader via Rithmic or Tradovate connections (most common for funded/eval accounts). Supported futures instruments align with CME/CBOT/NYMEX/CME group exchanges. Key symbols from Apex docs and NinjaTrader symbology:CategorySymbol (NinjaTrader Format)RootDescriptionExchangeNotes / Apex SupportEquity IndicesES (E-mini S&P 500)ESPrimary target (front-month continuous: ES1!)CMEFully supportedNQ (E-mini Nasdaq-100)NQTech-heavy, high liquidityCMEFully supportedYM (Mini-DOW)YMDow JonesCBOTSupportedRTY (Russell 2000)RTYSmall-capCMESupportedEnergyCL (Crude Oil)CLWTI CrudeNYMEXSupported (verified in GC/CL examples)MetalsGC (Gold)GCGold futuresCOMEXSupportedCryptoBTC (Bitcoin)BTCCME Bitcoin futuresCMEMicro BTC (MBT) also; supported on some plansETH (Ether)ETHCME Ether futuresCMESupportedAgs/GrainsZS (Soybeans)ZSSoybeansCBOTSupported (Apex lists many CBOT ags)ZC (Corn)ZCCornCBOTSupportedZW (Wheat)ZWWheatCBOTSupported
+Continuous Contracts: Use ES1!, NQ1!, CL1!, GC1!, etc. in NinjaTrader for front-month continuous (auto-rolls). Polygon backtester stitches specific contracts (e.g., ESM5, ESU5) — align by using same root + continuous in bridge (instrument=ES1!).
+Apex-Specific: Only instruments in Apex's Tradovate/Rithmic list are allowed (check dashboard or helpdesk for additions). Crypto (BTC/ETH) often has notes (e.g., "do not trade mini" in some lists); confirm via Apex support ticket if missing.
+Alignment Tip: In Replit scanner, set symbol roots (ES, NQ, CL, GC, ZS, BTC, ETH). Bridge payload uses NinjaTrader format (e.g., instrument=CL1! for continuous crude). Test one signal per symbol in sim to verify fill.
+
+Next Recommendations for Expansion
+Add symbol selector in Edge Builder UI (dropdown: ES, NQ, CL, GC, ZS, BTC, ETH) — backtest each + report edge (win rate, PF, avg R:R) per symbol/pattern/timeframe.
+Intraday focus (5-min/15-min) remains best for Live Traders patterns; daily lower frequency expected.
+Spreadsheet/Dashboard: Export backtest results to CSV (Supabase query or Python script) → Google Sheets/Excel for pivot tables (most profitable: symbol/pattern/confluence ≥8pt).
+Separate System? Keep modular — add multi-symbol scanner mode (loop roots) vs. full separate repo (not needed yet).
+
+Test in Replit/Bridge
+Update bridge payload for new symbols (e.g., instrument=BTC1! for Bitcoin continuous). Run manual test signal → confirm NT sim accepts.

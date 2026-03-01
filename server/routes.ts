@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { type Server } from "http";
 import path from "path";
 import express from "express";
-import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase } from "./trader";
+import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase, getSafetyStatus } from "./trader";
 import { getTradeAck } from "./supabase";
 import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
 import { sendToCrossTrade } from "./services/crosstrade";
@@ -214,6 +214,10 @@ export async function registerRoutes(
     res.json({ tradingOpen: isTradingOpen(), forceActive: isForceTradeActive(), tradovate: tvStatus });
   });
 
+  app.get("/api/trader/safety", (_req, res) => {
+    res.json(getSafetyStatus());
+  });
+
   app.post("/api/tradovate/connect", async (_req, res) => {
     const result = await connectTradovate();
     res.json(result);
@@ -271,6 +275,12 @@ export async function registerRoutes(
 
     signalLog.push(signal);
     if (signalLog.length > 200) signalLog.shift();
+
+    const safety = getSafetyStatus();
+    if (safety.dailyLimitHit) {
+      console.warn(`[trade-signal] BLOCKED by daily loss limit: $${safety.dailyPnl.toFixed(2)}`);
+      return res.status(403).json({ success: false, error: "Daily loss limit reached — trading paused", safety });
+    }
 
     console.log(`[trade-signal] ${signal.source.toUpperCase()} | ${signal.direction} ${signal.symbol} @ ${signal.entryPrice} | SL: ${signal.stopLoss} TP: ${signal.takeProfit} | ${signal.pattern} (${signal.confluence}) | R:R ${signal.riskReward}`);
 

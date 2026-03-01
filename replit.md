@@ -46,6 +46,13 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
     *   **Advanced Filters:** Sideways filter (EMA9≈EMA21 <0.3%), MTF pivot alignment, gap detection (Level 1: 0.5%, Level 2/3: 1%), parabolic filter (7+ consecutive bars >3% from EMA), W-Bottom/W-Top detection (2+ touches within 0.3% + bottoming/topping tail), and enhanced pattern recognition (Double Bottom/Top Retest, W-Bottom Retest, 4 Bar Play).
     *   **Output:** Shows individual trade details with confluence scores and volume types.
 *   **Risk Management:** Implements fixed dollar risk per trade, strict R:R adherence (no trailing stops affecting final P&L), and a configurable maximum number of open trades.
+*   **Safety Guardrails:**
+    *   **Live confluence filter:** ≥8pt required (`LIVE_CONFLUENCE_MIN = 8` in trader.ts)
+    *   **Max risk per trade:** 1% of $50,000 account (`MAX_RISK_PCT = 0.01`)
+    *   **Daily loss limit:** -3% stops all scanning (`DAILY_LOSS_LIMIT_PCT = -0.03`)
+    *   **SIM-only enforcement:** Non-SIM accounts blocked unless `ALLOW_LIVE_TRADES=true`
+    *   **Contract limit:** `MAX_CONTRACTS` env var (default 1) in CrossTrade
+    *   **Safety status API:** `GET /api/trader/safety` returns daily P&L, limits, confluence min
 *   **CrossTrade Integration:** Connects to CrossTrade webhook for sending orders to NinjaTrader.
 
 **System Design Choices:**
