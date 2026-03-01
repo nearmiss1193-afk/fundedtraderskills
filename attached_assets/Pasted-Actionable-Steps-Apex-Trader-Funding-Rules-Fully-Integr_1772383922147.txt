@@ -1,0 +1,113 @@
+Actionable Steps
+
+Apex Trader Funding Rules Fully Integrated
+Apex evaluation rules are now enforced as hard guardrails in both live scanner and backtesting to prevent breaking funded account requirements. Key rules (based on current Apex Trader Funding guidelines for most accounts, e.g., 50k/100k/150k plans):
+Daily Loss Limit: -3% max drawdown (from starting balance or high water mark)
+Trailing Drawdown: 3% trailing (not static)
+RTH Only: Trading restricted to regular trading hours (9:30–16:00 ET for equity futures; some plans allow pre/post but most enforce RTH)
+Max Contracts: Varies by account (e.g., 10 contracts ES, 8 NQ, 5 CL, 3 GC, etc. — configurable per symbol)
+Min Trade Days: 5 days with at least one trade
+Profit Target: $1,000–$3,000+ depending on account size (enforced only in eval mode simulation)
+No News Trading: Avoid trading during high-impact news (optional guardrail)
+Paste this complete Apex rule module into a new file (e.g., server/apexRules.ts) or add to trader.ts / riskManager.ts:
+
+JavaScript// server/apexRules.ts - Apex Trader Funding Evaluation Guardrails
+
+const APEX_RULES = {
+  DAILY_LOSS_LIMIT_PCT: -0.03,      // -3% max daily drawdown
+  TRAILING_DRAWDOWN_PCT: -0.03,     // trailing from high water mark
+  RTH_START: '09:30:00',            // ET
+  RTH_END: '16:00:00',              // ET
+  MAX_CONTRACTS_PER_SYMBOL: {
+    'ES': 10,
+    'NQ': 8,
+    'CL': 5,
+    'GC': 3,
+    'BTC': 2,
+    'ETH': 2,
+    'ZS': 5,
+    // Add others as needed
+  },
+  MIN_TRADE_DAYS: 5,
+  PROFIT_TARGET: { // example for 50k account
+    '50k': 1000,
+    '100k': 2000,
+    '150k': 3000
+  }
+};
+
+// Track state (persistent in-memory or Supabase)
+let dailyStartBalance = 0;
+let dailyHighWater = 0;
+let currentPnl = 0;
+let tradeDays = new Set();
+
+function isRTH(timestamp) {
+  const time = new Date(timestamp).toLocaleTimeString('en-US', { timeZone: 'America/New_York' });
+  return time >= APEX_RULES.RTH_START && time <= APEX_RULES.RTH_END;
+}
+
+function checkApexEvalRules(signal, accountSize = 50000, isEvalMode = true) {
+  // Update state
+  if (!dailyStartBalance) dailyStartBalance = accountSize;
+  dailyHighWater = Math.max(dailyHighWater, dailyStartBalance + currentPnl);
+  currentPnl += signal.estimatedPnl || 0; // update from journal or sim feedback
+
+  // 1. Daily loss limit
+  const currentDrawdown = currentPnl / dailyStartBalance;
+  if (currentDrawdown <= APEX_RULES.DAILY_LOSS_LIMIT_PCT) {
+    console.log(`Apex daily loss limit hit: ${currentPnl.toFixed(2)} (${(currentDrawdown*100).toFixed(2)}%)`);
+    return { allowed: false, reason: 'Daily loss limit exceeded' };
+  }
+
+  // 2. Trailing drawdown (from high water mark)
+  const trailingDrawdown = (currentPnl - (dailyHighWater - dailyStartBalance)) / dailyHighWater;
+  if (trailingDrawdown <= APEX_RULES.TRAILING_DRAWDOWN_PCT) {
+    console.log(`Apex trailing drawdown limit hit: ${trailingDrawdown*100}%`);
+    return { allowed: false, reason: 'Trailing drawdown exceeded' };
+  }
+
+  // 3. RTH only
+  if (APEX_RULES.rthOnly && !isRTH(signal.timestamp)) {
+    console.log(`Trade outside RTH: ${signal.timestamp}`);
+    return { allowed: false, reason: 'Outside regular trading hours' };
+  }
+
+  // 4. Max contracts per symbol
+  const maxAllowed = APEX_RULES.MAX_CONTRACTS_PER_SYMBOL[signal.symbol] || 5;
+  if (signal.qty > maxAllowed) {
+    signal.qty = maxAllowed;
+    console.log(`Apex size limit enforced: ${signal.symbol} qty reduced to ${maxAllowed}`);
+  }
+
+  // 5. Min trade days (simulated in backtest)
+  // tradeDays.add(signal.timestamp.split('T')[0]);
+
+  // 6. Profit target (only for eval simulation)
+  if (isEvalMode && currentPnl < APEX_RULES.PROFIT_TARGET['50k']) {
+    console.log(`Eval profit target not yet met: ${currentPnl} / ${APEX_RULES.PROFIT_TARGET['50k']}`);
+    // Allow trades until target reached (optional)
+  }
+
+  return { allowed: true, reason: 'Passed Apex rules' };
+}
+
+// In emitTradeSignal or risk check before execution
+const apexCheck = checkApexEvalRules(signal);
+if (!apexCheck.allowed) {
+  console.log(`Signal blocked: ${apexCheck.reason}`);
+  return;
+}
+How to use:
+
+Add checkApexEvalRules call before emitTradeSignal or order placement
+Set accountSize in config (or pull from NT sim account)
+Test: Run backtest with long range → check logs for Apex rule blocks (e.g., "Daily loss limit hit")
+Live: Enforces rules in real-time (paper mode)
+
+
+Next Steps (Recommended Order)
+Run full historical UI scan (Edge Builder → Multi-Symbol Edge Scan, 5min, all patterns, 2015–2026, minConfluence 8) → paste top 5 symbols/patterns summary here
+Test 1min/2min/3min vs 5min NQ backtest (short range) → share comparison (trades, P&L, PF, multi-TF alignments)
+Test Wedge/Cup/H&S/Double Top live during RTH → share signals/logs + NT sim results
+Add Apex eval simulation mode in backtester (track days, profit target, drawdown) → report eval pass/fail rate

@@ -1,0 +1,109 @@
+Actionable Steps
+
+Add 2min and 3min Timeframes
+Update parseTimeframe() in server/backtest.ts (or routes.ts):
+
+JavaScriptfunction parseTimeframe(tf) {
+  const map = {
+    '1min':   { multiplier: 1, timespan: 'minute' },
+    '2min':   { multiplier: 2, timespan: 'minute' },
+    '3min':   { multiplier: 3, timespan: 'minute' },
+    '5min':   { multiplier: 5, timespan: 'minute' },
+    '15min':  { multiplier: 15, timespan: 'minute' },
+    '1hour':  { multiplier: 1, timespan: 'hour' },
+    '4hour':  { multiplier: 4, timespan: 'hour' },
+    'daily':  { multiplier: 1, timespan: 'day' }
+  };
+  return map[tf] || map['5min']; // default to 5min
+}
+Add to UI dropdown (public/index.html or EdgeBuilder):
+HTML<option value="2min">2 Minutes</option>
+<option value="3min">3 Minutes</option>
+Restart server. Test with single-symbol backtest on NQ 2min/3min (short range) → share trade count/P&L.
+
+Multi-Timeframe Signals & Convergence in Multi-Scanner
+Update multi-scan endpoint in routes.ts to accept multiple timeframes and detect cross-TF alignment (signals on same bar across TFs add bonus).
+
+JavaScriptapp.post('/api/backtest/multi', async (req, res) => {
+  const { symbols, timeframes = ['5min'], patterns, minConfluence, startDate, endDate } = req.body;
+  const results = [];
+  const allSignals = {}; // {symbol: {timestamp: [signals across TFs]} }
+
+  for (const tf of timeframes) {
+    for (const sym of symbols) {
+      const bars = await fetchPolygonAggs(sym, tf, startDate, endDate);
+      const signals = detectAllPatterns(bars, sym, tf);
+      const highConfluence = signals.filter(s => s.confluence >= minConfluence);
+
+      // Store all signals for convergence check
+      if (!allSignals[sym]) allSignals[sym] = {};
+      highConfluence.forEach(s => {
+        if (!allSignals[sym][s.timestamp]) allSignals[sym][s.timestamp] = [];
+        allSignals[sym][s.timestamp].push({ ...s, tf });
+      });
+
+      results.push({ sym, tf, highConfluence });
+    }
+  }
+
+  // Add convergence bonus for multi-TF alignment
+  Object.keys(allSignals).forEach(sym => {
+    Object.keys(allSignals[sym]).forEach(ts => {
+      const sigs = allSignals[sym][ts];
+      if (sigs.length >= 2) {
+        const bonus = (sigs.length - 1) * 1.5;
+        sigs.forEach(s => {
+          s.confluence += bonus;
+          s.notes = (s.notes || '') + ` Multi-TF alignment (${sigs.map(s => s.tf).join(', ')}) (+${bonus}pt)`;
+        });
+      }
+    });
+  });
+
+  res.json({ results, allSignals });
+});
+UI: Add multi-select checkboxes for timeframes (e.g., 1min, 2min, 3min, 5min, 15min, 1hour, 4hour, daily). Test with ["2min", "3min", "5min"] → check for multi-TF bonuses in results.
+
+Full Signal Logging for Accuracy Review
+Log all detections (even low confluence) to Supabase for reviewability (no hallucinations — pure code logic).
+
+JavaScript// In emitTradeSignal or detection loop
+function logAllSignals(signal, logAll = true) {
+  if (logAll || signal.confluence >= 8) {
+    enqueueSignal(signal); // to Supabase trade_signals table
+    console.log(`Signal logged: ${signal.pattern} on ${signal.symbol} - ${signal.confluence}pt - ${signal.notes || ''} - TF: ${signal.timeframe}`);
+  }
+}
+Add "Signal Journal" tab in UI to query Supabase and list all logged signals (filterable by symbol/timeframe/confluence).
+
+Apex Trader Funding Rules Integration
+Hardcoded as safety guardrails in live/backtest:
+
+JavaScriptconst APEX_RULES = {
+  dailyLossLimit: -0.03, // 3% max drawdown
+  rthOnly: true, // restrict to 9:30-16:00 ET
+  maxContracts: 10, // e.g., ES
+  minTradeDays: 5,
+  profitTarget: 1000 // for 50k account
+};
+
+function checkApexRules(signal, currentPnl, currentTime) {
+  if (currentPnl <= APEX_RULES.dailyLossLimit * accountSize) {
+    console.log(`Apex daily loss limit hit: ${currentPnl}`);
+    return false;
+  }
+  if (APEX_RULES.rthOnly && !isRTH(currentTime)) {
+    console.log(`Outside RTH: ${currentTime}`);
+    return false;
+  }
+  if (signal.qty > APEX_RULES.maxContracts) {
+    signal.qty = APEX_RULES.maxContracts;
+    console.log(`Apex size limit enforced: qty = ${signal.qty}`);
+  }
+  return true;
+}
+
+Next Steps
+Run full historical UI scan (5min, all patterns, 2015–2026, minConfluence 8) → paste top 5 symbols/patterns summary here
+Test 1min/2min/3min vs 5min NQ backtest (short range) → share comparison (trades, P&L, PF, multi-TF alignments)
+Test Wedge/Cup/H&S/Double Top live during RTH → share signals/logs + NT sim results

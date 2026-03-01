@@ -1478,6 +1478,7 @@ export async function runBacktest(config: {
   console.log(`[backtest] Detected ${signals.length} ${patternKey} signals (${filteredSignals.length} with confluence >= ${minConf})`);
 
   const trades = simulateTrades(data, filteredSignals, rrRatio, maxHold, pointValue);
+  trades.forEach(t => { (t as any).timeframe = tf; (t as any).symbol = symbol; });
   const result = computeResults(trades, symbol, patternKey, `${from} to ${to}`, bars.length);
 
   console.log(`[backtest] Result: ${result.totalTrades} trades, ${result.winRate}% WR, $${result.totalPnlDollars} P&L, PF ${result.profitFactor}`);

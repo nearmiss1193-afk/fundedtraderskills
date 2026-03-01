@@ -882,6 +882,10 @@
           <span class="status-dot"></span>
           <span id="tradovate-status-text">Tradovate: Checking...</span>
         </div>
+        <div id="rth-status" class="trading-status closed" style="margin-top:0.4rem;" data-testid="rth-status">
+          <span class="status-dot"></span>
+          <span id="rth-status-text">RTH: Checking...</span>
+        </div>
 
         <label>Equity Index Futures</label>
         <div class="check-group">
@@ -1685,6 +1689,19 @@
             tvText.textContent = 'Tradovate: Not connected — set credentials in Secrets';
           }
         }
+
+        try {
+          const safety = await (await fetch('/api/trader/safety')).json();
+          const rthBadge = document.getElementById('rth-status');
+          const rthText = document.getElementById('rth-status-text');
+          if (safety.rthActive) {
+            rthBadge.className = 'trading-status open';
+            rthText.textContent = 'RTH Active (9:30 AM – 4:00 PM ET) | Daily P&L: $' + (safety.dailyPnl || 0).toFixed(2) + (safety.dailyLimitHit ? ' ⚠ LIMIT HIT' : '');
+          } else {
+            rthBadge.className = 'trading-status closed';
+            rthText.textContent = 'Outside RTH (signals blocked by Apex rules) | Daily P&L: $' + (safety.dailyPnl || 0).toFixed(2);
+          }
+        } catch {}
       } catch {}
     }
 
@@ -2609,6 +2626,15 @@
             const dcls = t.direction === 'LONG' ? 'dir-long' : 'dir-short';
             const pSign = t.pnlDollars >= 0 ? '+' : '';
             html += '<tr><td>' + esc(t.symbol) + '</td><td>' + esc(t.date) + '</td><td class="' + dcls + '">' + t.direction + '</td><td>' + esc(t.pattern) + '</td><td>' + t.entry + '</td><td class="' + cls + '">' + pSign + '$' + t.pnlDollars.toFixed(2) + '</td><td class="' + cls + '">' + t.outcome + '</td><td>' + (t.confluence != null ? t.confluence + 'pt' : '-') + '</td><td>' + (t.volType || '-') + '</td></tr>';
+          }
+          html += '</tbody></table></div>';
+        }
+
+        if (d.multiTfAlignments && d.multiTfAlignments.length > 0) {
+          html += '<div style="font-size:0.82rem;font-weight:600;margin:0.8rem 0 0.3rem;color:#facc15;">Multi-TF Alignments (' + d.multiTfAlignments.length + ' found)</div>';
+          html += '<div class="bt-trades-wrap"><table class="bt-trades-table"><thead><tr><th>Symbol</th><th>Pattern</th><th>Date</th><th>Timeframes</th><th>Bonus</th></tr></thead><tbody>';
+          for (const a of d.multiTfAlignments) {
+            html += '<tr><td style="font-weight:600">' + esc(a.symbol) + '</td><td>' + esc(a.pattern) + '</td><td>' + esc(a.entryDate) + '</td><td style="color:#60a5fa">' + esc(a.timeframes.join(', ')) + '</td><td style="color:#34d399">+' + a.bonus.toFixed(1) + 'pt</td></tr>';
           }
           html += '</tbody></table></div>';
         }

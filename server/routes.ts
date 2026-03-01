@@ -564,11 +564,35 @@ export async function registerRoutes(
       };
     }
 
+    const multiTfAlignments: { symbol: string; pattern: string; timeframes: string[]; entryDate: string; bonus: number }[] = [];
+    if (tfList.length > 1) {
+      const tradeIndex: Record<string, { tf: string; pattern: string; direction: string; entryDate: string }[]> = {};
+      for (const r of results) {
+        if (!r.trades) continue;
+        for (const t of r.trades) {
+          const dateKey = t.entryDate || t.date || "";
+          if (!dateKey) continue;
+          const key = `${r.symbol}|${t.pattern || ""}|${dateKey}|${t.direction || ""}`;
+          if (!tradeIndex[key]) tradeIndex[key] = [];
+          tradeIndex[key].push({ tf: t.timeframe || "", pattern: t.pattern || "", direction: t.direction || "", entryDate: dateKey });
+        }
+      }
+      for (const [key, entries] of Object.entries(tradeIndex)) {
+        const uniqueTfs = [...new Set(entries.map(e => e.tf))];
+        if (uniqueTfs.length >= 2) {
+          const [sym, pat, dt] = key.split("|");
+          const bonus = (uniqueTfs.length - 1) * 1.5;
+          multiTfAlignments.push({ symbol: sym, pattern: pat, timeframes: uniqueTfs, entryDate: dt, bonus });
+        }
+      }
+    }
+
     res.json({
       success: true,
       summary: {
         symbolsScanned: symList.length,
         patternsUsed: patternList,
+        timeframesUsed: tfList,
         totalTrades,
         totalWins,
         totalLosses,
@@ -577,9 +601,11 @@ export async function registerRoutes(
         netPnL: Math.round(totalPnl * 100) / 100,
         minConfluence: minConf,
         period: `${dateFrom} to ${dateTo}`,
+        multiTfAlignments: multiTfAlignments.length,
       },
       patternBreakdown,
       heatmap: heatmapCells,
+      multiTfAlignments,
       results,
     });
   });

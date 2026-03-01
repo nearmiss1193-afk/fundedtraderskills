@@ -42,7 +42,7 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
 *   **Historical Backtester:**
     *   **Functionality:** Tests trading patterns against historical data from Polygon.io.
     *   **Configuration:** Allows adjustable date ranges, R:R ratios, max hold bars, and timeframe selection (1min, 2min, 3min, 5min, 15min, 30min, 1hour, 4hour, daily, weekly).
-    *   **Multi-Symbol Edge Scan:** `POST /api/backtest/multi` accepts `symbols[]`, `patterns[]`, `timeframes[]` (multi-TF), `minConfluence`, date range; runs batch backtests across up to 25 symbols × 13 patterns × multiple timeframes. Returns `summary`, `patternBreakdown` (aggregated by pattern), `heatmap` (Symbol × Pattern cells with winRate/PF/pnl/expectancy), and `results` ranked by P&L.
+    *   **Multi-Symbol Edge Scan:** `POST /api/backtest/multi` accepts `symbols[]`, `patterns[]`, `timeframes[]` (multi-TF), `minConfluence`, date range; runs batch backtests across up to 25 symbols × 13 patterns × multiple timeframes. Returns `summary`, `patternBreakdown`, `heatmap`, `multiTfAlignments` (cross-TF convergence with +1.5pt bonus per aligned TF), and `results` ranked by P&L.
     *   **Backtest Edge Heatmap:** Color-coded Symbol × Pattern performance grid auto-populates after multi-scan. Includes Pattern Breakdown table, visual heatmap grid (green/yellow/red cells), and full sortable detail table.
     *   **CSV Export:** Download backtest results as CSV for external analysis (Google Sheets, Excel pivot tables).
     *   **Metrics:** Calculates detailed performance metrics (Win Rate, Profit Factor, Max Drawdown).
@@ -58,7 +58,8 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
     *   **Daily loss limit:** -3% stops all scanning (`DAILY_LOSS_LIMIT_PCT = -0.03`)
     *   **SIM-only enforcement:** Non-SIM accounts blocked unless `ALLOW_LIVE_TRADES=true`
     *   **Contract limit:** `MAX_CONTRACTS` env var (default 1) in CrossTrade
-    *   **Safety status API:** `GET /api/trader/safety` returns daily P&L, limits, confluence min
+    *   **Apex Trader Funding rules:** RTH-only filter (9:30 AM – 4:00 PM ET), max 10 contracts, daily loss limit enforcement via `checkApexRules()`. RTH status badge shown in trader panel with live daily P&L. `isRTH()` and `APEX_RULES` exported for external use.
+    *   **Safety status API:** `GET /api/trader/safety` returns daily P&L, limits, confluence min, `rthActive` boolean, full `apexRules` object
 *   **CrossTrade Integration:** Connects to CrossTrade webhook for sending orders to NinjaTrader.
 
 **System Design Choices:**

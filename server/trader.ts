@@ -47,6 +47,46 @@ function generateSignalId(): string {
   return `sig-${Date.now()}-${randomBytes(3).toString("hex")}`;
 }
 
+const APEX_RULES = {
+  dailyLossLimit: -0.03,
+  rthOnly: true,
+  rthStart: { hour: 9, minute: 30 },
+  rthEnd: { hour: 16, minute: 0 },
+  maxContracts: 10,
+  minTradeDays: 5,
+  profitTarget: 1000,
+};
+
+function isRTH(now?: Date): boolean {
+  const d = now || new Date();
+  const et = new Date(d.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const h = et.getHours();
+  const m = et.getMinutes();
+  const totalMin = h * 60 + m;
+  const startMin = APEX_RULES.rthStart.hour * 60 + APEX_RULES.rthStart.minute;
+  const endMin = APEX_RULES.rthEnd.hour * 60 + APEX_RULES.rthEnd.minute;
+  return totalMin >= startMin && totalMin < endMin;
+}
+
+function checkApexRules(direction: string, qty: number, accountSize: number = DEFAULT_ACCOUNT_SIZE): { allowed: boolean; reason?: string; adjustedQty: number } {
+  if (isDailyLossLimitHit(accountSize)) {
+    return { allowed: false, reason: "Apex daily loss limit hit", adjustedQty: qty };
+  }
+  if (APEX_RULES.rthOnly && !isRTH()) {
+    const now = new Date();
+    const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" });
+    return { allowed: false, reason: `Outside RTH (${etStr} ET)`, adjustedQty: qty };
+  }
+  let adjQty = qty;
+  if (adjQty > APEX_RULES.maxContracts) {
+    console.log(`[apex] Size limit enforced: qty ${adjQty} → ${APEX_RULES.maxContracts}`);
+    adjQty = APEX_RULES.maxContracts;
+  }
+  return { allowed: true, adjustedQty: adjQty };
+}
+
+export { isRTH, checkApexRules, APEX_RULES };
+
 export function forwardSignalToSupabase(payload: { symbol: string; direction: string; entryPrice: number; stopLoss: number; takeProfit: number; riskReward: string; confluence: number; pattern: string; qty?: number; source?: string }): Promise<{ status: string; signalId: string }> {
   const signalId = generateSignalId();
   const dir = (payload.direction === "Long" || payload.direction === "LONG") ? "BUY" : "SELL";
@@ -73,6 +113,13 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
     console.warn(`[safety] BLOCKED: Non-SIM account "${account}" requires ALLOW_LIVE_TRADES=true`);
     return;
   }
+
+  const apexCheck = checkApexRules(direction, 1);
+  if (!apexCheck.allowed) {
+    console.warn(`[apex] BLOCKED: ${apexCheck.reason} — ${direction} ${symbol} ${pattern}`);
+    return;
+  }
+
   const signalId = generateSignalId();
   const dir = direction === "LONG" ? "BUY" : "SELL";
   const instrument = getNTInstrument(symbol);
@@ -80,7 +127,7 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
   const signalPayload = {
     symbol: instrument,
     direction: dir === "BUY" ? "Long" : "Short",
-    quantity: 1,
+    quantity: apexCheck.adjustedQty,
     account,
     strategy: pattern,
     entry_price: entry,
@@ -2134,7 +2181,7 @@ export function isForceTradeActive(): boolean {
   return Object.values(sessions).some(s => s.running && s.forceTrading);
 }
 
-export function getSafetyStatus(): { dailyPnl: number; dailyLossLimit: number; maxRiskPct: number; confluenceMin: number; accountSize: number; dailyLimitHit: boolean } {
+export function getSafetyStatus(): { dailyPnl: number; dailyLossLimit: number; maxRiskPct: number; confluenceMin: number; accountSize: number; dailyLimitHit: boolean; rthActive: boolean; apexRules: typeof APEX_RULES } {
   resetDailyPnlIfNeeded();
   return {
     dailyPnl: dailyPnlTracker,
@@ -2143,6 +2190,8 @@ export function getSafetyStatus(): { dailyPnl: number; dailyLossLimit: number; m
     confluenceMin: LIVE_CONFLUENCE_MIN,
     accountSize: DEFAULT_ACCOUNT_SIZE,
     dailyLimitHit: isDailyLossLimitHit(),
+    rthActive: isRTH(),
+    apexRules: APEX_RULES,
   };
 }
 
