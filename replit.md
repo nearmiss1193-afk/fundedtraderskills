@@ -27,7 +27,7 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
     *   **Technical Indicators:** Incorporates 9 EMA, 21 EMA, and 200 SMA for trend confirmation.
     *   **Pattern Detection:** Detects 8 key trading patterns (e.g., 3 Bar Play, Retest Buy/Sell, Pivot Breakout, Climax/Exhaustion Reversal, Cup & Handle, Wedge Breakout) with individual long/short toggles.
     *   **Pre-Trade Checklist:** Enforces a strict 6-point checklist (HTF alignment, volume, MA confluence, R:R, market choppiness, confluence score) before signal generation.
-    *   **Confluence Scoring:** Assigns a score (0-12) to each potential trade based on multiple factors (e.g., volume, MA respect, pivot proximity, bar formation, HTF alignment, candlestick tails, gaps). Provides descriptive labels (A+ Setup, High Probability).
+    *   **Confluence Scoring:** Assigns a score (0-11) per signal based on: volume surge, igniting vol type, candlestick tail, strong body, MA respect, HTF alignment, tail/wick quality, Level 1 gap (0.5%), Level 2/3 gap (1%), W-Bottom/W-Top, double bottom/top. Provides descriptive labels (A+ Setup, High Probability).
     *   **Trade Management:** Includes trailing stops (activates after 1R move, trails at 0.6R from high/low), breakeven management, and detailed logging of entry reasons and confluence.
     *   **Sentiment Analysis:** Incorporates fear/greed dynamics to bias price movement.
     *   **Price Scaling:** Uses relative percentages for thresholds (e.g., near MA, near pivot) instead of hardcoded points.
@@ -43,7 +43,7 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
     *   **Functionality:** Tests trading patterns against historical data from Polygon.io.
     *   **Configuration:** Allows adjustable date ranges, R:R ratios, and max hold bars.
     *   **Metrics:** Calculates detailed performance metrics (Win Rate, Profit Factor, Max Drawdown).
-    *   **Advanced Filters:** Incorporates sideways filters, MTF alignment, gap detection, parabolic filters, and enhanced pattern recognition (e.g., Double Bottom/Top Retest, 4 Bar Play).
+    *   **Advanced Filters:** Sideways filter (EMA9≈EMA21 <0.3%), MTF pivot alignment, gap detection (Level 1: 0.5%, Level 2/3: 1%), parabolic filter (7+ consecutive bars >3% from EMA), W-Bottom/W-Top detection (2+ touches within 0.3% + bottoming/topping tail), and enhanced pattern recognition (Double Bottom/Top Retest, W-Bottom Retest, 4 Bar Play).
     *   **Output:** Shows individual trade details with confluence scores and volume types.
 *   **Risk Management:** Implements fixed dollar risk per trade, strict R:R adherence (no trailing stops affecting final P&L), and a configurable maximum number of open trades.
 *   **CrossTrade Integration:** Connects to CrossTrade webhook for sending orders to NinjaTrader.

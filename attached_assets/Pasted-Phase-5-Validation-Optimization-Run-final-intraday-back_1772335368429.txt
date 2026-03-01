@@ -1,0 +1,37 @@
+Phase 5 Validation & Optimization — Run final intraday backtest on stitched ES/NQ 5-min/15-min data (2020–2026). Focus on:
+High-confluence signals (≥6/9) win rate / profit factor.
+Pattern performance ranking (e.g., 4 Bar Play + Retest often strongest).
+Gap + MTF + igniting vol impact on edge.
+Compare A/B: ≥6 vs ≥7 confluence threshold.
+Use code_execution tool or Replit to simulate; adjust if needed (e.g., relax parabolic filter for climactic in strong trends).
+
+Add Remaining Live Traders Boosters — From Jared Wesley teachings: emphasize W-Bottom variant in Retest Buy Setup (two touches support + tail + vol), Level 2/3 gaps as stronger confluence (+1.5–2 if aligned), pre-market / daily catalyst filter (e.g., daily gap/breakout causes lower TF pattern). Quick code addition (paste to addIndicators() or detection):
+
+Python# Enhanced gap (Level 2/3 example: >1% gap)
+data['level2_gap_up'] = data['open'] > data['close'].shift(1) * 1.01
+data['level2_gap_down'] = data['open'] < data['close'].shift(1) * 0.99
+
+# W-Bottom in Retest: two low touches within 0.3% + bottoming tail on second
+data['w_bottom'] = (abs(data['low'] - data['low'].rolling(20).min()) < 0.003 * data['close']) & data['bottoming_tail'] & (data['low'].shift(1) ≈ data['low'])
+
+# Add to confluence (weight gaps higher if level2)
+confluence_factors = [
+    data['volume_surge'],
+    data['vol_type'] == 'igniting',
+    data['tail_present'],
+    data['strong_body'],
+    data['ma_respect'],
+    data['htf_aligned'],
+    data['gap_up'] | data['gap_down'],
+    data['level2_gap_up'] | data['level2_gap_down'],  # +1.5 if level2
+    data['w_bottom']  # +1 for Retest
+]
+data['confluence_score'] = sum(confluence_factors)  # Now up to 9+
+
+Live Scanner & Alert Readiness — With backtester mature, enable high-confluence signals (>6/9) in live Replit scanner. Add basic alert (console log + Supabase insert for future SMS/email). Ensure NT bridge uses "ES1!" / "NQ1!" for continuous front-month execution (matches Polygon stitch intent).
+Phase 6: Packaging Kickoff — System is retail-ready core (scanner + backtest + execution sim). Start:
+Export Replit to GitHub repo.
+Draft README.md install guide: clone repo, setup Replit (secrets: POLYGON_API_KEY), run bridge.py, connect NT8 sim, Vercel deploy dashboard.
+Add version tag (v1.0-alpha) with current 8+ patterns.
+
+Visual References — Examples of enhanced setups: 4 Bar Play double resting, Double Bottom Retest with tail, gap-aligned Breakout, high-confluence signal.
