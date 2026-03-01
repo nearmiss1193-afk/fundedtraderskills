@@ -1271,14 +1271,30 @@
             <div class="bt-field">
               <label for="bt-symbol">Symbol</label>
               <select id="bt-symbol" data-testid="select-bt-symbol">
-                <option value="ES" selected>ES (E-mini S&P)</option>
-                <option value="NQ">NQ (E-mini Nasdaq)</option>
-                <option value="YM">YM (E-mini Dow)</option>
-                <option value="RTY">RTY (Russell 2000)</option>
-                <option value="CL">CL (Crude Oil)</option>
-                <option value="GC">GC (Gold)</option>
-                <option value="ZB">ZB (30Y Bond)</option>
-                <option value="ZN">ZN (10Y Note)</option>
+                <optgroup label="Equity Index">
+                  <option value="ES" selected>ES (E-mini S&P)</option>
+                  <option value="MES">MES (Micro S&P)</option>
+                  <option value="NQ">NQ (E-mini Nasdaq)</option>
+                  <option value="MNQ">MNQ (Micro Nasdaq)</option>
+                  <option value="YM">YM (E-mini Dow)</option>
+                  <option value="RTY">RTY (Russell 2000)</option>
+                </optgroup>
+                <optgroup label="Energy">
+                  <option value="CL">CL (Crude Oil)</option>
+                </optgroup>
+                <optgroup label="Metals">
+                  <option value="GC">GC (Gold)</option>
+                  <option value="SI">SI (Silver)</option>
+                </optgroup>
+                <optgroup label="Treasury">
+                  <option value="ZB">ZB (30Y Bond)</option>
+                  <option value="ZN">ZN (10Y Note)</option>
+                </optgroup>
+                <optgroup label="Agriculture">
+                  <option value="ZC">ZC (Corn)</option>
+                  <option value="ZS">ZS (Soybeans)</option>
+                  <option value="ZW">ZW (Wheat)</option>
+                </optgroup>
               </select>
             </div>
             <div class="bt-field">

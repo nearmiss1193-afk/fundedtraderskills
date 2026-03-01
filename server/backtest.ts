@@ -125,15 +125,38 @@ async function fetchStitchedData(symbol: string, from: string, to: string): Prom
   }).sort((a, b) => a.timestamp - b.timestamp);
 }
 
-async function fetchSPYProxy(from: string, to: string): Promise<Bar[]> {
-  const bars = await fetchPolygonAggs("SPY", from, to);
-  const ratio = 7.8;
+const ETF_PROXIES: Record<string, { etf: string; ratio: number }> = {
+  ES:  { etf: "SPY",  ratio: 7.8 },
+  MES: { etf: "SPY",  ratio: 7.8 },
+  NQ:  { etf: "QQQ",  ratio: 37.0 },
+  MNQ: { etf: "QQQ",  ratio: 37.0 },
+  YM:  { etf: "DIA",  ratio: 86.0 },
+  MYM: { etf: "DIA",  ratio: 86.0 },
+  RTY: { etf: "IWM",  ratio: 9.5 },
+  M2K: { etf: "IWM",  ratio: 9.5 },
+  CL:  { etf: "USO",  ratio: 1.0 },
+  MCL: { etf: "USO",  ratio: 1.0 },
+  GC:  { etf: "GLD",  ratio: 12.0 },
+  MGC: { etf: "GLD",  ratio: 12.0 },
+  SI:  { etf: "SLV",  ratio: 1.15 },
+  ZB:  { etf: "TLT",  ratio: 1.2 },
+  ZN:  { etf: "IEF",  ratio: 1.15 },
+  ZC:  { etf: "CORN", ratio: 20.0 },
+  ZS:  { etf: "SOYB", ratio: 40.0 },
+  ZW:  { etf: "WEAT", ratio: 25.0 },
+};
+
+async function fetchETFProxy(symbol: string, from: string, to: string): Promise<Bar[]> {
+  const proxy = ETF_PROXIES[symbol];
+  if (!proxy) return [];
+  const bars = await fetchPolygonAggs(proxy.etf, from, to);
+  if (bars.length === 0) return [];
   return bars.map(b => ({
     ...b,
-    open: b.open * ratio,
-    high: b.high * ratio,
-    low: b.low * ratio,
-    close: b.close * ratio,
+    open: Math.round(b.open * proxy.ratio * 100) / 100,
+    high: Math.round(b.high * proxy.ratio * 100) / 100,
+    low: Math.round(b.low * proxy.ratio * 100) / 100,
+    close: Math.round(b.close * proxy.ratio * 100) / 100,
   }));
 }
 
@@ -486,8 +509,8 @@ export async function runBacktest(config: {
   console.log(`[backtest] Starting ${patternKey} backtest on ${symbol} from ${from} to ${to} (R:R ${rrRatio}, maxHold ${maxHold})`);
 
   let bars: Bar[];
-  if (symbol === "ES" || symbol === "MES") {
-    bars = await fetchSPYProxy(from, to);
+  if (ETF_PROXIES[symbol]) {
+    bars = await fetchETFProxy(symbol, from, to);
   } else {
     bars = await fetchStitchedData(symbol, from, to);
   }

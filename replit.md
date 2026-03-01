@@ -99,12 +99,12 @@ data/               - Persistent JSON files (trade_journal.json, trader_settings
   - **Pattern Library**: 8 cards covering all long + short patterns from the manual with entry/stop/target rules and confluence tips
   - **Filtered Analytics**: Edge Builder stats reflect only currently enabled patterns/timeframes from settings
   - **Historical Backtester**: Test any of the 4 patterns against real Polygon historical data
-    - Symbols: ES, NQ, YM, RTY, CL, GC, ZB, ZN (SPY proxy for ES/MES)
+    - 16 symbols via ETF proxies (free Polygon tier): SPY→ES/MES, QQQ→NQ/MNQ, DIA→YM/MYM, IWM→RTY/M2K, USO→CL/MCL, GLD→GC/MGC, SLV→SI, TLT→ZB, IEF→ZN, CORN→ZC, SOYB→ZS, WEAT→ZW
     - Configurable date range, R:R ratio (1:1.5 to 1:3), max hold bars (3-10)
     - Metrics: Win Rate, Profit Factor, Expectancy, Total P&L, Max Drawdown, Best/Worst Trade
     - Shows last 50 trades with entry/SL/TP/exit/outcome
     - ATR-based stop loss and take profit calculation
-    - Contract stitching for futures continuous data
+    - Contract stitching available for Polygon futures subscription (falls back to ETF proxy)
   - API: GET `/api/journal/analytics?patterns=...&timeframes=...`
   - API: POST `/api/backtest/pattern` `{ symbol, pattern, from, to, rrRatio, maxHold }`
 
