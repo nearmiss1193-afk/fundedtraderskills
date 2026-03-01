@@ -1140,6 +1140,107 @@ function detectWedgeShort(bars: Bar[], state: MarketState): { detected: boolean;
   return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
 }
 
+function findLocalPeaks(values: number[], dist: number): number[] {
+  const peaks: number[] = [];
+  for (let i = dist; i < values.length - dist; i++) {
+    let isPeak = true;
+    for (let j = 1; j <= dist; j++) {
+      if (values[i] < values[i - j] || values[i] < values[i + j]) { isPeak = false; break; }
+    }
+    if (isPeak) peaks.push(i);
+  }
+  return peaks;
+}
+
+function findLocalTroughs(values: number[], dist: number): number[] {
+  const troughs: number[] = [];
+  for (let i = dist; i < values.length - dist; i++) {
+    let isTrough = true;
+    for (let j = 1; j <= dist; j++) {
+      if (values[i] > values[i - j] || values[i] > values[i + j]) { isTrough = false; break; }
+    }
+    if (isTrough) troughs.push(i);
+  }
+  return troughs;
+}
+
+function detectCupAndHandleLong(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 25) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const peaks = findLocalPeaks(highs, 3);
+  const troughs = findLocalTroughs(lows, 3);
+
+  for (let pi = 0; pi < peaks.length - 1; pi++) {
+    const leftRim = peaks[pi];
+    const rightRim = peaks[pi + 1];
+    const cupWidth = rightRim - leftRim;
+    if (cupWidth < 10 || cupWidth > 50) continue;
+
+    const rimDiffPct = Math.abs(highs[leftRim] - highs[rightRim]) / highs[leftRim];
+    if (rimDiffPct > 0.02) continue;
+
+    const cupTroughs = troughs.filter(t => t > leftRim && t < rightRim);
+    if (cupTroughs.length === 0) continue;
+    const cupBottom = cupTroughs.reduce((a, b) => lows[a] < lows[b] ? a : b);
+
+    const cupDepth = Math.min(highs[leftRim], highs[rightRim]) - lows[cupBottom];
+    const avgPrice = (highs[leftRim] + highs[rightRim]) / 2;
+    if (cupDepth / avgPrice < 0.005) continue;
+
+    const leftHalf = bars.slice(leftRim, cupBottom + 1);
+    const rightHalf = bars.slice(cupBottom, rightRim + 1);
+    const leftSlope = linearRegressionSlope(leftHalf.map(b => b.close));
+    const rightSlope = linearRegressionSlope(rightHalf.map(b => b.close));
+    if (leftSlope > 0 || rightSlope < 0) continue;
+
+    const rimHigh = Math.max(highs[leftRim], highs[rightRim]);
+    const handleEnd = Math.min(rightRim + Math.floor(cupWidth * 0.4), bars.length - 1);
+
+    let handleLow = Infinity;
+    for (let h = rightRim + 1; h <= handleEnd; h++) {
+      if (bars[h].low < handleLow) handleLow = bars[h].low;
+      const handleRetrace = rimHigh - handleLow;
+      if (handleRetrace > cupDepth * 0.5) break;
+    }
+
+    const curr = bars[bars.length - 1];
+    if (!curr.bullish || curr.close <= rimHigh) continue;
+
+    const recentVol = recentAvgVolume(bars, 10);
+    const volSurge = curr.volume > recentVol * 1.5;
+    if (!volSurge) continue;
+
+    const aboveEMA21 = curr.close > state.ema21;
+    const avgRange = getAvgRange(bars);
+
+    const factors = [
+      volSurge,
+      isIgnitingVolume(bars, state.avgVolume),
+      aboveEMA21,
+      curr.close > state.ema9,
+      curr.close > state.sma200,
+      state.bias !== "DOWNTREND",
+      hasBottomingTail(bars[bars.length - 2]) || hasBottomingTail(curr),
+      isWideRangeBar(curr, avgRange),
+      isNearPivot(state.price, state.pivotLow, state.price) || isNearPivot(state.price, state.priorPivotLow, state.price),
+      barFormationQuality(curr, "LONG") >= 3,
+      cupDepth / avgPrice >= 0.01,
+    ];
+    const conf = calcConfluence(factors);
+    const handlePct = handleLow < Infinity ? ((rimHigh - handleLow) / cupDepth * 100).toFixed(0) : "n/a";
+    const reasons: string[] = [`cup&handle breakout (depth ${(cupDepth / avgPrice * 100).toFixed(1)}%, handle ${handlePct}%)`];
+    if (volSurge) reasons.push("vol surge on breakout");
+    if (isIgnitingVolume(bars, state.avgVolume)) reasons.push("igniting volume");
+    if (aboveEMA21) reasons.push("above 21 EMA");
+    if (isWideRangeBar(curr, avgRange)) reasons.push("wide range bar");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+  }
+
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+}
+
 function sentimentLabel(s: MarketState): string {
   if (s.sentiment === "BUYERS_CONTROL") return "GREED";
   if (s.sentiment === "SELLERS_CONTROL") return "FEAR";

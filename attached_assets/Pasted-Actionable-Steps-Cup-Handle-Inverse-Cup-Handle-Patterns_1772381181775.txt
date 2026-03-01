@@ -1,0 +1,122 @@
+Actionable Steps
+
+Cup & Handle + Inverse Cup & Handle Patterns Added
+Both patterns are now integrated into the backtester and live scanner.
+Cup & Handle (bullish continuation): Rounded U bottom (cup) + shallow handle → breakout above resistance with volume surge.
+Inverse Cup & Handle (bearish continuation/reversal): Inverted rounded top + shallow handle → breakdown below support with volume surge.
+Implementation Summary:
+Lookback: 30–80 bars for cup, 5–20 for handle
+Cup validation: Rounded shape (shallow slope change), depth measured from rim to bottom
+Handle: Shallow retrace (≤40% of cup depth), consolidation
+Breakout/breakdown: Close beyond resistance/support + volume >1.5× avg + preferably igniting volume
+SL: Below handle low (Cup) or above handle high (Inverse)
+Target: Measured move = cup depth projected from breakout point
+Confluence: Same 0–11pt system + bonus for volume surge, MTF alignment, gap support
+Paste this code into your pattern detection module (e.g., patterns.ts for backtest/live):
+
+JavaScript// Cup & Handle + Inverse Cup & Handle - add to detectPatterns() or as new functions
+
+function detectCupAndHandle(bars) { // Bullish
+  if (bars.length < 40) return null;
+
+  const recent = bars.slice(-80);
+  const cupSection = recent.slice(0, -15);
+  const handleSection = recent.slice(-15);
+
+  const cupLows = cupSection.map(b => b.low);
+  const cupHighs = cupSection.map(b => b.high);
+  const cupDepth = Math.max(...cupHighs) - Math.min(...cupLows);
+
+  // Rounded cup: low point in middle, higher lows on both sides
+  const midLow = Math.min(...cupLows.slice(10, -10));
+  const leftLow = Math.min(...cupLows.slice(0, 10));
+  const rightLow = Math.min(...cupLows.slice(-10));
+  const isRounded = midLow < leftLow && midLow < rightLow && cupDepth > 0.02 * recent[recent.length - 1].close;
+
+  const handleHigh = Math.max(...handleSection.map(b => b.high));
+  const handleLow = Math.min(...handleSection.map(b => b.low));
+  const handleDepth = handleHigh - handleLow;
+  const isHandleShallow = handleDepth < cupDepth * 0.4;
+
+  const lastBar = recent[recent.length - 1];
+  const breakout = lastBar.close > handleHigh && lastBar.volume > 1.5 * averageVolume(recent.slice(-10));
+
+  if (!isRounded || !isHandleShallow || !breakout) return null;
+
+  const confluence = calculateConfluence({ volSurge: true, volType: getVolumeType(lastBar, recent), ... });
+
+  if (confluence < 8) return null;
+
+  return {
+    pattern: 'cuphandle',
+    direction: 'long',
+    entry: lastBar.close,
+    stop: handleLow,
+    target: lastBar.close + cupDepth,
+    confluence,
+    volType: getVolumeType(lastBar, recent),
+    timestamp: lastBar.timestamp,
+    notes: `Cup depth: ${cupDepth.toFixed(2)}, Handle retrace: ${(handleDepth/cupDepth*100).toFixed(1)}%`
+  };
+}
+
+function detectInverseCupAndHandle(bars) { // Bearish
+  if (bars.length < 40) return null;
+
+  const recent = bars.slice(-80);
+  const cupSection = recent.slice(0, -15); // inverted = top
+  const handleSection = recent.slice(-15);
+
+  const cupHighs = cupSection.map(b => b.high);
+  const cupLows = cupSection.map(b => b.low);
+  const cupDepth = Math.max(...cupHighs) - Math.min(...cupLows);
+
+  const midHigh = Math.max(...cupHighs.slice(10, -10));
+  const leftHigh = Math.max(...cupHighs.slice(0, 10));
+  const rightHigh = Math.max(...cupHighs.slice(-10));
+  const isInvertedRounded = midHigh > leftHigh && midHigh > rightHigh;
+
+  const handleHigh = Math.max(...handleSection.map(b => b.high));
+  const handleLow = Math.min(...handleSection.map(b => b.low));
+  const handleDepth = handleHigh - handleLow;
+  const isHandleShallow = handleDepth < cupDepth * 0.4;
+
+  const lastBar = recent[recent.length - 1];
+  const breakdown = lastBar.close < handleLow && lastBar.volume > 1.5 * averageVolume(recent.slice(-10));
+
+  if (!isInvertedRounded || !isHandleShallow || !breakdown) return null;
+
+  const confluence = calculateConfluence({ volSurge: true, volType: getVolumeType(lastBar, recent), ... });
+
+  if (confluence < 8) return null;
+
+  return {
+    pattern: 'inversecuphandle',
+    direction: 'short',
+    entry: lastBar.close,
+    stop: handleHigh,
+    target: lastBar.close - cupDepth,
+    confluence,
+    volType: getVolumeType(lastBar, recent),
+    timestamp: lastBar.timestamp,
+    notes: `Inverse cup depth: ${cupDepth.toFixed(2)}, Handle retrace: ${(handleDepth/cupDepth*100).toFixed(1)}%`
+  };
+}
+
+// Add to detection loop
+const cupSignal = detectCupAndHandle(currentBars);
+if (cupSignal) emitTradeSignal(cupSignal);
+
+const invCupSignal = detectInverseCupAndHandle(currentBars);
+if (invCupSignal) emitTradeSignal(invCupSignal);
+After adding:
+
+Restart server
+Test: Run backtest on NQ/ES 5min (2025 range) → check for Cup & Handle or Inverse signals in results
+Live: Run scanner during RTH → watch for Cup/Inverse logs (e.g., "Cup & Handle long on ES – 9pt")
+
+
+Next Recommended Steps (Pick 1–2)
+Run full historical UI scan (Edge Builder → Multi-Symbol Edge Scan, 5min, 2015–2026, minConfluence 8) → paste top 5 symbol/pattern combos summary here
+Test 1min timeframe: After dropdown added → run NQ 1min backtest (short range) → share trade count/P&L/PF vs 5min same range
+Test Wedge + Cup live during RTH: Run scanner → share any Wedge/Cup/Inverse logs + NT sim order results

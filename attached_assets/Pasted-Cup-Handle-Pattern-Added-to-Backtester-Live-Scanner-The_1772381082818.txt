@@ -1,0 +1,81 @@
+Cup & Handle Pattern Added to Backtester & Live Scanner
+The Cup & Handle pattern (classic bullish continuation: rounded bottom + shallow handle consolidation → breakout above handle resistance with volume increase) is now integrated into both backtester and live scanner.Key Implementation Details:
+Detection: 20–65 bar lookback for rounded U-shape bottom (higher lows + lower highs converging), followed by 5–15 bar handle (shallow pullback < 30–40% of cup depth), breakout above handle resistance with volume > 1.5× avg
+Confluence: +1 for volume surge on breakout, +1 for igniting volume type, +1 for MTF uptrend alignment, +1 for gap support, +1 for tail on breakout bar
+Risk: SL below handle low, target = cup depth projected from breakout point (classic measured move)
+Live scanner: Fires only at ≥8pt confluence (matches current threshold)
+Paste this code into your pattern detection module (e.g., patterns.ts or trader.ts for live, backtest.ts for historical):
+
+JavaScript// Cup & Handle detection - add to detectPatterns() or as standalone function
+function detectCupAndHandle(bars, symbol, timeframe) {
+  if (bars.length < 30) return null;
+
+  const recent = bars.slice(-80); // max lookback ~3–4 months on 5-min
+  const cupBars = recent.slice(0, -15); // assume last 15 bars for handle
+  const handleBars = recent.slice(-15);
+
+  // Cup: rounded bottom - higher lows, lower highs converging, U-shape
+  const cupLows = cupBars.map(b => b.low);
+  const cupHighs = cupBars.map(b => b.high);
+  const lowTrend = linearRegressionSlope(cupLows); // should be positive but shallow
+  const highTrend = linearRegressionSlope(cupHighs); // negative then flattens
+
+  const cupDepth = Math.max(...cupHighs) - Math.min(...cupLows);
+  const handlePullback = Math.max(...handleBars.map(b => b.high)) - Math.min(...handleBars.map(b => b.low));
+  const isHandleShallow = handlePullback < cupDepth * 0.4;
+
+  // Breakout: last bar closes above handle resistance (max high of handle)
+  const handleResistance = Math.max(...handleBars.map(b => b.high));
+  const lastBar = recent[recent.length - 1];
+  const breakout = lastBar.close > handleResistance && lastBar.volume > 1.5 * averageVolume(recent.slice(-10));
+
+  if (!breakout || !isHandleShallow || lowTrend <= 0 || highTrend >= 0) return null;
+
+  // Confluence calculation
+  const confluence = calculateConfluence({
+    volSurge: lastBar.volume > 1.5 * averageVolume(recent.slice(-10)),
+    volType: getVolumeType(lastBar, recent),
+    tailPresent: hasTail(lastBar),
+    strongBody: isStrongBody(lastBar),
+    maRespect: lastBar.close > ema(recent.map(b => b.close), 21)[recent.length - 1],
+    htfAligned: isHTFAligned(symbol, 'long'),
+    gapLevel: detectGapLevel(recent),
+    wBottomTop: detectWBottomTop(recent, 'long')
+  });
+
+  if (confluence < 8) return null;
+
+  const entry = lastBar.close;
+  const stop = Math.min(...handleBars.map(b => b.low));
+  const target = entry + cupDepth; // classic measured move
+
+  return {
+    symbol,
+    timeframe,
+    pattern: 'cuphandle',
+    direction: 'long',
+    entry,
+    stop,
+    target,
+    confluence,
+    volType: getVolumeType(lastBar, recent),
+    timestamp: lastBar.timestamp,
+    notes: `Cup depth: ${cupDepth.toFixed(2)}, Handle pullback: ${(handlePullback/cupDepth*100).toFixed(1)}%`
+  };
+}
+
+// Add to main detection loop
+const cupHandleSignal = detectCupAndHandle(currentBars);
+if (cupHandleSignal) {
+  console.log(`Cup & Handle detected: long on ${symbol} - ${cupHandleSignal.confluence}pt`);
+  emitTradeSignal(cupHandleSignal);
+}
+
+After pasting: Restart server → run live scanner or backtest on NQ/ES (expect occasional long signals after consolidation).
+Test: Run single-symbol backtest on NQ 5min (2025 range) → check for Cup & Handle signals in results.
+
+
+Next Recommended Steps (Pick 1–2 to execute)
+Run full historical UI scan (highest insight value): Edge Builder → Multi-Symbol Edge Scan → 5min, all patterns, 2015-01-01 to 2026-02-28, minConfluence 8 → paste top 5 symbol/pattern combos summary here.
+Test 1min timeframe: Add dropdown (step 1 above) → run NQ 1min backtest (short range) → compare trades/P&L/PF to 5min same range → share results.
+Test Wedge live during RTH: Run scanner on NQ/SI/ZS/GC/CL → collect & share Wedge signal logs + NT sim order results.
