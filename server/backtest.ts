@@ -1,6 +1,25 @@
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
 
+const barCache: Map<string, { bars: Bar[]; fetchedAt: number }> = new Map();
+const BAR_CACHE_TTL = 300_000;
+
+function getCachedBars(key: string): Bar[] | null {
+  const entry = barCache.get(key);
+  if (entry && Date.now() - entry.fetchedAt < BAR_CACHE_TTL) {
+    return entry.bars;
+  }
+  return null;
+}
+
+function setCachedBars(key: string, bars: Bar[]): void {
+  barCache.set(key, { bars: [...bars], fetchedAt: Date.now() });
+  if (barCache.size > 100) {
+    const oldest = [...barCache.entries()].sort((a, b) => a[1].fetchedAt - b[1].fetchedAt);
+    for (let i = 0; i < 20; i++) barCache.delete(oldest[i][0]);
+  }
+}
+
 interface Bar {
   open: number;
   high: number;
@@ -66,25 +85,62 @@ function getContractTickers(symbol: string, startYear: number, endYear: number):
   return tickers;
 }
 
+let polygonCallCount = 0;
+let polygonMinuteStart = Date.now();
+
+async function rateLimitGuard(): Promise<void> {
+  const now = Date.now();
+  if (now - polygonMinuteStart > 60000) {
+    polygonCallCount = 0;
+    polygonMinuteStart = now;
+  }
+  if (polygonCallCount >= 4) {
+    const waitMs = 60000 - (now - polygonMinuteStart) + 1000;
+    if (waitMs > 0) {
+      console.log(`[backtest] Rate limit guard: waiting ${Math.ceil(waitMs / 1000)}s before next Polygon call`);
+      await new Promise(r => setTimeout(r, waitMs));
+    }
+    polygonCallCount = 0;
+    polygonMinuteStart = Date.now();
+  }
+}
+
 async function fetchPolygonAggs(ticker: string, from: string, to: string, multiplier = 1, timespan = "day"): Promise<Bar[]> {
   if (!POLYGON_API_KEY) return [];
+
+  await rateLimitGuard();
+
   const url = `${POLYGON_BASE}/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${POLYGON_API_KEY}`;
-  try {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    if (!data.results || data.results.length === 0) return [];
-    return data.results.map((r: any) => ({
-      open: r.o,
-      high: r.h,
-      low: r.l,
-      close: r.c,
-      volume: r.v || 0,
-      timestamp: r.t,
-    }));
-  } catch {
-    return [];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      polygonCallCount++;
+
+      if (resp.status === 429) {
+        const retryAfter = Math.min(65000, (attempt + 1) * 30000);
+        console.log(`[backtest] Polygon 429 rate limited on ${ticker}, retry ${attempt + 1}/3 after ${retryAfter / 1000}s`);
+        await new Promise(r => setTimeout(r, retryAfter));
+        polygonCallCount = 0;
+        polygonMinuteStart = Date.now();
+        continue;
+      }
+
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      if (!data.results || data.results.length === 0) return [];
+      return data.results.map((r: any) => ({
+        open: r.o,
+        high: r.h,
+        low: r.l,
+        close: r.c,
+        volume: r.v || 0,
+        timestamp: r.t,
+      }));
+    } catch {
+      if (attempt < 2) await new Promise(r => setTimeout(r, 5000));
+    }
   }
+  return [];
 }
 
 async function fetchStitchedData(symbol: string, from: string, to: string): Promise<Bar[]> {
@@ -151,9 +207,17 @@ const ETF_PROXIES: Record<string, { etf: string; ratio: number }> = {
 async function fetchETFProxy(symbol: string, from: string, to: string): Promise<Bar[]> {
   const proxy = ETF_PROXIES[symbol];
   if (!proxy) return [];
-  const bars = await fetchPolygonAggs(proxy.etf, from, to);
-  if (bars.length === 0) return [];
-  return bars.map(b => ({
+
+  const etfCacheKey = `ETF:${proxy.etf}:${from}:${to}`;
+  let rawBars = getCachedBars(etfCacheKey);
+  if (!rawBars) {
+    rawBars = await fetchPolygonAggs(proxy.etf, from, to);
+    if (rawBars.length > 0) setCachedBars(etfCacheKey, rawBars);
+  } else {
+    console.log(`[backtest] ETF cache hit: ${rawBars.length} bars for ${proxy.etf} (proxy for ${symbol})`);
+  }
+  if (rawBars.length === 0) return [];
+  return rawBars.map(b => ({
     ...b,
     open: Math.round(b.open * proxy.ratio * 100) / 100,
     high: Math.round(b.high * proxy.ratio * 100) / 100,
@@ -1130,11 +1194,20 @@ export async function runBacktest(config: {
 
   console.log(`[backtest] Starting ${patternKey} backtest on ${symbol} from ${from} to ${to} (R:R ${rrRatio}, maxHold ${maxHold}, minConf ${minConf})`);
 
-  let bars: Bar[];
-  if (ETF_PROXIES[symbol]) {
-    bars = await fetchETFProxy(symbol, from, to);
+  const cacheKey = `${symbol}:${from}:${to}`;
+  let bars: Bar[] | null = getCachedBars(cacheKey);
+
+  if (bars) {
+    console.log(`[backtest] Cache hit: ${bars.length} bars for ${symbol}`);
   } else {
-    bars = await fetchStitchedData(symbol, from, to);
+    if (ETF_PROXIES[symbol]) {
+      bars = await fetchETFProxy(symbol, from, to);
+    } else {
+      bars = await fetchStitchedData(symbol, from, to);
+    }
+    if (bars.length > 0) {
+      setCachedBars(cacheKey, bars);
+    }
   }
 
   if (bars.length === 0) {

@@ -1,0 +1,97 @@
+This is the ready-to-run prompt to trigger the multi-symbol scan. Paste it directly into the Replit console (server must be running). It scans 21 Apex-compatible symbols on 5-min timeframe with min 7pt confluence.
+
+JavaScript// Paste this into Replit console and press Enter
+const axios = require('axios');
+
+const BASE_URL = 'http://localhost:3000'; // or your Replit public URL
+
+const symbols = [
+  'ES', 'MES', 'NQ', 'MNQ', 'YM', 'MYM', 'RTY', 'M2K',
+  'CL', 'MCL', 'GC', 'MGC', 'SI', 'HG',
+  'BTC', 'ETH', 'ZB', 'ZN', 'ZC', 'ZS', 'ZW'
+];
+
+const scanParams = {
+  timeframe: '5min',
+  startDate: '2020-01-01',
+  endDate: '2026-02-28',
+  patterns: ['3bar', '4bar', 'buysetup', 'retest', 'breakout', 'climax', 'cuphandle', 'wedge'],
+  minConfluence: 7
+};
+
+async function runMultiScan() {
+  console.log('Initiating multi-symbol edge scan...');
+  console.log(`Symbols (${symbols.length}): ${symbols.join(', ')}`);
+  console.log(`Timeframe: ${scanParams.timeframe} | Min Confluence: ${scanParams.minConfluence}pt`);
+
+  try {
+    const res = await axios.post(`${BASE_URL}/api/backtest/multi`, {
+      symbols,
+      ...scanParams
+    });
+
+    const data = res.data;
+
+    console.log('\nSUMMARY');
+    console.log(`Symbols Scanned: ${data.summary.symbolsScanned}`);
+    console.log(`Total Trades: ${data.summary.totalTrades}`);
+    console.log(`Win Rate: ${(data.summary.winRate * 100).toFixed(1)}%`);
+    console.log(`Profit Factor: ${data.summary.profitFactor.toFixed(2)}`);
+    console.log(`Net P&L: ${data.summary.netPnL.toFixed(2)}`);
+    console.log(`Max Drawdown: ${data.summary.maxDrawdown?.toFixed(2) || 'N/A'}%`);
+
+    console.log('\nTOP 5 SYMBOLS BY P&L');
+    data.results
+      .sort((a, b) => b.totalPnL - a.totalPnL)
+      .slice(0, 5)
+      .forEach(r => {
+        console.log(`${r.symbol.padEnd(6)} | P&L: ${r.totalPnL.toFixed(2).padStart(8)} | WR: ${(r.winRate * 100).toFixed(1)}% | PF: ${r.profitFactor.toFixed(2)} | Trades: ${r.tradeCount}`);
+      });
+
+    console.log('\nPATTERN BREAKDOWN (AGGREGATED ACROSS SYMBOLS)');
+    if (data.patternBreakdown) {
+      Object.entries(data.patternBreakdown)
+        .sort(([,a], [,b]) => b.pnl - a.pnl)
+        .slice(0, 5)
+        .forEach(([pattern, stats]) => {
+          console.log(`${pattern.padEnd(12)} | P&L: ${stats.pnl.toFixed(2).padStart(8)} | WR: ${(stats.winRate * 100).toFixed(1)}% | PF: ${stats.profitFactor.toFixed(2)} | Trades: ${stats.count}`);
+        });
+    } else {
+      console.log('No patternBreakdown returned – check backend');
+    }
+
+    console.log('\nNext steps:');
+    console.log('1. Open Edge Builder UI → view Backtest Edge Heatmap');
+    console.log('2. Click "Export CSV" for full pivot analysis');
+
+  } catch (err) {
+    console.error('Scan error:', err.message);
+    if (err.response) console.error('Response:', err.response.data);
+  }
+}
+
+runMultiScan();
+
+After Execution:
+Copy the console output (summary + top 5 symbols + top patterns) and paste it in your next message.
+Open Edge Builder in browser → Backtest Edge Heatmap should auto-populate with Symbol × Pattern grid (color-coded: green high WR/PF, yellow medium, red low).
+
+
+
+Test BTC/ETH Signal in NT Sim
+In Edge Builder UI: Select "BTC" or "ETH" → Run single backtest (or trigger manual signal if live scanner active).
+Watch Replit console for:
+Pattern detection log (e.g., "BTC 5min: 3bar 8pt IGNITING")
+Supabase insert confirmation
+Bridge payload: instrument=BTC1! or ETH1!
+
+In NinjaTrader sim account: Check Orders tab → confirm market entry + SL/TP placed.
+If "No data" or error: Polygon free tier may limit crypto futures history — fallback to proxy ETF (add BITO for BTC, ETHA for ETH in ETF_PROXIES if needed).
+Share: Replit log snippet + NT sim order screenshot/description.
+
+Edge Heatmap Tab
+Already added in last session (Backtest Edge Heatmap card with Symbol × Pattern grid + color-coding + pattern breakdown table).
+After multi-scan runs:
+Grid shows per-symbol/per-pattern stats (trades, WR, PF, P&L).
+Cells colored by win rate (green ≥60%, yellow 45–60%, red <45%).
+Pattern breakdown table below shows aggregated top performers.
