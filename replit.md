@@ -57,6 +57,7 @@ The frontend is organized into four main tabs: "Create Skill," "Permit Checker,"
     *   **Max risk per trade:** 1% of $50,000 account (`MAX_RISK_PCT = 0.01`)
     *   **Daily loss limit:** -3% stops all scanning (`DAILY_LOSS_LIMIT_PCT = -0.03`)
     *   **SIM-only enforcement:** Non-SIM accounts blocked unless `ALLOW_LIVE_TRADES=true`
+    *   **Account Selector:** UI dropdown with type badges (SIM=green, TEST=amber, FUNDED=red). Selection persists to localStorage and syncs to backend via `POST /api/config/set-account`. Funded accounts default to read-only (signals logged but no execution). `GET /api/accounts` returns configured accounts + active selection.
     *   **Contract limit:** `MAX_CONTRACTS` env var (default 1) in CrossTrade
     *   **Apex Trader Funding rules:** Full eval guardrails — RTH-only filter (9:30 AM – 4:00 PM ET, weekdays only), per-symbol max contracts (ES:10, NQ:8, CL:5, GC:3, BTC:2, etc.), trailing drawdown from high water mark (-3%), daily loss limit, trade day tracking, profit target per plan (50k: $1K, 100k: $2K, 150k: $3K). `checkApexRules()` called before every signal emission. Apex eval status panel in trader UI shows P&L, HWM, drawdown, trade days, and target progress in real-time. API: `GET /api/trader/apex-eval?plan=50k`.
     *   **Safety status API:** `GET /api/trader/safety` returns daily P&L, limits, confluence min, `rthActive` boolean, full `apexRules` object

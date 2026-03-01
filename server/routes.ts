@@ -10,6 +10,19 @@ import { runBacktest } from "./backtest";
 
 let skills: any[] = [];
 
+interface AccountConfig {
+  id: string;
+  name: string;
+  type: "sim" | "test" | "funded";
+}
+
+const ACCOUNTS: AccountConfig[] = [
+  { id: "Sim101", name: "NinjaTrader Sim 101", type: "sim" },
+  { id: "APEX2210630000011", name: "Apex Funded 50k", type: "funded" },
+];
+
+let activeAccount: AccountConfig = ACCOUNTS[0];
+
 interface TradeSignal {
   symbol: string;
   direction: string;
@@ -347,6 +360,27 @@ export async function registerRoutes(
       account: account
     });
     res.json(result);
+  });
+
+  app.get("/api/accounts", (_req, res) => {
+    res.json({ accounts: ACCOUNTS, active: activeAccount });
+  });
+
+  app.post("/api/config/set-account", (req, res) => {
+    const { account } = req.body;
+    if (!account) {
+      return res.status(400).json({ success: false, error: "Missing account id" });
+    }
+    const found = ACCOUNTS.find(a => a.id === account);
+    if (!found) {
+      return res.status(400).json({ success: false, error: `Unknown account: ${account}` });
+    }
+    if (found.type === "funded" && process.env.ALLOW_LIVE_TRADES !== "true") {
+      console.warn(`[account] Switched to funded account ${found.id} — execution disabled (ALLOW_LIVE_TRADES != true)`);
+    }
+    activeAccount = found;
+    console.log(`[account] Active account switched to: ${found.id} (${found.type})`);
+    res.json({ success: true, account: activeAccount });
   });
 
   app.get("/api/journal", (_req, res) => {

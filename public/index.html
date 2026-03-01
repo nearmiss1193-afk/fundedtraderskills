@@ -981,10 +981,11 @@
         </select>
 
         <label for="tradeAccount">NinjaTrader Account</label>
-        <select id="tradeAccount" style="max-width:280px;" data-testid="select-trade-account" onchange="syncAccountFields()">
-          <option value="Sim101" selected>Sim101 (Simulation)</option>
-          <option value="APEX2210630000011">APEX2210630000011 (Live/Paper)</option>
+        <select id="tradeAccount" style="max-width:320px;" data-testid="select-trade-account" onchange="syncAccountFields()">
+          <option value="Sim101" data-type="sim" selected>Sim101 — NinjaTrader Sim 101 (SIM)</option>
+          <option value="APEX2210630000011" data-type="funded">APEX2210630000011 — Apex Funded 50k (FUNDED)</option>
         </select>
+        <span id="account-type-badge" data-testid="text-account-type" style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;margin-left:4px;background:#22c55e;color:#fff;">SIM</span>
 
         <label for="rewardRatio">Risk : Reward Ratio (Hard Rule)</label>
         <select id="rewardRatio" style="max-width:200px;" data-testid="select-reward-ratio">
@@ -1847,8 +1848,32 @@
     }
 
     function syncAccountFields() {
-      const acct = document.getElementById('tradeAccount').value;
+      const sel = document.getElementById('tradeAccount');
+      const acct = sel.value;
+      const opt = sel.options[sel.selectedIndex];
+      const acctType = opt.getAttribute('data-type') || 'sim';
       document.getElementById('ct-account-display').textContent = acct;
+
+      const badge = document.getElementById('account-type-badge');
+      if (acctType === 'funded') {
+        badge.textContent = 'FUNDED';
+        badge.style.background = '#ef4444';
+      } else if (acctType === 'test') {
+        badge.textContent = 'TEST';
+        badge.style.background = '#f59e0b';
+      } else {
+        badge.textContent = 'SIM';
+        badge.style.background = '#22c55e';
+      }
+
+      localStorage.setItem('selectedAccount', acct);
+      fetch('/api/config/set-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account: acct })
+      }).then(r => r.json()).then(d => {
+        if (d.success) console.log('[account] Switched to:', d.account.id, d.account.type);
+      }).catch(e => console.warn('[account] Sync failed:', e));
     }
 
     async function sendCrossTrade() {
@@ -2701,6 +2726,17 @@
     loadJournalData();
     loadTraderSettings();
     setInterval(loadJournalData, 10000);
+
+    (function restoreAccount() {
+      const saved = localStorage.getItem('selectedAccount');
+      if (saved) {
+        const sel = document.getElementById('tradeAccount');
+        for (let i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === saved) { sel.selectedIndex = i; break; }
+        }
+        syncAccountFields();
+      }
+    })();
   </script>
 </body>
 </html>
