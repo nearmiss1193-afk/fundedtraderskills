@@ -1,5 +1,11 @@
+import fs from "fs";
+import path from "path";
+import YahooFinance from "yahoo-finance2";
+const yahooFinance = new YahooFinance();
+
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
+const DATA_DIR = path.resolve("./data");
 
 function parseTimeframe(tf: string): { multiplier: number; timespan: string } {
   const map: Record<string, { multiplier: number; timespan: string }> = {
@@ -22,11 +28,28 @@ function parseTimeframe(tf: string): { multiplier: number; timespan: string } {
 const barCache: Map<string, { bars: Bar[]; fetchedAt: number }> = new Map();
 const BAR_CACHE_TTL = 300_000;
 
+function diskCachePath(key: string): string {
+  const safe = key.replace(/[^a-zA-Z0-9_\-]/g, "_");
+  return path.join(DATA_DIR, `${safe}.json`);
+}
+
 function getCachedBars(key: string): Bar[] | null {
   const entry = barCache.get(key);
   if (entry && Date.now() - entry.fetchedAt < BAR_CACHE_TTL) {
     return entry.bars;
   }
+  const diskPath = diskCachePath(key);
+  try {
+    if (fs.existsSync(diskPath)) {
+      const raw = fs.readFileSync(diskPath, "utf-8");
+      const bars: Bar[] = JSON.parse(raw);
+      if (bars.length > 0) {
+        barCache.set(key, { bars, fetchedAt: Date.now() });
+        console.log(`[cache] Disk hit: ${bars.length} bars for ${key}`);
+        return bars;
+      }
+    }
+  } catch {}
   return null;
 }
 
@@ -35,6 +58,12 @@ function setCachedBars(key: string, bars: Bar[]): void {
   if (barCache.size > 100) {
     const oldest = [...barCache.entries()].sort((a, b) => a[1].fetchedAt - b[1].fetchedAt);
     for (let i = 0; i < 20; i++) barCache.delete(oldest[i][0]);
+  }
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(diskCachePath(key), JSON.stringify(bars));
+  } catch (e: any) {
+    console.error(`[cache] Disk write error for ${key}: ${e.message}`);
   }
 }
 
@@ -82,6 +111,7 @@ interface BacktestResult {
   bestTrade: number;
   worstTrade: number;
   trades: BacktestTrade[];
+  allTrades: BacktestTrade[];
   dataPoints: number;
   error?: string;
 }
@@ -143,8 +173,19 @@ async function fetchPolygonAggs(ticker: string, from: string, to: string, multip
         continue;
       }
 
-      if (!resp.ok) return [];
-      const data = await resp.json();
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => "");
+        console.error(`[backtest] Polygon HTTP ${resp.status} for ${ticker}: ${errText.slice(0, 120)}`);
+        if (attempt < 2) { await new Promise(r => setTimeout(r, 5000)); continue; }
+        return [];
+      }
+      const rawText = await resp.text();
+      let data: any;
+      try { data = JSON.parse(rawText); } catch {
+        console.error(`[backtest] Polygon returned non-JSON for ${ticker}: ${rawText.slice(0, 120)}`);
+        if (attempt < 2) { await new Promise(r => setTimeout(r, 10000)); continue; }
+        return [];
+      }
       if (!data.results || data.results.length === 0) return [];
       if (data.results.length >= 49999) {
         console.log(`[backtest] WARNING: Polygon returned ${data.results.length} bars for ${ticker} — data may be truncated. Narrow date range or use a larger timeframe.`);
@@ -248,6 +289,68 @@ async function fetchETFProxy(symbol: string, from: string, to: string, multiplie
     low: Math.round(b.low * proxy.ratio * 100) / 100,
     close: Math.round(b.close * proxy.ratio * 100) / 100,
   }));
+}
+
+const YAHOO_INTERVAL_MAP: Record<string, string> = {
+  "1min": "1m", "2min": "2m", "5min": "5m", "15min": "15m", "30min": "30m",
+  "1hour": "1h", "4hour": "4h", "daily": "1d", "day": "1d", "week": "1wk", "weekly": "1wk",
+};
+
+const YAHOO_SYMBOL_MAP: Record<string, string> = {
+  ES: "ES=F", MES: "ES=F", NQ: "NQ=F", MNQ: "NQ=F",
+  YM: "YM=F", MYM: "YM=F", RTY: "RTY=F", M2K: "RTY=F",
+  CL: "CL=F", MCL: "CL=F", GC: "GC=F", MGC: "GC=F",
+  SI: "SI=F", HG: "HG=F", ZC: "ZC=F", ZS: "ZS=F", ZW: "ZW=F",
+  ZB: "ZB=F", ZN: "ZN=F", ZF: "ZF=F", ZT: "ZT=F",
+  BTC: "BTC-USD", MBT: "BTC-USD", ETH: "ETH-USD", MET: "ETH-USD",
+};
+
+async function fetchYahooFinance(symbol: string, from: string, to: string, timeframe: string): Promise<Bar[]> {
+  const yahooSymbol = YAHOO_SYMBOL_MAP[symbol] || symbol;
+  const interval = YAHOO_INTERVAL_MAP[timeframe] || "1d";
+
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+  toDate.setDate(toDate.getDate() + 1);
+
+  const maxIntraday = 60 * 24 * 3600 * 1000;
+  if (["1m", "2m", "5m", "15m", "30m", "1h"].includes(interval)) {
+    const rangeMs = toDate.getTime() - fromDate.getTime();
+    if (rangeMs > maxIntraday) {
+      console.log(`[yahoo] Intraday range too long for ${yahooSymbol} (${Math.round(rangeMs / 86400000)}d). Yahoo limits intraday to ~60 days.`);
+    }
+  }
+
+  try {
+    console.log(`[yahoo] Fetching ${yahooSymbol} [${interval}] from ${from} to ${to}`);
+    const result = await yahooFinance.chart(yahooSymbol, {
+      period1: fromDate,
+      period2: toDate,
+      interval: interval as any,
+    });
+
+    if (!result || !result.quotes || result.quotes.length === 0) {
+      console.log(`[yahoo] No data returned for ${yahooSymbol}`);
+      return [];
+    }
+
+    const bars: Bar[] = result.quotes
+      .filter((q: any) => q.open != null && q.high != null && q.low != null && q.close != null)
+      .map((q: any) => ({
+        open: q.open,
+        high: q.high,
+        low: q.low,
+        close: q.close,
+        volume: q.volume || 0,
+        timestamp: new Date(q.date).getTime(),
+      }));
+
+    console.log(`[yahoo] Got ${bars.length} bars for ${yahooSymbol} [${interval}]`);
+    return bars;
+  } catch (err: any) {
+    console.error(`[yahoo] Error fetching ${yahooSymbol}: ${err.message}`);
+    return [];
+  }
 }
 
 type VolType = "IGNITING" | "ENDING" | "RESTING" | "NORMAL";
@@ -455,6 +558,149 @@ interface Signal {
   pattern: string;
   confluence?: number;
   volType?: VolType;
+}
+
+function getBacktestVPBonus(bars: { close: number; high: number; low: number; volume: number }[], idx: number): number {
+  const lookback = Math.min(50, idx);
+  if (lookback < 20) return 0;
+
+  const slice = bars.slice(idx - lookback, idx);
+  const volumeMap: Record<string, number> = {};
+  let totalVolume = 0;
+
+  slice.forEach(bar => {
+    const price = (Math.round(bar.close * 100) / 100).toFixed(2);
+    volumeMap[price] = (volumeMap[price] || 0) + bar.volume;
+    totalVolume += bar.volume;
+  });
+
+  if (totalVolume === 0) return 0;
+
+  const pocPrice = parseFloat(Object.keys(volumeMap).reduce((a, b) => volumeMap[a] > volumeMap[b] ? a : b));
+
+  const sortedPrices = Object.keys(volumeMap).sort((a, b) => volumeMap[b] - volumeMap[a]);
+  let vaVol = 0, vaHigh = pocPrice, vaLow = pocPrice;
+  for (const price of sortedPrices) {
+    vaVol += volumeMap[price];
+    const p = parseFloat(price);
+    if (p > vaHigh) vaHigh = p;
+    if (p < vaLow) vaLow = p;
+    if (vaVol >= totalVolume * 0.7) break;
+  }
+
+  const currentPrice = bars[idx].close;
+  const recentBars = bars.slice(Math.max(0, idx - 10), idx);
+  const avgVol = recentBars.reduce((s, b) => s + b.volume, 0) / (recentBars.length || 1);
+  const hasVolSurge = bars[idx].volume > avgVol * 1.3;
+
+  const priceRange = Math.max(...slice.map(b => b.high)) - Math.min(...slice.map(b => b.low));
+  const pocThreshold = priceRange * 0.005;
+
+  let vpBonus = 0;
+  if (Math.abs(currentPrice - pocPrice) < pocThreshold && hasVolSurge) vpBonus += 1;
+  if ((currentPrice > vaHigh || currentPrice < vaLow) && hasVolSurge) vpBonus += 1;
+  if (currentPrice >= vaLow && currentPrice <= vaHigh && Math.abs(currentPrice - pocPrice) > pocThreshold) vpBonus += 0.5;
+
+  return Math.min(vpBonus, 2);
+}
+
+function getBacktestOFBonus(bars: { close: number; open: number; high: number; low: number; volume: number }[], idx: number, direction: "LONG" | "SHORT"): number {
+  const lookback = Math.min(20, idx);
+  if (lookback < 10) return 0;
+
+  const slice = bars.slice(idx - lookback, idx + 1);
+  let cumulativeDelta = 0;
+  let buyVolume = 0;
+  let sellVolume = 0;
+
+  slice.forEach(bar => {
+    const bullish = bar.close >= bar.open;
+    const barDelta = bullish ? bar.volume : -bar.volume;
+    cumulativeDelta += barDelta;
+    if (bullish) buyVolume += bar.volume;
+    else sellVolume += bar.volume;
+  });
+
+  const totalVol = buyVolume + sellVolume;
+  if (totalVol === 0) return 0;
+
+  const imbalance = Math.abs(buyVolume - sellVolume) / totalVol;
+
+  const last10 = slice.slice(-10);
+  const avgVol = last10.reduce((s, b) => s + b.volume, 0) / last10.length;
+  const avgRange = last10.reduce((s, b) => s + (b.high - b.low), 0) / last10.length;
+  const lastBar = slice[slice.length - 1];
+
+  const priceMove = slice[slice.length - 1].close - slice[0].open;
+  const avgDelta = cumulativeDelta / slice.length;
+
+  let ofBonus = 0;
+
+  if (imbalance > 0.6) {
+    const imbalanceBullish = buyVolume > sellVolume;
+    if ((direction === "LONG" && imbalanceBullish) || (direction === "SHORT" && !imbalanceBullish)) {
+      ofBonus += 1;
+    }
+  }
+
+  if (Math.sign(avgDelta) !== Math.sign(priceMove)) {
+    ofBonus += 1;
+  }
+
+  const lastBody = Math.abs(lastBar.close - lastBar.open);
+  if (lastBar.volume > avgVol * 1.5 && lastBody < avgRange * 0.5) {
+    ofBonus += 1;
+  }
+
+  return Math.min(ofBonus, 3);
+}
+
+function getBacktestVWAPBonus(bars: { close: number; high: number; low: number; volume: number }[], idx: number, direction: "LONG" | "SHORT"): number {
+  const lookback = Math.min(50, idx);
+  if (lookback < 20) return 0;
+  const slice = bars.slice(idx - lookback, idx + 1);
+  let cumPV = 0;
+  let cumVol = 0;
+  slice.forEach(bar => {
+    const tp = (bar.high + bar.low + bar.close) / 3;
+    cumPV += tp * bar.volume;
+    cumVol += bar.volume;
+  });
+  if (cumVol === 0) return 0;
+  const vwap = cumPV / cumVol;
+  const price = bars[idx].close;
+  if (price > vwap && direction === "LONG") return 1;
+  if (price < vwap && direction === "SHORT") return 1;
+  return 0;
+}
+
+function getBacktestRSIBonus(bars: { close: number }[], idx: number, direction: "LONG" | "SHORT"): number {
+  const period = 14;
+  if (idx < period) return 0;
+  const closes = [];
+  for (let i = idx - period; i <= idx; i++) closes.push(bars[i].close);
+  let gains = 0, losses = 0;
+  for (let i = 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) gains += diff;
+    else losses += Math.abs(diff);
+  }
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  if (avgLoss === 0) return direction === "SHORT" ? -1 : 0;
+  const rs = avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+
+  if (direction === "LONG") {
+    if (rsi >= 30 && rsi <= 45) return 2;
+    if (rsi >= 45 && rsi <= 55) return 1;
+    if (rsi > 80) return -1;
+  } else {
+    if (rsi >= 55 && rsi <= 70) return 1;
+    if (rsi >= 70) return 2;
+    if (rsi < 20) return -1;
+  }
+  return 0;
 }
 
 function detect3BarPlay(data: ReturnType<typeof addIndicators>): Signal[] {
@@ -975,6 +1221,7 @@ function computeResults(trades: BacktestTrade[], symbol: string, pattern: string
     bestTrade: Math.round(bestTrade * 100) / 100,
     worstTrade: Math.round(worstTrade * 100) / 100,
     trades: trades.slice(-50),
+    allTrades: trades,
     dataPoints,
   };
 }
@@ -1384,6 +1631,268 @@ function detectWedgeBreakout(data: ReturnType<typeof addIndicators>): Signal[] {
   });
 }
 
+function detectBullBearFlag(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema21, ema9, avgRange, avgVol, green, volType, body, range, bottomingTail, toppingTail, htfUp, htfDown } = data;
+
+  for (let i = 12; i < bars.length; i++) {
+    const ignitingBar = bars[i - 11];
+    const ignitingBody = Math.abs(ignitingBar.close - ignitingBar.open);
+    const pullbackBars = bars.slice(i - 10, i);
+    const breakoutBar = bars[i];
+    const avgR = avgRange[i];
+    const avgV = avgVol[i];
+
+    if (ignitingBar.close > ignitingBar.open && ignitingBody > avgR * 1.5 && ignitingBar.volume > avgV * 1.5) {
+      const pullbackDown = pullbackBars.filter(b => b.close < b.open).length;
+      if (pullbackDown >= 2) {
+        const flagHigh = Math.max(...pullbackBars.map(b => b.high));
+        const flagLow = Math.min(...pullbackBars.map(b => b.low));
+        const pullbackDepth = (ignitingBar.high - flagLow) / (ignitingBar.high - ignitingBar.low || 1);
+        if (pullbackDepth <= 0.8 && green[i] && breakoutBar.close > flagHigh && breakoutBar.volume > avgV * 1.3) {
+          const conf = [
+            breakoutBar.volume > avgV * 1.5,
+            volType[i] === "IGNITING",
+            body[i] > 0.5 * range[i],
+            breakoutBar.close > ema9[i],
+            breakoutBar.close > ema21[i],
+            htfUp[i],
+            pullbackDepth < 0.5,
+            bottomingTail[i] || bottomingTail[i - 1],
+          ].filter(Boolean).length;
+          signals.push({ index: i, direction: "LONG", pattern: "Bull Flag", confluence: conf, volType: volType[i] });
+        }
+      }
+    }
+
+    if (ignitingBar.close < ignitingBar.open && ignitingBody > avgR * 1.5 && ignitingBar.volume > avgV * 1.5) {
+      const pullbackUp = pullbackBars.filter(b => b.close > b.open).length;
+      if (pullbackUp >= 2) {
+        const flagHigh = Math.max(...pullbackBars.map(b => b.high));
+        const flagLow = Math.min(...pullbackBars.map(b => b.low));
+        const pullbackDepth = (flagHigh - ignitingBar.low) / (ignitingBar.open - ignitingBar.low || 1);
+        if (pullbackDepth <= 0.8 && !green[i] && breakoutBar.close < flagLow && breakoutBar.volume > avgV * 1.3) {
+          const conf = [
+            breakoutBar.volume > avgV * 1.5,
+            volType[i] === "IGNITING",
+            body[i] > 0.5 * range[i],
+            breakoutBar.close < ema9[i],
+            breakoutBar.close < ema21[i],
+            htfDown[i],
+            pullbackDepth < 0.5,
+            toppingTail[i] || toppingTail[i - 1],
+          ].filter(Boolean).length;
+          signals.push({ index: i, direction: "SHORT", pattern: "Bear Flag", confluence: conf, volType: volType[i] });
+        }
+      }
+    }
+  }
+  return signals;
+}
+
+function detectFlagPullbackSetup(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema21, ema9, avgRange, avgVol, green, volType, body, range, bottomingTail, toppingTail, htfUp, htfDown, gapUp, gapDown, level2GapUp, level2GapDown, wBottom, wTop } = data;
+
+  for (let i = 8; i < bars.length; i++) {
+    for (const pullbackLen of [3, 4, 5]) {
+      const ignitingIdx = i - pullbackLen - 1;
+      if (ignitingIdx < 1) continue;
+
+      const igBar = bars[ignitingIdx];
+      const igBody = Math.abs(igBar.close - igBar.open);
+      const igRange = igBar.high - igBar.low;
+      const avgR = avgRange[ignitingIdx] || 1;
+      const avgV = avgVol[ignitingIdx] || 1;
+
+      const pullbackBars = bars.slice(ignitingIdx + 1, i);
+      const breakoutBar = bars[i];
+
+      if (igBar.close > igBar.open && igBody > avgR * 1.5 && igBar.volume > avgV * 2) {
+        const flagHigh = Math.max(...pullbackBars.map(b => b.high));
+        const flagLow = Math.min(...pullbackBars.map(b => b.low));
+        const pullbackDown = pullbackBars.filter(b => b.close < b.open).length;
+        const pullbackDepth = igRange > 0 ? (igBar.high - flagLow) / igRange : 1;
+
+        if (pullbackDown >= 2 && pullbackDepth <= 0.75 &&
+            green[i] && breakoutBar.close > flagHigh && breakoutBar.volume > avgV * 1.5) {
+          const conf = [
+            breakoutBar.volume > avgV * 2,
+            volType[i] === "IGNITING",
+            body[i] > 0.6 * range[i],
+            breakoutBar.close > ema9[i],
+            breakoutBar.close > ema21[i],
+            htfUp[i],
+            pullbackDepth < 0.5,
+            bottomingTail[i] || (i > 0 && bottomingTail[i - 1]),
+            gapUp[i] || level2GapUp[i],
+            wBottom[i],
+          ].filter(Boolean).length;
+          signals.push({ index: i, direction: "LONG", pattern: "Bull Flag Pullback", confluence: conf, volType: volType[i] });
+          break;
+        }
+      }
+
+      if (igBar.close < igBar.open && igBody > avgR * 1.5 && igBar.volume > avgV * 2) {
+        const flagHigh = Math.max(...pullbackBars.map(b => b.high));
+        const flagLow = Math.min(...pullbackBars.map(b => b.low));
+        const pullbackUp = pullbackBars.filter(b => b.close > b.open).length;
+        const pullbackDepth = igRange > 0 ? (flagHigh - igBar.low) / igRange : 1;
+
+        if (pullbackUp >= 2 && pullbackDepth <= 0.75 &&
+            !green[i] && breakoutBar.close < flagLow && breakoutBar.volume > avgV * 1.5) {
+          const conf = [
+            breakoutBar.volume > avgV * 2,
+            volType[i] === "IGNITING",
+            body[i] > 0.6 * range[i],
+            breakoutBar.close < ema9[i],
+            breakoutBar.close < ema21[i],
+            htfDown[i],
+            pullbackDepth < 0.5,
+            toppingTail[i] || (i > 0 && toppingTail[i - 1]),
+            gapDown[i] || level2GapDown[i],
+            wTop[i],
+          ].filter(Boolean).length;
+          signals.push({ index: i, direction: "SHORT", pattern: "Bear Flag Pullback", confluence: conf, volType: volType[i] });
+          break;
+        }
+      }
+    }
+  }
+
+  const seen = new Set<number>();
+  return signals.filter(s => {
+    if (seen.has(s.index)) return false;
+    seen.add(s.index);
+    return true;
+  });
+}
+
+function detectBearTrapReversal(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema9, ema21, avgVol, avgRange, green, bottomingTail, body, range, volType, htfUp, htfDown, atr } = data;
+
+  for (let i = 12; i < bars.length; i++) {
+    const trapBar = bars[i - 2];
+    const reversalBar = bars[i - 1];
+    const entryBar = bars[i];
+
+    const priorLow = Math.min(...bars.slice(Math.max(0, i - 12), i - 2).map(b => b.low));
+    if (trapBar.low >= priorLow) continue;
+
+    if (trapBar.volume > avgVol[i] * 1.1) continue;
+
+    if (reversalBar.close <= reversalBar.open) continue;
+
+    const revTailLen = reversalBar.open - reversalBar.low;
+    const revRange = reversalBar.high - reversalBar.low;
+    const hasRevTail = revRange > 0 && revTailLen / revRange >= 0.3;
+    if (!hasRevTail && !bottomingTail[i - 1]) continue;
+
+    if (!green[i]) continue;
+
+    const conf = [
+      trapBar.low < priorLow,
+      trapBar.volume < avgVol[i] * 0.8,
+      reversalBar.close > reversalBar.open,
+      bottomingTail[i - 1] || hasRevTail,
+      entryBar.volume > avgVol[i] * 1.2,
+      entryBar.volume > avgVol[i] * 1.5,
+      entryBar.close > reversalBar.high,
+      entryBar.close > ema9[i],
+      body[i] > 0.5 * range[i],
+      htfUp[i],
+      volType[i] === "IGNITING",
+      entryBar.close > ema21[i],
+    ].filter(Boolean).length;
+
+    if (conf >= 5) {
+      signals.push({ index: i, direction: "LONG", pattern: "Bear Trap Reversal", confluence: conf, volType: volType[i] });
+    }
+  }
+  return signals;
+}
+
+function detectVWAPBounce(data: ReturnType<typeof addIndicators>): Signal[] {
+  const signals: Signal[] = [];
+  const { bars, ema9, ema21, avgVol, avgRange, green, bottomingTail, toppingTail, body, range, volType, htfUp, htfDown, atr } = data;
+
+  for (let i = 20; i < bars.length; i++) {
+    let cumPV = 0, cumV = 0;
+    const vwapWindow = Math.min(20, i);
+    for (let j = i - vwapWindow; j <= i; j++) {
+      const typical = (bars[j].high + bars[j].low + bars[j].close) / 3;
+      cumPV += typical * bars[j].volume;
+      cumV += bars[j].volume;
+    }
+    const vwap = cumV > 0 ? cumPV / cumV : ema21[i];
+
+    const testBar = bars[i - 1];
+    const bounceBar = bars[i];
+    const vwapRange = avgRange[i] * 0.25;
+
+    const bounceBody = Math.abs(bounceBar.close - bounceBar.open);
+    const bounceRange = bounceBar.high - bounceBar.low;
+    if (bounceRange < avgRange[i] * 0.8) continue;
+    if (bounceBody < bounceRange * 0.4) continue;
+
+    if (Math.abs(testBar.low - vwap) < vwapRange) {
+      if (green[i] && bounceBar.close > testBar.high && bounceBar.volume > avgVol[i] * 1.3) {
+        const testTail = testBar.open > testBar.close ?
+          (testBar.close - testBar.low) : (testBar.open - testBar.low);
+        const testRange = testBar.high - testBar.low;
+        const hasTestTail = testRange > 0 && testTail / testRange >= 0.3;
+
+        const conf = [
+          Math.abs(testBar.low - vwap) < vwapRange,
+          bottomingTail[i - 1] || hasTestTail,
+          bounceBar.volume > avgVol[i] * 1.5,
+          bounceBar.volume > avgVol[i] * 2.0,
+          green[i],
+          bounceBar.close > ema9[i],
+          bounceBar.close > vwap,
+          body[i] > 0.6 * range[i],
+          bounceBar.close > ema21[i],
+          htfUp[i],
+          volType[i] === "IGNITING",
+          bounceBar.close > bounceBar.open && bounceBar.close === bounceBar.high || bounceBar.close > bounceBar.high * 0.99,
+        ].filter(Boolean).length;
+        if (conf >= 6) {
+          signals.push({ index: i, direction: "LONG", pattern: "VWAP Bounce", confluence: conf, volType: volType[i] });
+        }
+      }
+    }
+
+    if (Math.abs(testBar.high - vwap) < vwapRange) {
+      if (!green[i] && bounceBar.close < testBar.low && bounceBar.volume > avgVol[i] * 1.3) {
+        const testWick = testBar.close > testBar.open ?
+          (testBar.high - testBar.close) : (testBar.high - testBar.open);
+        const testRange = testBar.high - testBar.low;
+        const hasTestWick = testRange > 0 && testWick / testRange >= 0.3;
+
+        const conf = [
+          Math.abs(testBar.high - vwap) < vwapRange,
+          toppingTail[i - 1] || hasTestWick,
+          bounceBar.volume > avgVol[i] * 1.5,
+          bounceBar.volume > avgVol[i] * 2.0,
+          !green[i],
+          bounceBar.close < ema9[i],
+          bounceBar.close < vwap,
+          body[i] > 0.6 * range[i],
+          bounceBar.close < ema21[i],
+          htfDown[i],
+          volType[i] === "IGNITING",
+          bounceBar.close < bounceBar.open && bounceBar.close === bounceBar.low || bounceBar.close < bounceBar.low * 1.01,
+        ].filter(Boolean).length;
+        if (conf >= 6) {
+          signals.push({ index: i, direction: "SHORT", pattern: "VWAP Bounce", confluence: conf, volType: volType[i] });
+        }
+      }
+    }
+  }
+  return signals;
+}
+
 const PATTERN_DETECTORS: Record<string, (data: ReturnType<typeof addIndicators>) => Signal[]> = {
   "3bar": detect3BarPlay,
   "4bar": detect4BarPlay,
@@ -1398,6 +1907,14 @@ const PATTERN_DETECTORS: Record<string, (data: ReturnType<typeof addIndicators>)
   "headshoulders": (data) => detectHeadAndShoulders(data).filter(s => s.direction === "SHORT"),
   "invheadshoulders": (data) => detectHeadAndShoulders(data).filter(s => s.direction === "LONG"),
   "wedge": detectWedgeBreakout,
+  "bullflag": (data) => detectBullBearFlag(data).filter(s => s.direction === "LONG"),
+  "bearflag": (data) => detectBullBearFlag(data).filter(s => s.direction === "SHORT"),
+  "flagpullback": detectBullBearFlag,
+  "bullflagpullback": (data) => detectFlagPullbackSetup(data).filter(s => s.direction === "LONG"),
+  "bearflagpullback": (data) => detectFlagPullbackSetup(data).filter(s => s.direction === "SHORT"),
+  "flagpullbacksetup": detectFlagPullbackSetup,
+  "beartrap": detectBearTrapReversal,
+  "vwapbounce": detectVWAPBounce,
   "all": (data) => [
     ...detect3BarPlay(data),
     ...detect4BarPlay(data),
@@ -1410,6 +1927,10 @@ const PATTERN_DETECTORS: Record<string, (data: ReturnType<typeof addIndicators>)
     ...detectDoubleTopBottom(data),
     ...detectHeadAndShoulders(data),
     ...detectWedgeBreakout(data),
+    ...detectBullBearFlag(data),
+    ...detectFlagPullbackSetup(data),
+    ...detectBearTrapReversal(data),
+    ...detectVWAPBounce(data),
   ],
 };
 
@@ -1418,6 +1939,7 @@ const POINT_VALUES: Record<string, number> = {
   CL: 1000, MCL: 100, GC: 100, MGC: 10, SI: 5000, HG: 25000,
   ZB: 1000, ZN: 1000, ZT: 2000, ZF: 1000,
   ZC: 50, ZS: 50, ZW: 50,
+  BTC: 5, MBT: 0.5, ETH: 50, MET: 5,
 };
 
 export async function runBacktest(config: {
@@ -1429,6 +1951,7 @@ export async function runBacktest(config: {
   maxHold?: number;
   minConfluence?: number;
   timeframe?: string;
+  dataSource?: string;
 }): Promise<BacktestResult> {
   const symbol = (config.symbol || "ES").toUpperCase();
   const patternKey = config.pattern || "3bar";
@@ -1440,19 +1963,27 @@ export async function runBacktest(config: {
   const pointValue = POINT_VALUES[symbol] || 50;
   const tf = config.timeframe || "daily";
   const { multiplier, timespan } = parseTimeframe(tf);
+  const source = (config.dataSource || "auto").toLowerCase();
 
-  console.log(`[backtest] Starting ${patternKey} backtest on ${symbol} [${tf}] from ${from} to ${to} (R:R ${rrRatio}, maxHold ${maxHold}, minConf ${minConf})`);
+  console.log(`[backtest] Starting ${patternKey} backtest on ${symbol} [${tf}] from ${from} to ${to} (R:R ${rrRatio}, maxHold ${maxHold}, minConf ${minConf}, source: ${source})`);
 
-  const cacheKey = `${symbol}:${multiplier}${timespan}:${from}:${to}`;
+  const cacheKey = `${source === "yahoo" ? "YF:" : ""}${symbol}:${multiplier}${timespan}:${from}:${to}`;
   let bars: Bar[] | null = getCachedBars(cacheKey);
 
   if (bars) {
     console.log(`[backtest] Cache hit: ${bars.length} bars for ${symbol} [${tf}]`);
+  } else if (source === "yahoo") {
+    bars = await fetchYahooFinance(symbol, from, to, tf);
+    if (bars.length > 0) setCachedBars(cacheKey, bars);
   } else {
     if (ETF_PROXIES[symbol]) {
       bars = await fetchETFProxy(symbol, from, to, multiplier, timespan);
     } else {
       bars = await fetchStitchedData(symbol, from, to, multiplier, timespan);
+    }
+    if (bars.length === 0 && source === "auto") {
+      console.log(`[backtest] Polygon returned 0 bars for ${symbol}, falling back to Yahoo Finance`);
+      bars = await fetchYahooFinance(symbol, from, to, tf);
     }
     if (bars.length > 0) {
       setCachedBars(cacheKey, bars);
@@ -1474,6 +2005,16 @@ export async function runBacktest(config: {
   }
 
   const signals = detector(data);
+  signals.forEach(sig => {
+    const vpBonus = getBacktestVPBonus(bars, sig.index);
+    if (vpBonus > 0) sig.confluence = (sig.confluence || 0) + vpBonus;
+    const ofBonus = getBacktestOFBonus(bars, sig.index, sig.direction);
+    if (ofBonus > 0) sig.confluence = (sig.confluence || 0) + ofBonus;
+    const vwapBonus = getBacktestVWAPBonus(bars, sig.index, sig.direction);
+    if (vwapBonus > 0) sig.confluence = (sig.confluence || 0) + vwapBonus;
+    const rsiBonus = getBacktestRSIBonus(bars, sig.index, sig.direction);
+    if (rsiBonus !== 0) sig.confluence = (sig.confluence || 0) + rsiBonus;
+  });
   const filteredSignals = minConf > 0 ? signals.filter(s => (s.confluence || 0) >= minConf) : signals;
   console.log(`[backtest] Detected ${signals.length} ${patternKey} signals (${filteredSignals.length} with confluence >= ${minConf})`);
 
@@ -1483,4 +2024,363 @@ export async function runBacktest(config: {
 
   console.log(`[backtest] Result: ${result.totalTrades} trades, ${result.winRate}% WR, $${result.totalPnlDollars} P&L, PF ${result.profitFactor}`);
   return result;
+}
+
+export function scanCachedEdges(minWinRate: number = 45, minTrades: number = 5, minConfluence: number = 5): Array<{ symbol: string; pattern: string; timeframe: string; winRate: number; trades: number; pnl: number; profitFactor: number; avgConf: number; expectancy: number }> {
+  const results: Array<{ symbol: string; pattern: string; timeframe: string; winRate: number; trades: number; pnl: number; profitFactor: number; avgConf: number; expectancy: number }> = [];
+  const patternKeys = Object.keys(PATTERN_DETECTORS).filter(k => k !== "all");
+  const pvMap = POINT_VALUES;
+
+  for (const [cacheKey, cached] of barCache.entries()) {
+    const bars = cached.bars;
+    if (bars.length < 30) continue;
+
+    const parts = cacheKey.split(":");
+    const symbol = parts[0];
+    const tfRaw = parts[1] || "";
+    let tf = "daily";
+    if (tfRaw.includes("5minute")) tf = "5min";
+    else if (tfRaw.includes("15minute")) tf = "15min";
+    else if (tfRaw.includes("30minute")) tf = "30min";
+    else if (tfRaw.includes("1minute")) tf = "1min";
+    else if (tfRaw.includes("2minute")) tf = "2min";
+    else if (tfRaw.includes("3minute")) tf = "3min";
+    else if (tfRaw.includes("1hour") || tfRaw.includes("60minute")) tf = "1hour";
+    else if (tfRaw.includes("4hour") || tfRaw.includes("240minute")) tf = "4hour";
+
+    const data = addIndicators(bars);
+    const pointValue = pvMap[symbol] || 1;
+
+    for (const patKey of patternKeys) {
+      const detector = PATTERN_DETECTORS[patKey];
+      const signals = detector(data);
+
+      signals.forEach(sig => {
+        const vpBonus = getBacktestVPBonus(bars, sig.index);
+        if (vpBonus > 0) sig.confluence = (sig.confluence || 0) + vpBonus;
+        const ofBonus = getBacktestOFBonus(bars, sig.index, sig.direction);
+        if (ofBonus > 0) sig.confluence = (sig.confluence || 0) + ofBonus;
+        const vwapBonus = getBacktestVWAPBonus(bars, sig.index, sig.direction);
+        if (vwapBonus > 0) sig.confluence = (sig.confluence || 0) + vwapBonus;
+        const rsiBonus = getBacktestRSIBonus(bars, sig.index, sig.direction);
+        if (rsiBonus !== 0) sig.confluence = (sig.confluence || 0) + rsiBonus;
+      });
+
+      const filtered = minConfluence > 0 ? signals.filter(s => (s.confluence || 0) >= minConfluence) : signals;
+      if (filtered.length < minTrades) continue;
+
+      const trades = simulateTrades(data, filtered, 2, 5, pointValue);
+      if (trades.length < minTrades) continue;
+
+      const wins = trades.filter(t => t.outcome === "WIN").length;
+      const wr = Math.round((wins / trades.length) * 1000) / 10;
+      if (wr < minWinRate) continue;
+
+      const grossProfit = trades.filter(t => t.pnlDollars > 0).reduce((s, t) => s + t.pnlDollars, 0);
+      const grossLoss = Math.abs(trades.filter(t => t.pnlDollars < 0).reduce((s, t) => s + t.pnlDollars, 0));
+      const pf = grossLoss > 0 ? Math.round((grossProfit / grossLoss) * 100) / 100 : grossProfit > 0 ? 99.99 : 0;
+      const totalPnl = Math.round(trades.reduce((s, t) => s + t.pnlDollars, 0) * 100) / 100;
+      const avgConf = Math.round(filtered.reduce((s, sig) => s + (sig.confluence || 0), 0) / filtered.length * 10) / 10;
+
+      const avgWin = wins > 0 ? grossProfit / wins : 0;
+      const avgLoss = (trades.length - wins) > 0 ? grossLoss / (trades.length - wins) : 0;
+      const expectancy = Math.round(((wr / 100 * avgWin) - ((1 - wr / 100) * avgLoss)) * 100) / 100;
+
+      results.push({ symbol, pattern: patKey, timeframe: tf, winRate: wr, trades: trades.length, pnl: totalPnl, profitFactor: pf, avgConf, expectancy });
+    }
+  }
+
+  results.sort((a, b) => b.winRate - a.winRate || b.profitFactor - a.profitFactor);
+  return results;
+}
+
+interface ApexSimConfig {
+  accountSize: number;
+  profitTarget: number;
+  trailingDrawdownMax: number;
+  dailyLossLimit: number;
+  minTradeDays: number;
+  riskPerTrade: number;
+  mode: "eval" | "funded";
+}
+
+interface ApexDayResult {
+  date: string;
+  trades: number;
+  dayPnl: number;
+  cumPnl: number;
+  balance: number;
+  highWaterMark: number;
+  drawdownFromHWM: number;
+  dailyLimitHit: boolean;
+  drawdownBusted: boolean;
+  targetReached: boolean;
+}
+
+interface ApexSimResult {
+  passed: boolean;
+  busted: boolean;
+  bustReason?: string;
+  bustDate?: string;
+  passDate?: string;
+  totalTradeDays: number;
+  totalTradesTaken: number;
+  totalTradesSkipped: number;
+  finalBalance: number;
+  finalPnl: number;
+  highWaterMark: number;
+  maxDrawdownFromHWM: number;
+  maxDailyLoss: number;
+  profitTarget: number;
+  trailingDrawdownMax: number;
+  dailyLossLimit: number;
+  accountSize: number;
+  mode: string;
+  days: ApexDayResult[];
+  equityCurve: { date: string; balance: number; hwm: number }[];
+}
+
+export function simulateApexEval(trades: BacktestTrade[], config: ApexSimConfig): ApexSimResult {
+  const { accountSize, profitTarget, trailingDrawdownMax, dailyLossLimit, minTradeDays, riskPerTrade, mode } = config;
+
+  const tradesByDate = new Map<string, BacktestTrade[]>();
+  for (const t of trades) {
+    const date = t.date;
+    if (!tradesByDate.has(date)) tradesByDate.set(date, []);
+    tradesByDate.get(date)!.push(t);
+  }
+
+  const sortedDates = [...tradesByDate.keys()].sort();
+
+  let balance = accountSize;
+  let hwm = accountSize;
+  let cumPnl = 0;
+  let totalTradesTaken = 0;
+  let totalTradesSkipped = 0;
+  let maxDrawdownFromHWM = 0;
+  let maxDailyLoss = 0;
+  let passed = false;
+  let busted = false;
+  let bustReason: string | undefined;
+  let bustDate: string | undefined;
+  let passDate: string | undefined;
+
+  const days: ApexDayResult[] = [];
+  const equityCurve: { date: string; balance: number; hwm: number }[] = [];
+
+  for (const date of sortedDates) {
+    if (busted) break;
+    if (passed && days.filter(d => d.trades > 0).length >= minTradeDays) break;
+
+    const dayTrades = tradesByDate.get(date)!;
+    let dayPnl = 0;
+    let dayTradesTaken = 0;
+    let dailyLimitHit = false;
+    let drawdownBusted = false;
+
+    for (const t of dayTrades) {
+      if (busted) break;
+
+      const tradePnl = t.pnlDollars;
+
+      dayPnl += tradePnl;
+      dayTradesTaken++;
+      totalTradesTaken++;
+      cumPnl += tradePnl;
+      balance = accountSize + cumPnl;
+
+      if (balance > hwm) hwm = balance;
+
+      const ddFromHWM = hwm - balance;
+      if (ddFromHWM > maxDrawdownFromHWM) maxDrawdownFromHWM = ddFromHWM;
+
+      if (ddFromHWM >= trailingDrawdownMax) {
+        busted = true;
+        passed = false;
+        bustReason = `Trailing drawdown hit: -$${ddFromHWM.toFixed(0)} from HWM $${hwm.toFixed(0)} (limit -$${trailingDrawdownMax})`;
+        bustDate = date;
+        drawdownBusted = true;
+        break;
+      }
+
+      if (dayPnl <= -dailyLossLimit) {
+        dailyLimitHit = true;
+        if (mode === "funded") {
+          busted = true;
+          passed = false;
+          bustReason = `Daily loss limit hit: -$${Math.abs(dayPnl).toFixed(0)} (limit -$${dailyLossLimit})`;
+          bustDate = date;
+        }
+        totalTradesSkipped += dayTrades.length - dayTradesTaken;
+        break;
+      }
+
+      if (cumPnl >= profitTarget && !passed) {
+        passed = true;
+        passDate = date;
+      }
+    }
+
+    if (dayPnl < maxDailyLoss) {
+      maxDailyLoss = dayPnl;
+    }
+
+    const dayResult: ApexDayResult = {
+      date,
+      trades: dayTradesTaken,
+      dayPnl: Math.round(dayPnl * 100) / 100,
+      cumPnl: Math.round(cumPnl * 100) / 100,
+      balance: Math.round(balance * 100) / 100,
+      highWaterMark: Math.round(hwm * 100) / 100,
+      drawdownFromHWM: Math.round((hwm - balance) * 100) / 100,
+      dailyLimitHit,
+      drawdownBusted,
+      targetReached: passed && passDate === date,
+    };
+    days.push(dayResult);
+    equityCurve.push({ date, balance: Math.round(balance * 100) / 100, hwm: Math.round(hwm * 100) / 100 });
+  }
+
+  const tradeDays = days.filter(d => d.trades > 0).length;
+
+  if (passed && tradeDays < minTradeDays) {
+    passed = false;
+    bustReason = `Target reached but only ${tradeDays} trade days (need ${minTradeDays})`;
+  }
+
+  return {
+    passed: passed && !busted,
+    busted,
+    bustReason,
+    bustDate,
+    passDate,
+    totalTradeDays: tradeDays,
+    totalTradesTaken,
+    totalTradesSkipped,
+    finalBalance: Math.round(balance * 100) / 100,
+    finalPnl: Math.round(cumPnl * 100) / 100,
+    highWaterMark: Math.round(hwm * 100) / 100,
+    maxDrawdownFromHWM: Math.round(maxDrawdownFromHWM * 100) / 100,
+    maxDailyLoss: Math.round(maxDailyLoss * 100) / 100,
+    profitTarget,
+    trailingDrawdownMax,
+    dailyLossLimit,
+    accountSize,
+    mode,
+    days,
+    equityCurve,
+  };
+}
+
+const BULK_SYMBOLS = ["ES","NQ","YM","RTY","CL","GC","SI","ZC","ZS","ZW","BTC","ETH","ZB","ZN","MES","MNQ","MYM","M2K","MCL","MGC","HG"];
+const BULK_TIMEFRAMES = ["5min","15min","1hour","daily"];
+
+let bulkDownloadStatus: { running: boolean; progress: number; total: number; current: string; completed: string[]; errors: string[]; done: boolean } = {
+  running: false, progress: 0, total: 0, current: "", completed: [], errors: [], done: false,
+};
+
+export function getBulkCacheStatus() {
+  const cached: string[] = [];
+  try {
+    if (fs.existsSync(DATA_DIR)) {
+      const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith(".json"));
+      for (const f of files) {
+        try {
+          const stat = fs.statSync(path.join(DATA_DIR, f));
+          if (stat.size > 100) cached.push(f.replace(".json", ""));
+        } catch {}
+      }
+    }
+  } catch {}
+  return { ...bulkDownloadStatus, cachedFiles: cached.length, cached };
+}
+
+export async function downloadBulkCache(symbols: string[] = BULK_SYMBOLS, timeframes: string[] = BULK_TIMEFRAMES): Promise<{ completed: string[]; errors: string[] }> {
+  if (bulkDownloadStatus.running) return { completed: [], errors: ["Already running"] };
+
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+  const jobs: Array<{ symbol: string; tf: string; etf: string; mult: number; tspan: string; cacheKey: string }> = [];
+
+  for (const sym of symbols) {
+    const proxy = ETF_PROXIES[sym];
+    if (!proxy) continue;
+    for (const tf of timeframes) {
+      const { multiplier, timespan } = parseTimeframe(tf);
+      const from = "2024-01-01";
+      const to = new Date().toISOString().slice(0, 10);
+      const cacheKey = `${sym}:${multiplier}${timespan}:${from}:${to}`;
+      const diskPath = diskCachePath(cacheKey);
+      if (fs.existsSync(diskPath)) {
+        try {
+          const stat = fs.statSync(diskPath);
+          if (stat.size > 100) continue;
+        } catch {}
+      }
+      jobs.push({ symbol: sym, tf, etf: proxy.etf, mult: multiplier, tspan: timespan, cacheKey });
+    }
+  }
+
+  bulkDownloadStatus = { running: true, progress: 0, total: jobs.length, current: "", completed: [], errors: [], done: false };
+
+  if (jobs.length === 0) {
+    bulkDownloadStatus = { ...bulkDownloadStatus, running: false, done: true };
+    return { completed: [], errors: [] };
+  }
+
+  const etfDone = new Set<string>();
+
+  for (let i = 0; i < jobs.length; i++) {
+    const job = jobs[i];
+    bulkDownloadStatus.current = `${job.symbol} ${job.tf}`;
+    bulkDownloadStatus.progress = i;
+
+    try {
+      const from = "2024-01-01";
+      const to = new Date().toISOString().slice(0, 10);
+      const etfKey = `ETF:${job.etf}:${job.mult}${job.tspan}:${from}:${to}`;
+
+      let rawBars: Bar[] | null = null;
+      const etfDisk = diskCachePath(etfKey);
+      if (fs.existsSync(etfDisk)) {
+        try { rawBars = JSON.parse(fs.readFileSync(etfDisk, "utf-8")); } catch {}
+      }
+
+      if (!rawBars || rawBars.length === 0) {
+        if (!etfDone.has(etfKey)) {
+          rawBars = await fetchPolygonAggs(job.etf, from, to, job.mult, job.tspan);
+          if (rawBars.length > 0) {
+            fs.writeFileSync(etfDisk, JSON.stringify(rawBars));
+            setCachedBars(etfKey, rawBars);
+            etfDone.add(etfKey);
+            console.log(`[bulk] Downloaded ETF ${job.etf} ${job.tf}: ${rawBars.length} bars`);
+          }
+        } else {
+          try { rawBars = JSON.parse(fs.readFileSync(etfDisk, "utf-8")); } catch { rawBars = []; }
+        }
+      }
+
+      if (rawBars && rawBars.length > 0) {
+        const proxy = ETF_PROXIES[job.symbol];
+        const scaledBars = rawBars.map(b => ({
+          ...b,
+          open: Math.round(b.open * proxy.ratio * 100) / 100,
+          high: Math.round(b.high * proxy.ratio * 100) / 100,
+          low: Math.round(b.low * proxy.ratio * 100) / 100,
+          close: Math.round(b.close * proxy.ratio * 100) / 100,
+        }));
+        setCachedBars(job.cacheKey, scaledBars);
+        bulkDownloadStatus.completed.push(`${job.symbol}/${job.tf}`);
+        console.log(`[bulk] Cached ${job.symbol} ${job.tf}: ${scaledBars.length} bars`);
+      } else {
+        bulkDownloadStatus.errors.push(`${job.symbol}/${job.tf}: no data`);
+      }
+    } catch (e: any) {
+      bulkDownloadStatus.errors.push(`${job.symbol}/${job.tf}: ${e.message}`);
+      console.error(`[bulk] Error ${job.symbol} ${job.tf}: ${e.message}`);
+    }
+  }
+
+  bulkDownloadStatus = { ...bulkDownloadStatus, running: false, progress: jobs.length, done: true };
+  return { completed: bulkDownloadStatus.completed, errors: bulkDownloadStatus.errors };
 }

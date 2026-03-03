@@ -1,0 +1,52 @@
+Actionable Steps
+
+Current System Overview – How It Decides Trades
+Your system is a confluence-based, pattern-driven engine that combines multiple technical factors to generate high-probability signals. Here's exactly how it works right now:Core Decision Flow:
+Timeframe — Scans user-selected timeframes (1min to daily) independently or in multi-TF mode (with convergence bonus across aligned TFs).
+Patterns — Detects 13+ patterns from Live Traders manual + classic TA (3 Bar Play, 4 Bar Play, Buy/Sell Setup, Breakout, Climactic, Wedge, Cup & Handle, Inverse Cup & Handle, Head & Shoulders, Inverse Head & Shoulders, Double Top, Double Bottom, Pivot Breakout).
+Moving Averages — Uses 9/21 EMA for trend filter (longs only above EMA21, shorts below) and MA respect (+1pt confluence).
+VWAP — Not yet integrated (missing). Added below as next improvement.
+Volume — Igniting/ending/resting volume types (+1pt igniting on breakout, -1pt ending on continuation).
+Volume Profile — POC rejection, HVN support, LVN breakout, Value Area alignment (+1–2pt bonuses).
+Order Flow — Cumulative delta, absorption, delta divergence, bid/ask imbalance approximation (+1–2pt bonuses).
+MTF Alignment — Higher timeframe trend filter (e.g., 1h uptrend for 5min long) + cross-TF convergence bonus (+1.5pt per aligned TF).
+Confluence Scoring — 0–11+ points (volume surge, igniting vol, tail, strong body, MA respect, MTF, gaps, VP, Order Flow, wBottomTop, double bottom/top). Signals only fire at ≥8pt (live filter).
+Risk to Reward — Hardcoded 1:2 minimum (adjustable in UI). Target = 2× risk from entry.
+Apex Rules — Enforces daily loss -3%, trailing DD -3%, RTH only, max contracts per symbol, min trade days, profit target tracking.
+Final Filter — Only signals passing all filters (confluence ≥8, R:R ≥1:2, Apex rules) are emitted to bridge → NT sim.
+Current Strengths:
+High confluence filter (≥8pt) → very selective, high-quality trades
+Multi-TF alignment → reduces false signals
+Volume Profile + Order Flow → adds institutional-level context
+Apex rules → prevents eval blow-ups
+
+Add VWAP (Volume Weighted Average Price)
+VWAP is missing from current setup. Adding it will improve mean reversion and trend strength confluence.Paste this code into patterns.ts or trader.ts:
+
+JavaScript// VWAP Calculation - add to addIndicators() or signal processing
+function calculateVWAP(bars) {
+  let cumPV = 0;
+  let cumVolume = 0;
+
+  bars.forEach(bar => {
+    const typicalPrice = (bar.high + bar.low + bar.close) / 3;
+    cumPV += typicalPrice * bar.volume;
+    cumVolume += bar.volume;
+  });
+
+  return cumPV / cumVolume;
+}
+
+// In signal processing or confluence
+const vwap = calculateVWAP(currentBars.slice(-50)); // last 50 bars VWAP
+const aboveVWAP = lastBar.close > vwap;
+const belowVWAP = lastBar.close < vwap;
+
+if (aboveVWAP && signal.direction === 'long') signal.confluence += 1;
+if (belowVWAP && signal.direction === 'short') signal.confluence += 1;
+signal.notes += ` [VWAP ${aboveVWAP ? 'Above' : 'Below'} +1]`;
+After adding:
+
+Save → restart server
+Test: Run NQ 5min backtest → check notes for [VWAP Above +1] or [VWAP Below +1]
+Live: Run scanner during RTH → watch for VWAP-tagged signals

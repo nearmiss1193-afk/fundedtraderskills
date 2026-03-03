@@ -1,0 +1,64 @@
+// Volume Profile Confluence - add to calculateConfluence or as separate function
+function getVolumeProfileConfluence(bars, currentPrice) {
+  if (bars.length < 50) return 0;
+
+  const volumeMap = {};
+  let totalVolume = 0;
+
+  bars.forEach(bar => {
+    const price = Math.round(bar.close * 100) / 100; // round to 2 decimals
+    volumeMap[price] = (volumeMap[price] || 0) + bar.volume;
+    totalVolume += bar.volume;
+  });
+
+  // Find POC (highest volume price)
+  const pocPrice = Object.keys(volumeMap).reduce((a, b) => volumeMap[a] > volumeMap[b] ? a : b);
+  const pocVolume = volumeMap[pocPrice];
+
+  // Value Area (70% of total volume)
+  let sortedPrices = Object.keys(volumeMap).sort((a, b) => volumeMap[b] - volumeMap[a]);
+  let valueAreaVolume = 0;
+  let vaHigh = pocPrice;
+  let vaLow = pocPrice;
+
+  for (const price of sortedPrices) {
+    valueAreaVolume += volumeMap[price];
+    if (valueAreaVolume >= totalVolume * 0.7) break;
+    if (parseFloat(price) > parseFloat(vaHigh)) vaHigh = price;
+    if (parseFloat(price) < parseFloat(vaLow)) vaLow = price;
+  }
+
+  let vpBonus = 0;
+  const distanceToPOC = Math.abs(currentPrice - pocPrice);
+  if (distanceToPOC < 0.5 && lastBar.volume > averageVolume(bars.slice(-10))) {
+    vpBonus += 1; // POC rejection with volume
+  }
+  if (currentPrice > parseFloat(vaHigh) && lastBar.volume > averageVolume(bars.slice(-10))) {
+    vpBonus += 1; // breakout above VAH
+  }
+  if (currentPrice < parseFloat(vaLow) && lastBar.volume > averageVolume(bars.slice(-10))) {
+    vpBonus += 1; // breakdown below VAL
+  }
+  if (currentPrice > parseFloat(vaLow) && currentPrice < parseFloat(vaHigh)) {
+    vpBonus += 0.5; // inside value area (mean reversion potential)
+  }
+
+  return vpBonus;
+}
+
+// In calculateConfluence() or signal processing
+const vpConfluence = getVolumeProfileConfluence(currentBars, lastBar.close);
+signal.confluence += vpConfluence;
+signal.notes += ` [VP+${vpConfluence.toFixed(1)}]`;
+After adding:
+
+Save → restart server
+Test: Run backtest on NQ 5min (2025 range) → check for VP confluence bonuses in signal notes (e.g., [VP+2.0])
+Live: Run scanner during RTH → watch for VP-tagged signals
+
+
+Next Recommended Steps (Pick 1–2)
+Run full historical UI scan (Edge Builder → Multi-Symbol Edge Scan, 5min, 2022–2025, minConfluence 8) → paste top 5 symbols/patterns summary here
+Test 1min vs 5min NQ backtest (short range, minConf 9) → share comparison (trades, P&L, PF)
+Test Wedge/Cup/H&S/Double Top live during RTH → share signals/logs + NT sim results
+Test Apex rules in backtest → run long-range ES backtest → share rule triggers & eval status

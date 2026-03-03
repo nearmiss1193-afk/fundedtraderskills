@@ -1,0 +1,52 @@
+Step 1: Create a /data folder
+In Replit file tree → right-click → New Folder → name it data
+Step 2: Paste this new endpoint into server/routes.ts (add near the other backtest routes):
+JavaScript// === REPLIT-OPTIMIZED FAST CACHE (add this route) ===
+app.post('/api/backtest/download-bulk', async (req, res) => {
+  const { symbols = ['ES','NQ','CL','GC','SI','RTY','YM','BTC','ETH'], timeframe = '5min' } = req.body;
+  
+  console.log(`🔄 Replit Bulk Download started for ${symbols.length} symbols...`);
+  
+  for (const sym of symbols) {
+    const cacheFile = `./data/${sym}_${timeframe}.json`;
+    
+    // Skip if already cached
+    if (require('fs').existsSync(cacheFile)) {
+      console.log(`✅ Cache hit: ${sym}`);
+      continue;
+    }
+    
+    try {
+      // Reuse your existing Polygon fetch logic
+      const bars = await fetchPolygonAggs(sym, timeframe, '2015-01-01', '2026-03-01');
+      require('fs').writeFileSync(cacheFile, JSON.stringify(bars));
+      console.log(`✅ Downloaded & cached: ${sym} (${bars.length} bars)`);
+    } catch (e) {
+      console.log(`⚠️ Failed ${sym}: ${e.message}`);
+    }
+  }
+  
+  res.json({ status: "Bulk cache complete! Future scans are now instant on Replit." });
+});
+Step 3: Add this button to your Edge Builder tab in public/index.html:
+HTML<button onclick="downloadBulkCache()" style="background:#00cc00;color:white;padding:12px 24px;font-size:16px;margin:10px 0;">
+  📥 Download Full Historical Cache (One-Time – Replit)
+</button>
+Step 4: Add this JS (in your main script section):
+JavaScriptasync function downloadBulkCache() {
+  const btn = event.target;
+  btn.innerHTML = 'Downloading... (this takes 3-8 minutes first time)';
+  btn.disabled = true;
+  
+  await fetch('/api/backtest/download-bulk', { method: 'POST' });
+  
+  btn.innerHTML = '✅ Cache Ready – All scans now 100x faster!';
+  alert('Replit cache complete! All future backtests & multi-scans are now instant.');
+}
+After pasting:
+
+Save all files
+Click Run (or restart the Replit server)
+Go to Edge Builder tab → click the new green button
+Wait 3–8 minutes the first time only (it downloads everything once)
+After that, every multi-symbol scan or backtest runs in seconds instead of minutes

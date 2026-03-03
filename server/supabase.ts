@@ -47,7 +47,7 @@ export async function enqueueSignal(signal: SignalPayload): Promise<{ status: st
     stop_loss: signal.stopLoss,
     take_profit: signal.takeProfit,
     pattern: signal.pattern ?? null,
-    confluence: signal.confluence ?? null,
+    confluence: signal.confluence != null ? Math.round(signal.confluence) : null,
     risk_reward: signal.riskReward ? parseFloat(signal.riskReward.replace(/^1:/, "")) || null : null,
     account_hint: signal.accountHint ?? null,
     source: "replit",

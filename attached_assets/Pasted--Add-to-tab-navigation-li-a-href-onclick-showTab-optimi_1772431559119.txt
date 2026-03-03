@@ -1,0 +1,60 @@
+<!-- Add to tab navigation -->
+<li><a href="#" onclick="showTab('optimizer-tab')">Edge Optimizer</a></li>
+
+<!-- Add this full section anywhere in the body -->
+<div id="optimizer-tab" class="tab-content">
+  <h2>Edge Optimizer - Find the Highest Probability Setups</h2>
+  
+  <button onclick="runEdgeOptimizer()" style="background:#00cc00;color:white;padding:12px 24px;font-size:16px;">
+    Run Full Optimization Scan (6 months, all combos)
+  </button>
+  
+  <div id="optimizer-results" style="margin-top:20px;"></div>
+</div>
+Add this JavaScript (at the bottom of your script file):
+JavaScriptfunction showTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  document.getElementById(tabId).style.display = 'block';
+}
+
+async function runEdgeOptimizer() {
+  document.getElementById('optimizer-results').innerHTML = '<p style="color:orange;">Running full optimization across all patterns, timeframes, R:R, and confluence levels... (this takes 15–25 minutes)</p>';
+  
+  const res = await fetch('/api/optimizer/run', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      months: 6,
+      timeframes: ['1min','2min','3min','5min','15min'],
+      patterns: 'all',
+      rrRatios: [1.5, 2.0, 2.5, 3.0],
+      minConfluence: 6
+    })
+  });
+  
+  const data = await res.json();
+  
+  let html = '<h3>Top 10 Highest Probability Setups</h3><table border="1" style="width:100%;text-align:left;">';
+  html += '<tr><th>Rank</th><th>Symbol</th><th>Pattern</th><th>TF</th><th>R:R</th><th>Conf</th><th>Win%</th><th>PF</th><th>P&L</th></tr>';
+  
+  data.top10.forEach((row, i) => {
+    html += `<tr><td>${i+1}</td><td>${row.symbol}</td><td>${row.pattern}</td><td>${row.tf}</td><td>${row.rr}</td><td>${row.confluence}</td><td>${row.winRate}%</td><td>${row.pf}</td><td>$${row.pnl}</td></tr>`;
+  });
+  
+  html += '</table>';
+  document.getElementById('optimizer-results').innerHTML = html;
+}
+After pasting both blocks:
+
+Save file
+Restart Render service (or wait for auto-redeploy if GitHub push)
+Refresh https://fundedtraderskills.onrender.com
+Click the new Edge Optimizer tab
+Click the big green button → wait 15–25 minutes
+
+What to do next
+
+Add the Edge Optimizer tab and code above
+Restart Render service
+Run the optimizer scan
+Paste the top 10 ranked setups from the results table in your next message

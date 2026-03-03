@@ -1,0 +1,113 @@
+Phase 5 – Learning System & Backtesting Optimization (In Progress)
+Current Focus: Full historical scan results analyzed (3-year period, 5min, 15 symbols × 13 patterns, 2,971 total trades at minConfluence 0). Key findings: Double Top dominant, Silver (SI) strongest symbol, Wedge underperforms, optimal backtest threshold ~6–7pt (backtester max confluence = 7; live scanner reaches 11). Apex rules live and enforcing. Volume profile analysis now added to confluence scoring and live scanner/backtester.
+Top 5 Symbol/Pattern Combos by P&L (from your 3-year scan at minConf 0):
+
+NQ Double Top → 42 trades, 47.6% WR, PF 3.39, +$9,410 (standout combo)
+SI Inverse H&S → 20 trades, 40.0% WR, PF 4.57, +$3,939 (very high PF)
+SI Buy Setup → 10 trades, 30.0% WR, PF 3.41, +$3,175
+HG 3 Bar Play → 2 trades, 100% WR, PF 99, +$2,643 (small sample, high selectivity)
+SI Breakout → 13 trades, 30.8% WR, PF 1.75, +$2,207
+
+Top Symbols (aggregated across all patterns):
+
+SI: 161 trades, 23.6% WR, +$7,307 (clear winner)
+NQ: 175 trades, 26.3% WR, +$3,777
+YM: 188 trades, 30.9% WR, +$1,856
+RTY: 184 trades, 27.2% WR, +$1,815
+ZC: 215 trades, 38.6% WR, +$1,133
+
+Top Patterns (aggregated across all symbols):
+
+Double Top: 677 trades, 27.9% WR, +$9,817 (most profitable pattern)
+Buy Setup: 86 trades, 18.6% WR, +$1,962
+3 Bar Play: 41 trades, 24.4% WR, +$1,798
+Cup & Handle: 10 trades, 40.0% WR, +$683
+
+Combos to Avoid (negative edge):
+
+HG Wedge: 53 trades, PF 0.42, –$12,125
+HG Inverse H&S: 20 trades, PF 0.35, –$5,714
+HG H&S: 24 trades, PF 0.45, –$4,661
+SI Wedge: 25 trades, PF 0.24, –$3,982
+
+Key Insights & Immediate Recommendations
+
+Silver (SI) is the strongest symbol — multiple high-PF combos (Inv H&S PF 4.57, Buy Setup PF 3.41, Breakout PF 1.75). Add +2pt edge boost for all SI patterns in live scanner.
+NQ Double Top is the single best combo — 47.6% WR, PF 3.39, +$9.4K on only 42 trades. Add +2pt boost specifically for NQ Double Top.
+Double Top dominates long-term profitability across symbols — consider raising live priority or adding +1pt boost for Double Top setups.
+Wedge underperforms significantly (negative edge in most cases) → remove or reduce the current +2pt NQ/Wedge boost until further testing.
+HG (Copper) is consistently negative — restrict or disable HG in live scanner.
+3 Bar Play remains selective but solid (especially on ZS/ZW) — keep as-is or add +1pt boost for ag symbols.
+Confluence scoring mismatch: Backtester max = 7pt (missing some live indicators like real-time HTF alignment, gap detection). Live scanner should stay at minConf 8 (full scoring). Backtester default minConf should be 6 (first profitable level).
+
+Immediate Next Steps (Recommended Order)
+
+Update Live Scanner Edge Boosts Based on Scan
+Add these boosts to your live scanner logic (likely in trader.ts or signal processing):
+
+JavaScript// In signal processing / confluence calculation
+if (signal.symbol === 'SI') {
+  signal.confluence += 2; // +2pt for all SI patterns (strongest symbol)
+  signal.notes += ' [SI EDGE+2]';
+}
+if (signal.symbol === 'NQ' && signal.pattern === 'doubletop') {
+  signal.confluence += 2; // +2pt for NQ Double Top (best single combo)
+  signal.notes += ' [NQ DT EDGE+2]';
+}
+if (signal.pattern === 'doubletop') {
+  signal.confluence += 1; // +1pt for Double Top on any symbol
+  signal.notes += ' [DT EDGE+1]';
+}
+if (signal.pattern === 'wedge') {
+  signal.confluence -= 1; // reduce Wedge boost (underperforms)
+  signal.notes += ' [WEDGE EDGE-1]';
+}
+if (signal.symbol === 'HG') {
+  signal.confluence -= 2; // penalize HG (consistently negative)
+  signal.notes += ' [HG PENALTY -2]';
+}
+Restart server → test during next RTH.
+
+Run 1min vs 5min NQ Backtest Comparison
+In Edge Builder:
+Symbol: NQ
+Timeframe: 1min, Date: 2025-01-01 to 2025-01-15 (short range), Min Confluence: 9 → run
+Switch to 5min (same range/settings) → run again
+
+Share:
+1min: total trades, top pattern(s), net P&L, Profit Factor
+5min: total trades, top pattern(s), net P&L, Profit Factor
+Comparison note (e.g., "1min ~8× more trades, lower PF due to noise")
+
+
+Share Live RTH Logs/NT Results for Wedge/Cup/H&S/Double Top
+During next RTH (9:30–16:00 ET):
+Run live scanner on NQ, SI, ZS, GC, CL
+Monitor console for high-confluence signals (especially boosted combos: NQ Double Top, SI Inv H&S, etc.)
+If any fire: Check Supabase & NT sim
+Share: 3–5 log lines (pattern, confluence, notes) + NT sim result (order placed? filled? rejected?)
+
+Test Apex Rules in Backtest
+Run long-range backtest (e.g., ES 5min, full 2025) → check logs for Apex blocks (daily loss, RTH, size cap)
+Share: Any rule triggers? Apex Eval Status (daily P&L, trailing DD, trade days, profit target progress)
+
+
+What's the next step?
+Run the 1min vs 5min NQ backtest comparison (quickest next action):
+
+In Edge Builder on Render URL:
+Symbol: NQ
+Timeframe: 1min, Date: 2025-01-01 to 2025-01-15, Min Confluence: 9 → run
+Then switch to 5min (same range/settings) → run again
+
+Share:
+1min results (trades, top pattern, P&L, PF)
+5min results (same metrics)
+Comparison note
+
+
+Once you share that, we can:
+
+Update live scanner boosts based on scan
+Run full historical scan at minConf 6/7 (backtester optimal)
+Test live RTH with new boosts

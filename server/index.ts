@@ -6,7 +6,15 @@ import path from "path";
 const app = express();
 const httpServer = createServer(app);
 
-app.use(express.static(path.resolve(process.cwd(), "public")));
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.path === "/" || req.path.endsWith(".html")) {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+  next();
+});
+app.use(express.static(path.resolve(process.cwd(), "public"), { etag: false, lastModified: false, maxAge: 0 }));
 
 declare module "http" {
   interface IncomingMessage {
@@ -82,10 +90,6 @@ app.use((req, res, next) => {
     const { serveStatic } = await import("./static");
     serveStatic(app);
   }
-
-  app.get("/", (_req, res) => {
-    res.sendFile(path.resolve(process.cwd(), "public", "index.html"));
-  });
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.

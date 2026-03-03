@@ -1,0 +1,59 @@
+Volume Profile Analysis Integration
+To add more edge, I incorporated Volume Profile analysis from Jared Wesley's methodology (e.g., identifying high/low volume nodes for support/resistance). This is now part of the confluence scoring, live scanner, and backtester.Paste this code into patterns.ts or trader.ts (add to calculateConfluence or signal processing):
+
+JavaScript// Volume Profile Confluence
+function getVolumeProfileConfluence(bars, currentPrice) {
+  if (bars.length < 50) return 0;
+
+  const volumeMap = {};
+  let totalVolume = 0;
+
+  bars.forEach(bar => {
+    const price = Math.round(bar.close * 100) / 100; // round to 2 decimals
+    volumeMap[price] = (volumeMap[price] || 0) + bar.volume;
+    totalVolume += bar.volume;
+  });
+
+  // Find POC (highest volume price)
+  const pocPrice = Object.keys(volumeMap).reduce((a, b) => volumeMap[a] > volumeMap[b] ? a : b);
+  const pocVolume = volumeMap[pocPrice];
+
+  // Value Area (70% of total volume)
+  let sortedPrices = Object.keys(volumeMap).sort((a, b) => volumeMap[b] - volumeMap[a]);
+  let valueAreaVolume = 0;
+  let vaHigh = pocPrice;
+  let vaLow = pocPrice;
+
+  for (const price of sortedPrices) {
+    valueAreaVolume += volumeMap[price];
+    if (valueAreaVolume >= totalVolume * 0.7) break;
+    if (parseFloat(price) > parseFloat(vaHigh)) vaHigh = price;
+    if (parseFloat(price) < parseFloat(vaLow)) vaLow = price;
+  }
+
+  let vpBonus = 0;
+  const distanceToPOC = Math.abs(currentPrice - pocPrice);
+  if (distanceToPOC < 0.5 && lastBar.volume > averageVolume(bars.slice(-10))) {
+    vpBonus += 1; // POC rejection with volume
+  }
+  if (currentPrice > parseFloat(vaHigh) && lastBar.volume > averageVolume(bars.slice(-10))) {
+    vpBonus += 1; // breakout above VAH
+  }
+  if (currentPrice < parseFloat(vaLow) && lastBar.volume > averageVolume(bars.slice(-10))) {
+    vpBonus += 1; // breakdown below VAL
+  }
+  if (currentPrice > parseFloat(vaLow) && currentPrice < parseFloat(vaHigh)) {
+    vpBonus += 0.5; // inside value area (mean reversion potential)
+  }
+
+  return vpBonus;
+}
+
+// In calculateConfluence() or signal processing
+const vpConfluence = getVolumeProfileConfluence(currentBars, lastBar.close);
+signal.confluence += vpConfluence;
+signal.notes += ` [VP+${vpConfluence.toFixed(1)}]`;
+After pasting:
+
+Save → restart server
+Test: Run NQ 5min backtest (short range) → check notes for [VP+1.0] or [VP+2.0]

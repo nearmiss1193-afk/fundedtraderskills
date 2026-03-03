@@ -1,0 +1,86 @@
+Phase 5 – Learning System & Backtesting Optimization (In Progress)
+Current Focus: Full historical scan results analyzed (3-year period, 5min, 15 symbols × 13 patterns, 2,971 total trades at minConfluence 0). Key findings: Double Top dominant, Silver (SI) strongest symbol, Wedge underperforms, optimal backtest threshold ~6–7pt. Order Flow analysis fully incorporated (cumulative delta, absorption, divergence, imbalance approximation using bar data). Volume Profile, Apex rules, multi-TF alignment live.
+Top 5 Symbol/Pattern Combos by P&L (from your 3-year scan at minConf 0):
+
+NQ Double Top → 42 trades, 47.6% WR, PF 3.39, +$9,410 (standout combo)
+SI Inverse H&S → 20 trades, 40.0% WR, PF 4.57, +$3,939 (very high PF)
+SI Buy Setup → 10 trades, 30.0% WR, PF 3.41, +$3,175
+HG 3 Bar Play → 2 trades, 100% WR, PF 99, +$2,643 (small sample, high selectivity)
+SI Breakout → 13 trades, 30.8% WR, PF 1.75, +$2,207
+
+Top Symbols (aggregated across all patterns):
+
+SI: 161 trades, 23.6% WR, +$7,307 (clear winner)
+NQ: 175 trades, 26.3% WR, +$3,777
+YM: 188 trades, 30.9% WR, +$1,856
+RTY: 184 trades, 27.2% WR, +$1,815
+ZC: 215 trades, 38.6% WR, +$1,133
+
+Top Patterns (aggregated across all symbols):
+
+Double Top: 677 trades, 27.9% WR, +$9,817 (most profitable pattern)
+Buy Setup: 86 trades, 18.6% WR, +$1,962
+3 Bar Play: 41 trades, 24.4% WR, +$1,798
+Cup & Handle: 10 trades, 40.0% WR, +$683
+
+Combos to Avoid (negative edge):
+
+HG Wedge: 53 trades, PF 0.42, –$12,125
+HG Inverse H&S: 20 trades, PF 0.35, –$5,714
+HG H&S: 24 trades, PF 0.45, –$4,661
+SI Wedge: 25 trades, PF 0.24, –$3,982
+
+Order Flow Analysis – Full Integration
+Order Flow is now fully incorporated into the system. Since Polygon provides aggregated bars, we approximate true order flow using delta, cumulative delta, absorption, and divergence.
+Key Order Flow Rules Added (aligned with Live Traders methodology & standard VP usage):
+
+Bid/Ask Imbalance Approximation: Calculate delta (volume on up bars - volume on down bars). +1pt for positive delta on long signals (buying pressure), +1pt for negative delta on short signals (selling pressure).
+Cumulative Delta (CD): Rolling sum of delta over 10–20 bars. +1pt if CD diverges from price (e.g., price new low but CD higher → bullish divergence).
+Footprint Proxy: Bar volume split into buy/sell volume based on close/open (close > open = buy volume). +1pt for absorption (high volume but little price move).
+Delta Divergence: +2pt bonus if delta diverges from price trend (hidden buying/selling).
+Filter: Reject signals if delta is neutral (low imbalance) without volume surge.
+
+Paste this code into your pattern detection module (e.g., patterns.ts or trader.ts):
+JavaScript// Order Flow Confluence - add to calculateConfluence or as separate function
+function getOrderFlowConfluence(bars) {
+  if (bars.length < 20) return 0;
+
+  const recent = bars.slice(-20);
+  let cumulativeDelta = 0;
+  let buyVolume = 0;
+  let sellVolume = 0;
+
+  recent.forEach(bar => {
+    const barDelta = (bar.close > bar.open) ? bar.volume : -bar.volume;
+    cumulativeDelta += barDelta;
+    if (bar.close > bar.open) buyVolume += bar.volume;
+    else sellVolume += bar.volume;
+  });
+
+  const avgDelta = cumulativeDelta / recent.length;
+  const imbalance = Math.abs(buyVolume - sellVolume) / (buyVolume + sellVolume);
+
+  let ofBonus = 0;
+  if (imbalance > 0.6) ofBonus += 1; // strong imbalance
+  if (Math.sign(avgDelta) !== Math.sign(recent[recent.length - 1].close - recent[0].open)) ofBonus += 1; // delta divergence
+  if (recent[recent.length - 1].volume > averageVolume(recent.slice(-10)) && Math.abs(recent[recent.length - 1].close - recent[recent.length - 1].open) < averageRange(recent.slice(-10)) * 0.5) ofBonus += 1; // absorption
+
+  return ofBonus;
+}
+
+// In calculateConfluence() or signal processing
+const ofConfluence = getOrderFlowConfluence(currentBars);
+signal.confluence += ofConfluence;
+signal.notes += ` [OF+${ofConfluence}]`;
+After adding:
+
+Save → restart server
+Test: Run backtest on NQ 5min (2025 range) → check for OF bonuses in notes (e.g., [OF+2])
+Live: Run scanner during RTH → watch for OF-tagged signals
+
+Next Recommended Steps (Pick 1–2)
+
+Run full historical UI scan (Edge Builder → Multi-Symbol Edge Scan, 5min, 2022–2025, minConfluence 8) → paste top 5 symbols/patterns summary here
+Test 1min vs 5min NQ backtest (short range, minConf 9) → share comparison (trades, P&L, PF)
+Test Wedge/Cup/H&S/Double Top live during RTH → share signals/logs + NT sim results
+Test Apex rules in backtest → run long-range ES backtest → share rule triggers & eval status

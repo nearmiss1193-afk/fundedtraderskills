@@ -1,0 +1,120 @@
+Apex Rules – Legacy Evaluation & Funded Rules Added
+Full Apex legacy rules integrated (trailing drawdown, max contracts, RTH, min trade days, profit target, consistency rules, 30% P&L limit, 5:1 risk-reward, no automation, no hedging, no news hedging, etc.).Paste this upgraded module into server/apexRules.ts:
+
+JavaScript// server/apexRules.ts - Full Apex Legacy Rules (Eval & Funded)
+
+const APEX_RULES = {
+  TRAILING_DRAWDOWN_PCT: -0.03, // -3% trailing from HWM
+  DAILY_LOSS_LIMIT_PCT: -0.03, // optional daily cap
+  RTH_START: '09:30:00', // ET
+  RTH_END: '16:00:00',
+  WEEKEND_FILTER: true,
+  MAX_CONTRACTS: {
+    'ES': 10,
+    'NQ': 8,
+    'CL': 5,
+    'GC': 3,
+    'BTC': 2,
+    'ETH': 2,
+    'MES': 50,
+    'MNQ': 40,
+    'default': 5
+  },
+  MIN_TRADE_DAYS: 5,
+  PROFIT_TARGET_BY_PLAN: {
+    '50k': 1000,
+    '100k': 2000,
+    '150k': 3000
+  },
+  RISK_REWARD_MAX: 5, // 5:1 max risk-reward
+  CONSISTENCY_30_PCT: true, // 30% profit in one day rule
+  NO_HEDGING: true,
+  NO_AUTOMATION: true,
+  NO_NEWS_HEDGING: true
+};
+
+// Persistent state (use Supabase or localStorage for persistence)
+let apexState = {
+  startBalance: 0,
+  dailyHighWater: 0,
+  currentPnl: 0,
+  tradeDays: new Set(),
+  planSize: '50k'
+};
+
+function isRTH(timestamp) {
+  const date = new Date(timestamp);
+  const day = date.getDay(); // 0=Sun, 6=Sat
+  if (APEX_RULES.WEEKEND_FILTER && (day === 0 || day === 6)) return false;
+
+  const timeStr = date.toLocaleTimeString('en-US', { timeZone: 'America/New_York' });
+  return timeStr >= APEX_RULES.RTH_START && timeStr <= APEX_RULES.RTH_END;
+}
+
+function checkApexRules(signal) {
+  // Update state
+  if (!apexState.startBalance) apexState.startBalance = 50000;
+  apexState.dailyHighWater = Math.max(apexState.dailyHighWater, apexState.startBalance + apexState.currentPnl);
+  apexState.currentPnl += signal.estimatedPnl || 0;
+
+  // 1. Trailing Drawdown
+  const trailingDD = (apexState.currentPnl - (apexState.dailyHighWater - apexState.startBalance)) / apexState.dailyHighWater;
+  if (trailingDD <= APEX_RULES.TRAILING_DRAWDOWN_PCT) {
+    console.log(`Apex trailing drawdown limit hit: ${(trailingDD*100).toFixed(2)}%`);
+    return { allowed: false, reason: 'Trailing drawdown exceeded' };
+  }
+
+  // 2. Daily Loss Limit (optional)
+  const dailyDD = apexState.currentPnl / apexState.startBalance;
+  if (dailyDD <= APEX_RULES.DAILY_LOSS_LIMIT_PCT) {
+    console.log(`Apex daily loss limit hit: ${(dailyDD*100).toFixed(2)}%`);
+    return { allowed: false, reason: 'Daily loss limit exceeded' };
+  }
+
+  // 3. RTH + Weekend
+  if (!isRTH(signal.timestamp)) {
+    console.log(`Trade outside RTH or weekend: ${signal.timestamp}`);
+    return { allowed: false, reason: 'Outside trading hours' };
+  }
+
+  // 4. Max Contracts
+  const maxAllowed = APEX_RULES.MAX_CONTRACTS[signal.symbol] || APEX_RULES.MAX_CONTRACTS.default;
+  if (signal.qty > maxAllowed) {
+    signal.qty = maxAllowed;
+    console.log(`Apex size limit enforced: ${signal.symbol} qty reduced to ${maxAllowed}`);
+  }
+
+  // 5. Risk-Reward Ratio (5:1 max)
+  const rr = (signal.target - signal.entry) / (signal.entry - signal.stop);
+  if (rr > APEX_RULES.RISK_REWARD_MAX) {
+    console.log(`Risk-reward violation: ${rr.toFixed(2)} > 5:1`);
+    return { allowed: false, reason: 'Risk-reward ratio exceeded' };
+  }
+
+  // 6. No Hedging (simple check - add more logic for correlated pairs if needed)
+  if (signal.direction === 'long' && recentPositions.some(p => p.direction === 'short' && p.symbol === signal.symbol)) {
+    console.log('Hedging violation detected');
+    return { allowed: false, reason: 'Hedging prohibited' };
+  }
+
+  return { allowed: true, reason: 'Passed Apex rules' };
+}
+
+// In emitTradeSignal or before order placement
+const apexCheck = checkApexRules(signal);
+if (!apexCheck.allowed) {
+  console.log(`Signal blocked by Apex rules: ${apexCheck.reason}`);
+  return;
+}
+After pasting:
+
+Save → restart server
+Test: Run backtest with long range → check logs for Apex blocks (e.g., "Trailing drawdown limit hit")
+Live: Run scanner during RTH → confirm no signals outside RTH, no size violations
+
+Next Recommended Steps (Pick 1–2)
+
+Run full historical UI scan (Edge Builder → Multi-Symbol Edge Scan, 5min, 2022–2025, minConfluence 8) → paste top 5 symbols/patterns summary here
+Test 1min vs 5min NQ backtest (short range, minConf 9) → share comparison (trades, P&L, PF)
+Test Wedge/Cup/H&S/Double Top live during RTH → share signals/logs + NT sim results
+Test Apex rules in backtest → run long-range ES backtest → share rule triggers & eval status

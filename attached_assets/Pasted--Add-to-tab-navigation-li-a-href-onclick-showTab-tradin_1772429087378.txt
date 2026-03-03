@@ -1,0 +1,46 @@
+<!-- Add to tab navigation -->
+<li><a href="#" onclick="showTab('trading-plan-tab')">Trading Plan & Routine</a></li>
+Then add this section somewhere in the body:
+HTML<div id="trading-plan-tab" class="tab-content">
+  <h2>Trading Plan & Daily Routine</h2>
+  
+  <h3>Daily Routine Checklist (must complete before trading)</h3>
+  <ul id="daily-routine" style="list-style:none;">
+    <li><input type="checkbox" id="pre1"> Review economic calendar & news</li>
+    <li><input type="checkbox" id="pre2"> Set daily loss limit & max trades</li>
+    <li><input type="checkbox" id="pre3"> Review last 5 trades from journal</li>
+    <li><input type="checkbox" id="intra1"> Trade only A+ setups (minConf 8)</li>
+    <li><input type="checkbox" id="intra2"> No revenge trading</li>
+    <li><input type="checkbox" id="post1"> Journal every trade (emotions + rule adherence)</li>
+    <li><input type="checkbox" id="post2"> Review performance metrics</li>
+  </ul>
+
+  <button onclick="markChecklistComplete()">Mark Day Complete</button>
+
+  <h3>Personal Trading Plan Goals</h3>
+  <p>Batting Average Target: <input type="number" id="ba-target" value="50"> %</p>
+  <p>Weekly Net Target: $<input type="number" id="weekly-target" value="500"></p>
+  <p>Max Daily Loss: $<input type="number" id="daily-loss" value="300"></p>
+
+  <h3>Current Performance</h3>
+  <div id="performance-stats">
+    Batting Avg: <span id="live-ba">0%</span> | 
+    Sharpe: <span id="live-sharpe">0.00</span> | 
+    Recovery Factor: <span id="live-recovery">0.00</span>
+  </div>
+</div>
+JavaScript (add to your main script):
+JavaScriptfunction showTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  document.getElementById(tabId).style.display = 'block';
+}
+
+function markChecklistComplete() {
+  const checked = document.querySelectorAll('#daily-routine input[type="checkbox"]:checked').length;
+  if (checked === 7) {
+    alert("✅ Daily routine complete! You may trade today.");
+    // Save to Supabase or localStorage
+  } else {
+    alert("Complete all checklist items before trading.");
+  }
+}

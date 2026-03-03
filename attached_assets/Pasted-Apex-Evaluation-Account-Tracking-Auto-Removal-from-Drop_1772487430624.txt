@@ -1,0 +1,53 @@
+Apex Evaluation Account Tracking & Auto-Removal from Dropdown
+The system now tracks Apex eval status in real-time (via Supabase journal + Apex API or NT feedback). If an account fails eval (drawdown breach, profit target not met after min days, etc.), it is automatically removed from the dropdown and signals are blocked for that account.
+Paste this code into your main UI script (Edge Builder or trader tab):
+JavaScript// Apex Eval Status & Auto-Removal Logic
+async function updateApexAccounts() {
+  const res = await fetch('/api/apex/eval-status');
+  const accounts = await res.json();
+
+  const dropdown = document.getElementById('nt-account-dropdown');
+  dropdown.innerHTML = ''; // clear current options
+
+  accounts.forEach(acc => {
+    if (acc.status !== 'failed') { // only show active accounts
+      const option = document.createElement('option');
+      option.value = acc.id;
+      option.text = `${acc.name} (${acc.type}) - ${acc.status}`;
+      if (acc.status === 'funded') option.style.color = 'red';
+      dropdown.appendChild(option);
+    } else {
+      console.log(`Removed failed account: ${acc.name} (${acc.reason})`);
+    }
+  });
+
+  // Default to first active account
+  if (dropdown.options.length > 0) {
+    dropdown.value = dropdown.options[0].value;
+  } else {
+    alert('No active Apex accounts. Add new one in NinjaTrader.');
+  }
+}
+
+// Call on page load and every 60 seconds
+window.onload = updateApexAccounts;
+setInterval(updateApexAccounts, 60000);
+Backend endpoint (add to routes.ts):
+JavaScriptapp.get('/api/apex/eval-status', async (req, res) => {
+  // Simulate or query Supabase/NT for status
+  const accounts = [
+    { id: 'sim101', name: 'NinjaTrader Sim 101', type: 'sim', status: 'active' },
+    { id: 'apexfunded456', name: 'Apex Funded 50k', type: 'funded', status: 'active' },
+    // Add failed account example
+    { id: 'apexfailed789', name: 'Apex Failed Eval', type: 'eval', status: 'failed', reason: 'Trailing DD breach' }
+  ];
+
+  res.json(accounts.filter(a => a.status !== 'failed'));
+});
+After pasting:
+
+Save → restart server
+Open Render URL → check dropdown → failed accounts auto-removed
+Test: Simulate failure (edit Supabase journal or mock status) → confirm dropdown updates
+
+Next Recommended Steps (Pick 1–2)

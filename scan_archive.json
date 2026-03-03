@@ -1,0 +1,278 @@
+[
+  {
+    "label": "6-Month Scan Sep 2025 - Mar 2026 | 5min | R:R 2:1 | All Patterns | minConf 0",
+    "summary": {
+      "totalTrades": 1531,
+      "winRate": 26,
+      "profitFactor": 0.95,
+      "netPnL": -7157,
+      "minConfluence": 0,
+      "period": "2025-09-01 to 2026-03-01",
+      "timeframesUsed": [
+        "5min"
+      ],
+      "symbolsScanned": 9
+    },
+    "patternBreakdown": {
+      "wedge": {
+        "count": 182,
+        "wins": 58,
+        "winRate": 31.9,
+        "profitFactor": 1.58,
+        "pnl": 5899,
+        "expectancy": 32.41
+      },
+      "doublebottom": {
+        "count": 430,
+        "wins": 116,
+        "winRate": 27,
+        "profitFactor": 1.15,
+        "pnl": 5839,
+        "expectancy": 13.58
+      },
+      "doubletop": {
+        "count": 354,
+        "wins": 88,
+        "winRate": 24.9,
+        "profitFactor": 0.96,
+        "pnl": -1792,
+        "expectancy": -5.06
+      },
+      "headshoulders": {
+        "count": 248,
+        "wins": 59,
+        "winRate": 23.8,
+        "profitFactor": 0.76,
+        "pnl": -4716,
+        "expectancy": -19.02
+      },
+      "invheadshoulders": {
+        "count": 247,
+        "wins": 64,
+        "winRate": 25.9,
+        "profitFactor": 0.62,
+        "pnl": -8688,
+        "expectancy": -35.17
+      }
+    },
+    "heatmap": [
+      {
+        "symbol": "SI",
+        "pattern": "wedge",
+        "trades": 48,
+        "wins": 14,
+        "winRate": 29.2,
+        "pf": 1.58,
+        "pnl": 5339,
+        "expectancy": 111.23
+      },
+      {
+        "symbol": "NQ",
+        "pattern": "doublebottom",
+        "trades": 59,
+        "wins": 21,
+        "winRate": 35.6,
+        "pf": 1.66,
+        "pnl": 4397,
+        "expectancy": 74.53
+      },
+      {
+        "symbol": "SI",
+        "pattern": "doublebottom",
+        "trades": 47,
+        "wins": 12,
+        "winRate": 25.5,
+        "pf": 1.16,
+        "pnl": 1689,
+        "expectancy": 35.94
+      },
+      {
+        "symbol": "YM",
+        "pattern": "headshoulders",
+        "trades": 32,
+        "wins": 10,
+        "winRate": 31.3,
+        "pf": 2.03,
+        "pnl": 1554,
+        "expectancy": 48.58
+      },
+      {
+        "symbol": "ES",
+        "pattern": "doublebottom",
+        "trades": 61,
+        "wins": 17,
+        "winRate": 27.9,
+        "pf": 1.31,
+        "pnl": 1426,
+        "expectancy": 23.38
+      },
+      {
+        "symbol": "RTY",
+        "pattern": "invheadshoulders",
+        "trades": 39,
+        "wins": 16,
+        "winRate": 41,
+        "pf": 1.61,
+        "pnl": 1204,
+        "expectancy": 30.86
+      },
+      {
+        "symbol": "NQ",
+        "pattern": "buysetup",
+        "trades": 2,
+        "wins": 2,
+        "winRate": 100,
+        "pf": 99,
+        "pnl": 1213,
+        "expectancy": 606.73
+      },
+      {
+        "symbol": "SI",
+        "pattern": "headshoulders",
+        "trades": 20,
+        "wins": 3,
+        "winRate": 15,
+        "pf": 1.22,
+        "pnl": 1161,
+        "expectancy": 58.04
+      },
+      {
+        "symbol": "ES",
+        "pattern": "doubletop",
+        "trades": 43,
+        "wins": 10,
+        "winRate": 23.3,
+        "pf": 1.29,
+        "pnl": 1156,
+        "expectancy": 26.89
+      },
+      {
+        "symbol": "CL",
+        "pattern": "wedge",
+        "trades": 64,
+        "wins": 22,
+        "winRate": 34.4,
+        "pf": 1.43,
+        "pnl": 1005,
+        "expectancy": 15.7
+      },
+      {
+        "symbol": "SI",
+        "pattern": "4bar",
+        "trades": 3,
+        "wins": 1,
+        "winRate": 33.3,
+        "pf": 6.07,
+        "pnl": 1014,
+        "expectancy": 338.1
+      },
+      {
+        "symbol": "GC",
+        "pattern": "invheadshoulders",
+        "trades": 31,
+        "wins": 4,
+        "winRate": 12.9,
+        "pf": 0.28,
+        "pnl": -6393,
+        "expectancy": -206.23
+      },
+      {
+        "symbol": "GC",
+        "pattern": "headshoulders",
+        "trades": 37,
+        "wins": 4,
+        "winRate": 10.8,
+        "pf": 0.4,
+        "pnl": -6371,
+        "expectancy": -172.19
+      },
+      {
+        "symbol": "NQ",
+        "pattern": "doubletop",
+        "trades": 43,
+        "wins": 10,
+        "winRate": 23.3,
+        "pf": 0.74,
+        "pnl": -2667,
+        "expectancy": -62.03
+      }
+    ],
+    "results": [
+      {
+        "symbol": "SI",
+        "tradeCount": 210,
+        "winRate": 23.3,
+        "profitFactor": 1.2,
+        "totalPnL": 8150,
+        "expectancy": 38.81
+      },
+      {
+        "symbol": "ES",
+        "tradeCount": 177,
+        "winRate": 26.6,
+        "profitFactor": 1.15,
+        "totalPnL": 3463,
+        "expectancy": 19.56
+      },
+      {
+        "symbol": "NQ",
+        "tradeCount": 174,
+        "winRate": 29.3,
+        "profitFactor": 1.1,
+        "totalPnL": 2990,
+        "expectancy": 17.18
+      },
+      {
+        "symbol": "YM",
+        "tradeCount": 180,
+        "winRate": 25.6,
+        "profitFactor": 1.05,
+        "totalPnL": 1648,
+        "expectancy": 9.16
+      },
+      {
+        "symbol": "ZS",
+        "tradeCount": 100,
+        "winRate": 39,
+        "profitFactor": 1.1,
+        "totalPnL": 303,
+        "expectancy": 3.03
+      },
+      {
+        "symbol": "ZC",
+        "tradeCount": 72,
+        "winRate": 40.3,
+        "profitFactor": 1.05,
+        "totalPnL": 111,
+        "expectancy": 1.54
+      },
+      {
+        "symbol": "RTY",
+        "tradeCount": 198,
+        "winRate": 28.3,
+        "profitFactor": 0.98,
+        "totalPnL": -419,
+        "expectancy": -2.12
+      },
+      {
+        "symbol": "CL",
+        "tradeCount": 235,
+        "winRate": 23,
+        "profitFactor": 0.92,
+        "totalPnL": -1839,
+        "expectancy": -7.83
+      },
+      {
+        "symbol": "GC",
+        "tradeCount": 185,
+        "winRate": 14.6,
+        "profitFactor": 0.42,
+        "totalPnL": -21564,
+        "expectancy": -116.56
+      }
+    ],
+    "multiTfAlignments": [],
+    "id": "1772428342121",
+    "savedAt": "2026-03-02T05:12:22.121Z"
+  }
+]

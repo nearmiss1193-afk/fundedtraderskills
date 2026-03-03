@@ -1,0 +1,142 @@
+Striving for Low Costs:
+Apex Trader Funding aims to provide traders with the lowest possible commission rates.
+Name	Symbol	Exchange	Per Side	Round Turn
+Equity Futures
+E-Mini Dow ($5)	YM	CBOT	1.55	3.1
+E-Mini S&P 500	ES	CME	1.55	3.1
+E-Mini NASDAQ	NQ	CME	1.55	3.1
+E-Mini Russell	RTY	CME	1.55	3.1
+E-Mini S&P Midcap 400	EMD	CME	1.5	3
+Nikkei 225 (USD)	NKD	CME	2.32	4.64
+EUREX *additional exchange subscriptions apply
+DAX Index	FDAX	EUREX	1.46	2.92
+Mini-DAX	FDXM	EUREX	0.46	0.92
+Euro Stoxx 50	FESX	EUREX	0.59	1.18
+VSTOXX	FVS	EUREX	0.68	1.36
+STOXX Europe 600	FXXP	EUREX	0.39	0.78
+Micro DAX Index	FDXS	EUREX	0.34	0.68
+Micro Euro Stoxx 50	FSXE	EUREX	0.3	0.6
+EUREX *additional exchange subscriptions apply
+Euro-Buxl	FGBX	EUREX	0.45	0.9
+Euro-Schatz	FGBS	EUREX	0.45	0.9
+Euro-Bobl	FGBM	EUREX	0.45	0.9
+Euro-Bund	FGBL	EUREX	0.45	0.9
+Currency Futures
+Australian Dollar	6A	CME	1.77	3.54
+British Pound	6B	CME	1.77	3.54
+Japanese Yen	6J	CME	1.77	3.54
+Canadian Dollar	6C	CME	1.77	3.54
+Swiss Franc	6S	CME	1.77	3.54
+Euro FX	6E	CME	1.77	3.54
+New Zealand Dollar	6N	CME	1.77	3.54
+Agricultural Futures
+Lean Hogs	HE	CME	2.27	4.54
+Live Cattle	LE	CME	2.27	4.54
+Feeder Cattle	GF	CME	2.27	4.54
+Soybeans	ZS	CBOT	2.27	4.54
+Soybean Oil	ZL	CBOT	2.27	4.54
+Corn	ZC	CBOT	2.27	4.54
+Wheat	ZW	CBOT	2.27	4.54
+Soybean Meal	ZM	CBOT	2.27	4.54
+Energy Futures
+RBOB Gasoline	RB	NYMEX	1.67	3.34
+Crude Oil	CL	NYMEX	1.67	3.34
+Natural Gas	NG	NYMEX	1.77	3.54
+E-Mini Crude Oil	QM	NYMEX	1.37	2.74
+E-Mini Natural Gas	QG	NYMEX	0.67	1.34
+Heating Oil	HO	NYMEX	1.67	3.34
+Micro Futures
+Micro E-Mini Dow	MYM	CBOT	0.52	1.04
+Micro E-Mini S&P 500	MES	CME	0.52	1.04
+Micro E-Mini NASDAQ	MNQ	CME	0.52	1.04
+Micro E-Mini Russell	M2K	CME	0.52	1.04
+Micro Crude Oil	MCL	NYMEX	0.67	1.34
+E-Micro Australian Dollar	M6A	CME	0.41	0.82
+E-Micro Euro	M6E	CME	0.41	0.82
+Cryptocurrencies
+Micro Bitcoin	MBT	CME	2.67	5.34
+Micro Ether	MET	CME	0.37	0.74
+Tradovate Instrument List
+Tradovate offers a wide range of trading instruments. To ensure seamless trading, keep the following in mind:
+
+Available Instruments
+Only the instruments listed in the Tradovate Instrument List below are supported. Attempting to trade unsupported instruments will result in the rejection of the trade without penalties.
+Additional Fees
+Instruments marked in red text have extra fees associated with them.
+ICE US Instruments
+ICE US products are no longer offered as of March 13, 2024.
+Name	Symbol	Exchange
+Equity Futures	 	 
+E-Mini Dow ($5)	YM	CBOT
+E-Mini S&P 500	ES	CME
+E-Mini NASDAQ	NQ	CME
+E-Mini Russell	RTY	CME
+E-Mini S&P Midcap 400	EMD	CME
+Nikkei 225 (USD)	NKD	CME
+ 	 	 
+EUREX *additional exchange subscriptions apply	 	 
+DAX Index	FDAX	EUREX
+Mini-DAX	FDXM	EUREX
+Euro Stoxx 50	FESX	EUREX
+VSTOXX	FVS	EUREX
+STOXX Europe 600	FXXP	EUREX
+Micro DAX Index	FDXS	EUREX
+Micro Euro Stoxx 50	FSXE	EUREX
+ 	 	 
+EUREX *additional exchange subscriptions apply	 	 
+Euro-Buxl	FGBX	EUREX
+Euro-Schatz	FGBS	EUREX
+Euro-Bobl	FGBM	EUREX
+Euro-Bund	FGBL	EUREX
+ 	 	 
+Currency Futures	 	 
+Australian Dollar	6A	CME
+British Pound	6B	CME
+Japanese Yen	6J	CME
+Canadian Dollar	6C	CME
+Swiss Franc	6S	CME
+Euro FX	6E	CME
+New Zealand Dollar	6N	CME
+ 	 	 
+Agricultural Futures	 	 
+Lean Hogs	HE	CME
+Live Cattle	LE	CME
+Feeder Cattle	GF	CME
+Soybeans	ZS	CBOT
+Soybean Oil	ZL	CBOT
+Corn	ZC	CBOT
+Wheat	ZW	CBOT
+Soybean Meal	ZM	CBOT
+ 	 	 
+Energy Futures	 	 
+RBOB Gasoline	RB	NYMEX
+Crude Oil	CL	NYMEX
+Natural Gas	NG	NYMEX
+E-Mini Crude Oil	QM	NYMEX
+E-Mini Natural Gas	QG	NYMEX
+Heating Oil	HO	NYMEX
+ 	 	 
+Micro Futures	 	 
+Micro E-Mini Dow	MYM	CBOT
+Micro E-Mini S&P 500	MES	CME
+Micro E-Mini NASDAQ	MNQ	CME
+Micro E-Mini Russell	M2K	CME
+Micro Crude Oil	MCL	NYMEX
+E-Micro Australian Dollar	M6A	CME
+E-Micro Euro	M6E	CME
+ 	 	 
+Cryptocurrencies	 	 
+Micro Bitcoin (Note: Do not trade mini BT as it is not supported)	MBT	CME
+Micro Ether (Note: Do not trade mini ET as it is not supported)	MET	CME
+Note: Micro Crypto products operate as Mini products when considering your maximum contract allowance. E.g., if you are limited to 100 Micros and 10 Minis, you can only trade 10 contracts on MBT or MET.	 	 
+Final Notes
+Always verify your commission charges and ensure proper tracking in your trading platform to avoid discrepancies.
+Keep up-to-date with changes in supported instruments and their associated fees by regularly visiting the Tradovate Instrument List and Commission Schedule pages.
+For further assistance, visit the Apex Trader Funding Help Center.
+By staying informed, you can optimize your trading experience on Tradovate while effectively managing costs and compliance.
+
+In this article:
+Commissions for Tradovate
+Tradovate Instrument List
+Final Notes
+Back to website

@@ -1,12 +1,14 @@
 import type { Express } from "express";
 import { type Server } from "http";
 import path from "path";
+import fs from "fs";
 import express from "express";
-import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase, getSafetyStatus, getApexEvalStatus } from "./trader";
+import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase, getSafetyStatus, getApexEvalStatus, setDailyLossLimit, getNewsFilterStatus, getFundingWhitelist } from "./trader";
 import { getTradeAck } from "./supabase";
 import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
-import { sendToCrossTrade } from "./services/crosstrade";
-import { runBacktest } from "./backtest";
+import { sendToCrossTrade, sendCloseAll } from "./services/crosstrade";
+import { markAccountFailed as sharedMarkFailed, resetAccountStatus as sharedResetAccount, isAccountFailed } from "./account-status";
+import { runBacktest, simulateApexEval, downloadBulkCache, getBulkCacheStatus, scanCachedEdges } from "./backtest";
 
 let skills: any[] = [];
 
@@ -16,10 +18,29 @@ interface AccountConfig {
   type: "sim" | "test" | "funded";
 }
 
+interface AccountStatus {
+  status: "active" | "failed";
+  reason?: string;
+  failedAt?: string;
+}
+
 const ACCOUNTS: AccountConfig[] = [
   { id: "Sim101", name: "NinjaTrader Sim 101", type: "sim" },
-  { id: "APEX2210630000011", name: "Apex Funded 50k", type: "funded" },
+  { id: "APEX22106300000115", name: "Apex Funded 50k #5", type: "funded" },
+  { id: "APEX22106300000114", name: "Apex Funded 50k #4", type: "funded" },
 ];
+
+const accountStatuses: Record<string, AccountStatus> = {};
+ACCOUNTS.forEach(a => { accountStatuses[a.id] = { status: "active" }; });
+
+function markAccountFailed(accountId: string, reason: string) {
+  accountStatuses[accountId] = { status: "failed", reason, failedAt: new Date().toISOString() };
+  sharedMarkFailed(accountId, reason);
+}
+
+function isAccountActive(accountId: string): boolean {
+  return !isAccountFailed(accountId);
+}
 
 let activeAccount: AccountConfig = ACCOUNTS[0];
 
@@ -195,11 +216,20 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  const savedSettings = loadSettings();
+  if (savedSettings.dailyLossLimit && savedSettings.dailyLossLimit > 0) {
+    setDailyLossLimit(savedSettings.dailyLossLimit);
+  }
+
   app.get("/", (_req, res) => {
-    res.sendFile(path.resolve(process.cwd(), "public", "index.html"));
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    const html = fs.readFileSync(path.resolve(process.cwd(), "public", "index.html"), "utf-8");
+    res.type("html").send(html);
   });
 
-  app.use("/public", express.static(path.resolve(process.cwd(), "public")));
+  app.use("/public", express.static(path.resolve(process.cwd(), "public"), { etag: false, lastModified: false, setHeaders: (res) => { res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate"); } }));
 
   app.get("/health", (_req, res) => res.send("OK"));
 
@@ -228,7 +258,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/trader/safety", (_req, res) => {
-    res.json(getSafetyStatus());
+    res.json({ ...getSafetyStatus(), newsFilter: getNewsFilterStatus() });
   });
 
   app.get("/api/trader/apex-eval", (req, res) => {
@@ -246,12 +276,16 @@ export async function registerRoutes(
   });
 
   app.post("/api/trader/start", (req, res) => {
-    const { markets, timeframes, riskDollars, rewardRatio, maxOpenTrades, account, patterns, customCondition, forceTrading } = req.body;
+    const { markets, timeframes, riskDollars, rewardRatio, maxOpenTrades, dailyLossLimit, account, accounts, patterns, customCondition, forceTrading, fundingMode } = req.body;
     if (!markets?.length || !timeframes?.length || !patterns?.length) {
       return res.status(400).json({ error: "markets, timeframes, and patterns are required." });
     }
-    const sessionId = startTrader({ markets, timeframes, riskDollars: riskDollars || 100, rewardRatio: rewardRatio || 2, maxOpenTrades: maxOpenTrades || 3, account: account || "SIM101", patterns, customCondition: customCondition || "", forceTrading: !!forceTrading });
-    res.json({ success: true, sessionId });
+    if (dailyLossLimit && dailyLossLimit > 0) {
+      setDailyLossLimit(dailyLossLimit);
+    }
+    const resolvedAccounts = Array.isArray(accounts) && accounts.length > 0 ? accounts : [account || "SIM101"];
+    const sessionId = startTrader({ markets, timeframes, riskDollars: riskDollars || 100, rewardRatio: rewardRatio || 2, maxOpenTrades: maxOpenTrades || 3, account: resolvedAccounts[0], accounts: resolvedAccounts, patterns, customCondition: customCondition || "", forceTrading: !!forceTrading, fundingMode: !!fundingMode });
+    res.json({ success: true, sessionId, accounts: resolvedAccounts });
   });
 
   app.post("/api/trader/stop", (req, res) => {
@@ -266,6 +300,10 @@ export async function registerRoutes(
     const logs = getTraderLogs(req.params.sessionId, after);
     const status = getTraderStatus(req.params.sessionId);
     res.json({ logs, status });
+  });
+
+  app.get("/api/trader/funding-whitelist", (_req, res) => {
+    res.json({ whitelist: getFundingWhitelist() });
   });
 
   app.post("/api/trade-signal", async (req, res) => {
@@ -362,8 +400,53 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.post("/api/trader/close-all", async (req, res) => {
+    const { account } = req.body;
+    try {
+      const result = await sendCloseAll(account || "Sim101");
+      console.log(`[trader] Close all positions: account=${account || "sim101"} result=${result.message}`);
+      res.json({ success: result.success, message: result.message });
+    } catch (err: any) {
+      console.error(`[trader] Close all error: ${err.message}`);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   app.get("/api/accounts", (_req, res) => {
     res.json({ accounts: ACCOUNTS, active: activeAccount });
+  });
+
+  app.get("/api/apex/eval-status", (_req, res) => {
+    const safety = getSafetyStatus();
+    const evalStatus = getApexEvalStatus();
+
+    const accountsWithStatus = ACCOUNTS.map(a => {
+      const st = accountStatuses[a.id] || { status: "active" };
+      if (a.type === "funded" && st.status === "active") {
+        if (safety.dailyLimitHit) {
+          markAccountFailed(a.id, "Daily loss limit breached");
+          return { ...a, status: "failed" as const, reason: "Daily loss limit breached" };
+        }
+        const dd = evalStatus.trailingDrawdown;
+        if (dd <= -0.03) {
+          markAccountFailed(a.id, `Trailing drawdown breached (${(dd * 100).toFixed(1)}%)`);
+          return { ...a, status: "failed" as const, reason: `Trailing drawdown breached (${(dd * 100).toFixed(1)}%)` };
+        }
+      }
+      return { ...a, status: st.status, reason: st.reason, failedAt: st.failedAt };
+    });
+
+    res.json(accountsWithStatus);
+  });
+
+  app.post("/api/apex/reset-account", (req, res) => {
+    const { accountId } = req.body;
+    if (!accountId) return res.status(400).json({ success: false, error: "accountId required" });
+    if (!accountStatuses[accountId]) return res.status(404).json({ success: false, error: "Account not found" });
+    accountStatuses[accountId] = { status: "active" };
+    sharedResetAccount(accountId);
+    console.log(`[apex] Account ${accountId} status reset to active`);
+    res.json({ success: true, message: `${accountId} reset to active` });
   });
 
   app.post("/api/config/set-account", (req, res) => {
@@ -374,6 +457,9 @@ export async function registerRoutes(
     const found = ACCOUNTS.find(a => a.id === account);
     if (!found) {
       return res.status(400).json({ success: false, error: `Unknown account: ${account}` });
+    }
+    if (!isAccountActive(account)) {
+      return res.status(400).json({ success: false, error: `Account ${account} has failed eval — cannot select` });
     }
     if (found.type === "funded" && process.env.ALLOW_LIVE_TRADES !== "true") {
       console.warn(`[account] Switched to funded account ${found.id} — execution disabled (ALLOW_LIVE_TRADES != true)`);
@@ -456,15 +542,18 @@ export async function registerRoutes(
 
   app.post("/api/settings", (req, res) => {
     const saved = saveSettings(req.body);
+    if (saved.dailyLossLimit && saved.dailyLossLimit > 0) {
+      setDailyLossLimit(saved.dailyLossLimit);
+    }
     res.json({ success: true, settings: saved });
   });
 
   app.post("/api/backtest/pattern", async (req, res) => {
-    const { symbol, pattern, from, to, rrRatio, maxHold, minConfluence, timeframe } = req.body;
+    const { symbol, pattern, from, to, rrRatio, maxHold, minConfluence, timeframe, dataSource } = req.body;
     const validTimeframes = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "3min", "1hour", "4hour", "week", "weekly"];
     const tf = timeframe && validTimeframes.includes(timeframe) ? timeframe : "daily";
 
-    const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "headshoulders", "invheadshoulders", "wedge", "all"];
+    const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "headshoulders", "invheadshoulders", "wedge", "bullflag", "bearflag", "flagpullback", "bullflagpullback", "bearflagpullback", "flagpullbacksetup", "beartrap", "vwapbounce", "all"];
     if (pattern && !validPatterns.includes(pattern)) {
       return res.status(400).json({ success: false, error: `Invalid pattern: ${pattern}. Valid: ${validPatterns.join(", ")}` });
     }
@@ -476,21 +565,30 @@ export async function registerRoutes(
     }
 
     try {
-      const result = await runBacktest({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence: Number(minConfluence) || 0, timeframe: tf });
+      const result = await runBacktest({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence: Number(minConfluence) || 0, timeframe: tf, dataSource });
       if (result.error) {
         return res.status(400).json({ success: false, error: result.error });
       }
-      res.json({ success: true, ...result });
+      const { allTrades: _ignored, ...cleanResult } = result;
+      res.json({ success: true, ...cleanResult });
     } catch (err: any) {
       console.error("[backtest] Error:", err);
       res.status(500).json({ success: false, error: err.message || "Backtest failed" });
     }
   });
 
+  app.get("/api/backtest/scan-edges", (req, res) => {
+    const minWR = Number(req.query.minWinRate) || 45;
+    const minT = Number(req.query.minTrades) || 5;
+    const minC = Number(req.query.minConfluence) || 5;
+    const edges = scanCachedEdges(minWR, minT, minC);
+    res.json({ edges, count: edges.length, filters: { minWinRate: minWR, minTrades: minT, minConfluence: minC } });
+  });
+
   app.post("/api/backtest/multi", async (req, res) => {
-    const { symbols, pattern, patterns, from, to, rrRatio, maxHold, minConfluence, startDate, endDate, timeframe, timeframes } = req.body;
+    const { symbols, pattern, patterns, from, to, rrRatio, maxHold, minConfluence, startDate, endDate, timeframe, timeframes, dataSource } = req.body;
     const symList: string[] = Array.isArray(symbols) ? symbols.slice(0, 25) : ["ES", "NQ", "CL", "GC", "ZS"];
-    const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "headshoulders", "invheadshoulders", "wedge", "all"];
+    const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "headshoulders", "invheadshoulders", "wedge", "bullflag", "bearflag", "flagpullback", "bullflagpullback", "bearflagpullback", "flagpullbacksetup", "beartrap", "vwapbounce", "all"];
     const patternList: string[] = Array.isArray(patterns) ? patterns.filter((p: string) => validPatterns.includes(p)) : (pattern && validPatterns.includes(pattern) ? [pattern] : ["all"]);
     const dateFrom = from || startDate || "2020-01-01";
     const dateTo = to || endDate || new Date().toISOString().slice(0, 10);
@@ -522,7 +620,7 @@ export async function registerRoutes(
       for (const tf of tfList) {
       for (const pat of patternList) {
         try {
-          const r = await runBacktest({ symbol: symUpper, pattern: pat, from: dateFrom, to: dateTo, rrRatio: rr, maxHold: hold, minConfluence: minConf, timeframe: tf });
+          const r = await runBacktest({ symbol: symUpper, pattern: pat, from: dateFrom, to: dateTo, rrRatio: rr, maxHold: hold, minConfluence: minConf, timeframe: tf, dataSource });
           if (!r.error && r.totalTrades > 0) {
             symTrades += r.totalTrades;
             symWins += r.wins;
@@ -646,6 +744,231 @@ export async function registerRoutes(
       heatmap: heatmapCells,
       multiTfAlignments,
       results,
+    });
+  });
+
+  app.post("/api/backtest/apex-sim", async (req, res) => {
+    const { symbol, pattern, from, to, rrRatio, maxHold, minConfluence, timeframe,
+            accountSize, profitTarget, trailingDrawdownMax, dailyLossLimit, minTradeDays, riskPerTrade, mode, dataSource } = req.body;
+
+    const validTimeframes = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "3min", "1hour", "4hour", "week", "weekly"];
+    const tf = timeframe && validTimeframes.includes(timeframe) ? timeframe : "daily";
+    const validPatterns = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "headshoulders", "invheadshoulders", "wedge", "bullflag", "bearflag", "flagpullback", "bullflagpullback", "bearflagpullback", "flagpullbacksetup", "beartrap", "vwapbounce", "all"];
+    if (pattern && !validPatterns.includes(pattern)) {
+      return res.status(400).json({ success: false, error: `Invalid pattern: ${pattern}` });
+    }
+
+    try {
+      const result = await runBacktest({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence: Number(minConfluence) || 0, timeframe: tf, dataSource });
+      if (result.error) {
+        return res.status(400).json({ success: false, error: result.error });
+      }
+      if (result.totalTrades === 0) {
+        return res.json({ success: true, backtest: result, apexSim: null, message: "No trades found to simulate" });
+      }
+
+      const allTrades = result.allTrades || result.trades || [];
+      const simConfig = {
+        accountSize: Number(accountSize) || 50000,
+        profitTarget: Number(profitTarget) || 1000,
+        trailingDrawdownMax: Number(trailingDrawdownMax) || 1500,
+        dailyLossLimit: Number(dailyLossLimit) || 1500,
+        minTradeDays: Number(minTradeDays) || 5,
+        riskPerTrade: Number(riskPerTrade) || 100,
+        mode: (mode === "funded" ? "funded" : "eval") as "eval" | "funded",
+      };
+
+      const apexSim = simulateApexEval(allTrades, simConfig);
+      const { allTrades: _at, ...backtestClean } = result;
+      res.json({ success: true, backtest: backtestClean, apexSim });
+    } catch (err: any) {
+      console.error("[apex-sim] Error:", err);
+      res.status(500).json({ success: false, error: err.message || "Apex simulation failed" });
+    }
+  });
+
+  app.post("/api/backtest/download-bulk", async (req, res) => {
+    const { symbols, timeframes } = req.body || {};
+    console.log(`[bulk] Bulk cache download requested for ${(symbols || []).length || 'all'} symbols`);
+    res.json({ status: "started", message: "Bulk download started in background. Poll /api/backtest/cache-status for progress." });
+    downloadBulkCache(symbols, timeframes).then(result => {
+      console.log(`[bulk] Complete: ${result.completed.length} cached, ${result.errors.length} errors`);
+    }).catch(err => {
+      console.error("[bulk] Fatal error:", err);
+    });
+  });
+
+  app.get("/api/backtest/cache-status", (_req, res) => {
+    res.json(getBulkCacheStatus());
+  });
+
+  const SCAN_ARCHIVE_PATH = path.resolve("scan_archive.json");
+
+  function loadScanArchive(): any[] {
+    try {
+      if (fs.existsSync(SCAN_ARCHIVE_PATH)) {
+        return JSON.parse(fs.readFileSync(SCAN_ARCHIVE_PATH, "utf-8"));
+      }
+    } catch {}
+    return [];
+  }
+
+  function saveScanArchive(data: any[]) {
+    fs.writeFileSync(SCAN_ARCHIVE_PATH, JSON.stringify(data, null, 2));
+  }
+
+  app.get("/api/scan-archive", (_req, res) => {
+    res.json({ success: true, scans: loadScanArchive() });
+  });
+
+  app.post("/api/scan-archive", (req, res) => {
+    const { scan } = req.body;
+    if (!scan) return res.status(400).json({ success: false, error: "No scan data" });
+    const archive = loadScanArchive();
+    scan.id = Date.now().toString();
+    scan.savedAt = new Date().toISOString();
+    archive.unshift(scan);
+    if (archive.length > 20) archive.length = 20;
+    saveScanArchive(archive);
+    res.json({ success: true, id: scan.id });
+  });
+
+  app.delete("/api/scan-archive/:id", (req, res) => {
+    const archive = loadScanArchive().filter((s: any) => s.id !== req.params.id);
+    saveScanArchive(archive);
+    res.json({ success: true });
+  });
+
+  let optimizerRunning = false;
+  let optimizerProgress = { status: "idle", current: 0, total: 0, label: "", results: [] as any[] };
+
+  app.post("/api/optimizer/run", async (req, res) => {
+    if (optimizerRunning) {
+      return res.status(409).json({ success: false, error: "Optimizer already running" });
+    }
+
+    const { months, timeframes, rrRatios, minConfluence, symbols } = req.body;
+    const tfList = Array.isArray(timeframes) ? timeframes : ["5min", "15min"];
+    const rrList = Array.isArray(rrRatios) ? rrRatios : [1.5, 2, 2.5, 3];
+    const minConf = Number(minConfluence) || 0;
+    const monthsBack = Number(months) || 6;
+
+    const to = new Date().toISOString().slice(0, 10);
+    const fromDate = new Date();
+    fromDate.setMonth(fromDate.getMonth() - monthsBack);
+    const from = fromDate.toISOString().slice(0, 10);
+
+    const defaultSymbols = ["ES", "NQ", "YM", "RTY", "CL", "GC", "SI", "ZC", "ZS"];
+    const symList = Array.isArray(symbols) ? symbols : defaultSymbols;
+    const patternList = ["3bar", "4bar", "buysetup", "retest", "breakout", "climax", "cuphandle", "inversecuphandle", "doubletop", "doublebottom", "headshoulders", "invheadshoulders", "wedge"];
+
+    const combos: { symbol: string; pattern: string; tf: string; rr: number }[] = [];
+    for (const sym of symList) {
+      for (const pat of patternList) {
+        for (const tf of tfList) {
+          for (const rr of rrList) {
+            combos.push({ symbol: sym, pattern: pat, tf, rr });
+          }
+        }
+      }
+    }
+
+    optimizerRunning = true;
+    optimizerProgress = { status: "running", current: 0, total: combos.length, label: "Starting...", results: [] };
+
+    res.json({ success: true, totalCombos: combos.length, message: `Optimizer started: ${combos.length} combinations (${symList.length} symbols × ${patternList.length} patterns × ${tfList.length} TFs × ${rrList.length} R:R). Poll /api/optimizer/status for progress.` });
+
+    (async () => {
+      const allResults: any[] = [];
+      for (let i = 0; i < combos.length; i++) {
+        const c = combos[i];
+        optimizerProgress.current = i + 1;
+        optimizerProgress.label = `${c.symbol} / ${c.pattern} / ${c.tf} / R:R ${c.rr}`;
+
+        try {
+          const r = await runBacktest({ symbol: c.symbol, pattern: c.pattern, from, to, rrRatio: c.rr, maxHold: 5, minConfluence: minConf, timeframe: c.tf });
+          if (!r.error && r.totalTrades >= 3) {
+            allResults.push({
+              symbol: c.symbol,
+              pattern: c.pattern,
+              tf: c.tf,
+              rr: c.rr,
+              trades: r.totalTrades,
+              wins: r.wins,
+              losses: r.losses,
+              winRate: r.winRate,
+              pf: r.profitFactor,
+              pnl: Math.round(r.totalPnlDollars * 100) / 100,
+              expectancy: r.expectancy,
+              maxDD: r.maxDrawdownPct,
+              bestTrade: r.bestTrade,
+              worstTrade: r.worstTrade,
+            });
+          }
+        } catch (err: any) {
+          console.error(`[optimizer] ${c.symbol}/${c.pattern}/${c.tf}/RR${c.rr}: ${err.message}`);
+        }
+      }
+
+      allResults.sort((a, b) => {
+        const scoreA = (a.pf >= 1.2 ? a.pnl : 0) + (a.winRate * 10) + (a.pf * 100) + (a.expectancy * 5);
+        const scoreB = (b.pf >= 1.2 ? b.pnl : 0) + (b.winRate * 10) + (b.pf * 100) + (b.expectancy * 5);
+        return scoreB - scoreA;
+      });
+
+      optimizerProgress = {
+        status: "complete",
+        current: combos.length,
+        total: combos.length,
+        label: "Complete",
+        results: allResults,
+      };
+      optimizerRunning = false;
+
+      try {
+        const archive = loadScanArchive();
+        const top10 = allResults.slice(0, 10);
+        const worst5 = [...allResults].sort((a, b) => a.pnl - b.pnl).slice(0, 5);
+        archive.unshift({
+          id: Date.now().toString(),
+          savedAt: new Date().toISOString(),
+          label: `Optimizer Scan ${from} to ${to} | ${tfList.join(",")} | R:R ${rrList.join(",")} | minConf ${minConf}`,
+          summary: {
+            totalCombos: combos.length,
+            profitableCombos: allResults.filter(r => r.pnl > 0).length,
+            totalResults: allResults.length,
+            period: `${from} to ${to}`,
+            timeframesUsed: tfList,
+            symbolsScanned: symList.length,
+            rrRatios: rrList,
+            minConfluence: minConf,
+          },
+          top10,
+          worst5,
+          allResults: allResults.slice(0, 50),
+        });
+        if (archive.length > 20) archive.length = 20;
+        saveScanArchive(archive);
+        console.log(`[optimizer] Complete: ${allResults.length} combos with trades, top PnL: $${allResults[0]?.pnl || 0}`);
+      } catch (err: any) {
+        console.error("[optimizer] Failed to save:", err.message);
+      }
+    })();
+  });
+
+  app.get("/api/optimizer/status", (_req, res) => {
+    const top20 = optimizerProgress.results.length > 0
+      ? [...optimizerProgress.results].slice(0, 20)
+      : [];
+    const worst10 = optimizerProgress.results.length > 0
+      ? [...optimizerProgress.results].sort((a, b) => a.pnl - b.pnl).slice(0, 10)
+      : [];
+    res.json({
+      ...optimizerProgress,
+      pct: optimizerProgress.total > 0 ? Math.round((optimizerProgress.current / optimizerProgress.total) * 100) : 0,
+      top20,
+      worst10,
+      totalResults: optimizerProgress.results.length,
     });
   });
 

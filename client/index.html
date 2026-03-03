@@ -452,6 +452,8 @@
     .log-action.trail-update { color: #a78bfa; font-weight: 500; }
     .log-action.scanning { color: #4b5563; font-weight: 500; }
     .log-action.system { color: #6b7280; }
+    .log-action.funding-blocked { color: #f59e0b; font-weight: 600; }
+    .log-action.funding-mode { color: #10b981; font-weight: 700; }
     .log-action.tradovate { color: #8b5cf6; font-weight: 700; }
     .log-action.tradovate-err { color: #dc2626; font-weight: 700; }
 
@@ -802,6 +804,8 @@
       <button class="tab-btn" data-tab="permit" onclick="switchTab('permit')">Permit Checker</button>
       <button class="tab-btn" data-tab="trader" onclick="switchTab('trader')">AI Futures Trader</button>
       <button class="tab-btn" data-tab="edge" onclick="switchTab('edge');loadEdgeBuilder()" data-testid="tab-edge-builder">Edge Builder</button>
+      <button class="tab-btn" data-tab="plan" onclick="switchTab('plan');loadTradingPlan()" data-testid="tab-trading-plan">Trading Plan</button>
+      <button class="tab-btn" data-tab="optimizer" onclick="switchTab('optimizer');loadOptimizerStatus()" data-testid="tab-optimizer">Edge Optimizer</button>
     </div>
 
     <!-- TAB 1: Create a Skill -->
@@ -966,8 +970,25 @@
           </label>
         </div>
 
+        <div id="funding-mode-section" style="margin-bottom:1rem;padding:0.75rem;border-radius:10px;border:2px solid #10b98133;background:linear-gradient(135deg,#0f172a,#064e3b22);">
+          <div class="check-group" style="margin-bottom:0.5rem;">
+            <label class="check-label" style="border-color:#10b981;">
+              <input type="checkbox" id="fundingMode" data-testid="checkbox-funding-mode" onchange="toggleFundingMode(this.checked)" />
+              <span class="check-dot" style="background:#10b981;"></span>
+              <span style="color:#10b981;font-weight:700;font-size:0.95rem;">&#x1f3af; Funding Mode — High Probability Only</span>
+            </label>
+          </div>
+          <div id="funding-mode-info" style="display:none;font-size:0.8rem;color:#9ca3af;line-height:1.5;">
+            <div style="color:#10b981;font-weight:600;margin-bottom:4px;">Tradovate-only symbols — 35 confluence-verified setups at 1:2 R:R — optimized for Apex funded evaluations</div>
+            <div id="funding-whitelist-display" style="margin-top:6px;padding:6px 8px;background:#0f172a;border-radius:6px;border:1px solid #10b98133;max-height:120px;overflow-y:auto;"></div>
+          </div>
+        </div>
+
         <label for="riskDollars">Risk Per Trade ($)</label>
         <input id="riskDollars" type="number" value="100" min="10" max="10000" step="10" style="max-width:160px;" data-testid="input-risk-dollars" />
+
+        <label for="dailyLossLimit">Daily Loss Limit ($)</label>
+        <input id="dailyLossLimit" type="number" value="1500" min="100" max="10000" step="50" style="max-width:160px;" data-testid="input-daily-loss-limit" />
 
         <label for="maxOpenTrades">Max Open Trades</label>
         <select id="maxOpenTrades" style="max-width:160px;" data-testid="select-max-open-trades">
@@ -982,10 +1003,13 @@
 
         <label for="tradeAccount">NinjaTrader Account</label>
         <select id="tradeAccount" style="max-width:320px;" data-testid="select-trade-account" onchange="syncAccountFields()">
-          <option value="Sim101" data-type="sim" selected>Sim101 — NinjaTrader Sim 101 (SIM)</option>
-          <option value="APEX2210630000011" data-type="funded">APEX2210630000011 — Apex Funded 50k (FUNDED)</option>
         </select>
         <span id="account-type-badge" data-testid="text-account-type" style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;margin-left:4px;background:#22c55e;color:#fff;">SIM</span>
+        <label class="check-label" style="margin-top:0.3rem;">
+          <input type="checkbox" id="tradeAllAccounts" data-testid="checkbox-trade-all-accounts" onchange="toggleTradeAllAccounts()" />
+          <span class="check-dot"></span>
+          <span style="font-weight:700;color:#f59e0b;">Trade All Accounts Simultaneously</span>
+        </label>
 
         <label for="rewardRatio">Risk : Reward Ratio (Hard Rule)</label>
         <select id="rewardRatio" style="max-width:200px;" data-testid="select-reward-ratio">
@@ -1032,6 +1056,22 @@
             <label class="check-label"><input type="checkbox" name="pattern" value="invheadshoulders" checked /><span class="check-dot"></span><span>Inverse H&amp;S Long</span></label>
             <label class="check-label"><input type="checkbox" name="pattern" value="headshoulders" checked /><span class="check-dot"></span><span>Head &amp; Shoulders Short</span></label>
           </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="bullflag" checked /><span class="check-dot"></span><span>Bull Flag Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="bearflag" checked /><span class="check-dot"></span><span>Bear Flag Short</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="beartrap" checked /><span class="check-dot"></span><span>Bear Trap Reversal Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="vwapbounce" checked /><span class="check-dot"></span><span>VWAP Bounce</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="4bar_long" checked /><span class="check-dot"></span><span>4 Bar Play Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="4bar_short" checked /><span class="check-dot"></span><span>4 Bar Play Short</span></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label class="check-label"><input type="checkbox" name="pattern" value="retest_long" checked /><span class="check-dot"></span><span>Retest Buy Long</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="retest_short" checked /><span class="check-dot"></span><span>Retest Sell Short</span></label>
+          </div>
         </div>
 
         <label for="customCondition">Custom Buy Condition (optional)</label>
@@ -1041,6 +1081,7 @@
           <button id="btn-start-trader" class="btn-start" onclick="startTrader()" data-testid="button-start-trader">Start Autonomous Trader</button>
           <button id="btn-stop-trader" class="btn-stop" onclick="stopTrader()" disabled data-testid="button-stop-trader">Stop Trading</button>
           <button class="btn-test-signal" onclick="sendTestSignal()" data-testid="button-test-signal">&#x1f4e1; Test Signal</button>
+          <button id="btn-close-all" style="background:#ef4444;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.85rem;" onclick="closeAllPositions()" data-testid="button-close-all">Close All Positions</button>
         </div>
 
         <div class="crosstrade-row">
@@ -1175,6 +1216,10 @@
               <input id="set-risk" type="number" value="100" min="10" max="10000" step="10" data-testid="input-set-risk" />
             </div>
             <div>
+              <label for="set-daily-loss-limit">Daily Loss Limit ($)</label>
+              <input id="set-daily-loss-limit" type="number" value="1500" min="100" max="10000" step="50" data-testid="input-set-daily-loss-limit" />
+            </div>
+            <div>
               <label for="set-max-trades">Max Open Trades</label>
               <select id="set-max-trades" data-testid="select-set-max-trades">
                 <option value="1">1</option>
@@ -1263,6 +1308,19 @@
           <div class="edge-metric"><div class="em-label">Profit Factor</div><div class="em-value" id="edge-pf" data-testid="text-edge-pf">0</div></div>
           <div class="edge-metric"><div class="em-label">Expectancy</div><div class="em-value" id="edge-exp" data-testid="text-edge-exp">$0</div></div>
           <div class="edge-metric"><div class="em-label">Total P&amp;L</div><div class="em-value" id="edge-pnl" data-testid="text-edge-pnl">$0</div></div>
+        </div>
+
+        <div style="margin-bottom:1rem;padding:0.75rem;border-radius:10px;border:1px solid #22c55e33;background:#0f172a;">
+          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+            <button id="btn-bulk-cache" onclick="downloadBulkCache()" style="background:#22c55e;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.85rem;" data-testid="button-bulk-cache">&#128229; Download Historical Cache</button>
+            <span id="bulk-cache-status" style="font-size:0.8rem;color:#9ca3af;" data-testid="text-bulk-cache-status">One-time download — makes all scans instant</span>
+          </div>
+          <div id="bulk-cache-progress" style="display:none;margin-top:0.5rem;">
+            <div style="background:#1e293b;border-radius:6px;height:8px;overflow:hidden;">
+              <div id="bulk-cache-bar" style="background:linear-gradient(90deg,#22c55e,#10b981);height:100%;width:0%;transition:width 0.3s;"></div>
+            </div>
+            <div id="bulk-cache-detail" style="font-size:0.75rem;color:#6b7280;margin-top:4px;"></div>
+          </div>
         </div>
 
         <div class="edge-section-title"><span class="est">&#128293;</span> Optimize My Edge</div>
@@ -1439,6 +1497,65 @@
             </div>
             <button class="bt-run-btn" style="background:#059669;" id="bt-csv-btn" onclick="exportBacktestCSV()" data-testid="button-export-csv" disabled>Export CSV</button>
           </div>
+
+          <div style="margin-top:0.7rem;padding:0.6rem 0.8rem;background:linear-gradient(135deg,#1e1b4b 0%,#172554 100%);border-radius:0.5rem;border:1px solid #4f46e5;">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+              <span style="font-size:1rem;">&#127942;</span>
+              <span style="font-weight:700;font-size:0.82rem;color:#a5b4fc;">Apex Trader Funding Simulator</span>
+              <span style="font-size:0.65rem;color:#6b7280;margin-left:auto;">Simulates eval pass &amp; funded account survival</span>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
+              <div class="bt-field">
+                <label for="apex-sim-mode">Mode</label>
+                <select id="apex-sim-mode" data-testid="select-apex-sim-mode" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.25rem;border-radius:0.3rem;font-size:0.72rem;">
+                  <option value="eval" selected>Evaluation</option>
+                  <option value="funded">Funded Account</option>
+                </select>
+              </div>
+              <div class="bt-field">
+                <label for="apex-sim-acct">Account Size</label>
+                <select id="apex-sim-acct" data-testid="select-apex-sim-acct" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.25rem;border-radius:0.3rem;font-size:0.72rem;">
+                  <option value="50000" selected>$50,000</option>
+                  <option value="100000">$100,000</option>
+                  <option value="150000">$150,000</option>
+                </select>
+              </div>
+              <div class="bt-field">
+                <label for="apex-sim-target">Profit Target</label>
+                <select id="apex-sim-target" data-testid="select-apex-sim-target" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.25rem;border-radius:0.3rem;font-size:0.72rem;">
+                  <option value="1000" selected>$1,000 (50K)</option>
+                  <option value="2000">$2,000 (100K)</option>
+                  <option value="3000">$3,000 (150K)</option>
+                </select>
+              </div>
+              <div class="bt-field">
+                <label for="apex-sim-dd">Trailing DD</label>
+                <select id="apex-sim-dd" data-testid="select-apex-sim-dd" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.25rem;border-radius:0.3rem;font-size:0.72rem;">
+                  <option value="1500" selected>-$1,500 (50K)</option>
+                  <option value="2500">-$2,500 (100K)</option>
+                  <option value="3000">-$3,000 (150K)</option>
+                  <option value="625">-$625 (PA 25K)</option>
+                </select>
+              </div>
+              <div class="bt-field">
+                <label for="apex-sim-daily">Daily Loss</label>
+                <select id="apex-sim-daily" data-testid="select-apex-sim-daily" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.25rem;border-radius:0.3rem;font-size:0.72rem;">
+                  <option value="1500" selected>-$1,500</option>
+                  <option value="1000">-$1,000</option>
+                  <option value="750">-$750</option>
+                  <option value="500">-$500</option>
+                </select>
+              </div>
+              <div class="bt-field">
+                <label for="apex-sim-days">Min Days</label>
+                <input type="number" id="apex-sim-days" value="7" min="1" max="30" style="width:3rem;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.25rem;border-radius:0.3rem;font-size:0.72rem;" data-testid="input-apex-sim-days" />
+              </div>
+              <button class="bt-run-btn" style="background:#7c3aed;font-weight:700;" id="apex-sim-btn" onclick="runApexSim()" data-testid="button-apex-sim">&#127942; Run Apex Sim</button>
+            </div>
+          </div>
+
+          <div id="apex-sim-results" data-testid="apex-sim-results" style="margin-top:0.5rem;"></div>
+
           <div id="bt-results" data-testid="bt-results">
             <div class="bt-status" id="bt-status">Select parameters and click Run Backtest to analyze historical pattern performance.</div>
           </div>
@@ -1466,6 +1583,21 @@
             <thead><tr><th>Symbol</th><th>Pattern</th><th>Trades</th><th>Wins</th><th>Win %</th><th>PF</th><th>P&amp;L</th><th>Expectancy</th></tr></thead>
             <tbody id="bt-heatmap-table-body"></tbody>
           </table>
+        </div>
+      </div>
+
+      <div class="edge-card" id="scan-archive-card">
+        <h3><span class="edge-icon">&#128202;</span> Historical Scan Archive</h3>
+        <p class="edge-sub">Saved multi-timeframe scan results. Run full scans and compare performance across timeframes, symbols, and patterns.</p>
+
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+          <button class="bt-run-btn" style="background:#7c3aed;" id="btn-run-full-scan" onclick="runFullHistoricalScan()" data-testid="button-run-full-scan">Run Full Historical Scan (2024–2025)</button>
+          <button class="bt-run-btn" style="background:#6366f1;" id="btn-save-last-scan" onclick="saveLastScanToArchive()" data-testid="button-save-scan" disabled>Save Last Scan to Archive</button>
+        </div>
+        <div id="full-scan-status" data-testid="full-scan-status" style="font-size:0.8rem;color:#94a3b8;margin-bottom:0.5rem;"></div>
+
+        <div id="scan-archive-list" data-testid="scan-archive-list">
+          <div style="color:#9ca3af;font-size:0.82rem;padding:1rem;text-align:center;">No saved scans yet. Run a full historical scan to get started.</div>
         </div>
       </div>
 
@@ -1599,6 +1731,254 @@
 
   </div>
 
+    <!-- TAB 5: Trading Plan & Routine -->
+    <div id="panel-plan" class="tab-panel">
+      <div class="trader-card" style="border-top:3px solid #7c3aed;">
+        <h2 style="display:flex;align-items:center;gap:0.5rem;">
+          <span style="font-size:1.3rem;">&#128221;</span> Trading Plan &amp; Daily Routine
+        </h2>
+        <p class="card-sub">Pre-market checklist, personal goals, and live performance tracking. Complete your routine before trading.</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+
+          <div style="background:#1e293b;border-radius:0.6rem;padding:1rem;border:1px solid #334155;">
+            <h3 style="font-size:0.88rem;font-weight:700;color:#a5b4fc;margin:0 0 0.7rem 0;display:flex;align-items:center;gap:0.4rem;">
+              <span style="font-size:1rem;">&#9745;</span> Daily Routine Checklist
+            </h3>
+            <div id="daily-routine" style="display:flex;flex-direction:column;gap:0.45rem;" data-testid="daily-routine-checklist">
+              <div style="font-size:0.72rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.1rem;">Pre-Market</div>
+              <label class="check-label" style="font-size:0.78rem;color:#e2e8f0;cursor:pointer;display:flex;align-items:center;gap:0.4rem;">
+                <input type="checkbox" id="pre1" class="routine-check" data-testid="check-pre1" style="accent-color:#7c3aed;width:16px;height:16px;" />
+                <span>Review economic calendar &amp; news</span>
+              </label>
+              <label class="check-label" style="font-size:0.78rem;color:#e2e8f0;cursor:pointer;display:flex;align-items:center;gap:0.4rem;">
+                <input type="checkbox" id="pre2" class="routine-check" data-testid="check-pre2" style="accent-color:#7c3aed;width:16px;height:16px;" />
+                <span>Set daily loss limit &amp; max trades</span>
+              </label>
+              <label class="check-label" style="font-size:0.78rem;color:#e2e8f0;cursor:pointer;display:flex;align-items:center;gap:0.4rem;">
+                <input type="checkbox" id="pre3" class="routine-check" data-testid="check-pre3" style="accent-color:#7c3aed;width:16px;height:16px;" />
+                <span>Review last 5 trades from journal</span>
+              </label>
+
+              <div style="font-size:0.72rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-top:0.3rem;">During Trading</div>
+              <label class="check-label" style="font-size:0.78rem;color:#e2e8f0;cursor:pointer;display:flex;align-items:center;gap:0.4rem;">
+                <input type="checkbox" id="intra1" class="routine-check" data-testid="check-intra1" style="accent-color:#7c3aed;width:16px;height:16px;" />
+                <span>Trade only A+ setups (minConf 8)</span>
+              </label>
+              <label class="check-label" style="font-size:0.78rem;color:#e2e8f0;cursor:pointer;display:flex;align-items:center;gap:0.4rem;">
+                <input type="checkbox" id="intra2" class="routine-check" data-testid="check-intra2" style="accent-color:#7c3aed;width:16px;height:16px;" />
+                <span>No revenge trading</span>
+              </label>
+
+              <div style="font-size:0.72rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-top:0.3rem;">Post-Market</div>
+              <label class="check-label" style="font-size:0.78rem;color:#e2e8f0;cursor:pointer;display:flex;align-items:center;gap:0.4rem;">
+                <input type="checkbox" id="post1" class="routine-check" data-testid="check-post1" style="accent-color:#7c3aed;width:16px;height:16px;" />
+                <span>Journal every trade (emotions + rule adherence)</span>
+              </label>
+              <label class="check-label" style="font-size:0.78rem;color:#e2e8f0;cursor:pointer;display:flex;align-items:center;gap:0.4rem;">
+                <input type="checkbox" id="post2" class="routine-check" data-testid="check-post2" style="accent-color:#7c3aed;width:16px;height:16px;" />
+                <span>Review performance metrics</span>
+              </label>
+
+              <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+                <button onclick="markChecklistComplete()" style="flex:1;padding:0.5rem;background:#7c3aed;color:#fff;border:none;border-radius:0.4rem;font-weight:700;font-size:0.78rem;cursor:pointer;" data-testid="button-checklist-complete">
+                  &#9989; Mark Day Complete
+                </button>
+                <button onclick="resetChecklist()" style="padding:0.5rem 0.8rem;background:#334155;color:#94a3b8;border:none;border-radius:0.4rem;font-size:0.72rem;cursor:pointer;" data-testid="button-checklist-reset">Reset</button>
+              </div>
+              <div id="checklist-status" style="font-size:0.72rem;color:#6b7280;margin-top:0.2rem;" data-testid="text-checklist-status"></div>
+              <div id="checklist-history" style="font-size:0.68rem;color:#475569;margin-top:0.3rem;" data-testid="text-checklist-history"></div>
+            </div>
+
+            <div style="border-top:1px solid #334155;margin-top:0.8rem;padding-top:0.8rem;">
+              <h3 style="font-size:0.85rem;font-weight:700;color:#f472b6;margin:0 0 0.5rem 0;display:flex;align-items:center;gap:0.4rem;">
+                <span style="font-size:1rem;">&#129504;</span> Psychology Tracker
+              </h3>
+              <div style="display:flex;gap:0.5rem;align-items:end;flex-wrap:wrap;">
+                <div class="bt-field" style="flex:1;min-width:120px;">
+                  <label for="emotional-state" style="color:#94a3b8;font-size:0.72rem;">Current State</label>
+                  <select id="emotional-state" data-testid="select-emotional-state" style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.35rem;border-radius:0.3rem;font-size:0.78rem;">
+                    <option value="focused">&#127919; Focused</option>
+                    <option value="confident">&#128170; Confident</option>
+                    <option value="calm">&#128524; Calm</option>
+                    <option value="anxious">&#128552; Anxious</option>
+                    <option value="frustrated">&#128545; Frustrated</option>
+                    <option value="revenge">&#9888;&#65039; Revenge Trading</option>
+                    <option value="fomo">&#128680; FOMO</option>
+                    <option value="tired">&#128564; Tired/Fatigued</option>
+                  </select>
+                </div>
+                <button onclick="logPsychology()" style="padding:0.4rem 0.8rem;background:#7c3aed;color:#fff;border:none;border-radius:0.4rem;font-weight:700;font-size:0.75rem;cursor:pointer;white-space:nowrap;" data-testid="button-log-psychology">Log State</button>
+              </div>
+              <div id="psychology-warning" style="display:none;margin-top:0.4rem;padding:0.4rem 0.6rem;background:rgba(239,68,68,0.15);border:1px solid #ef4444;border-radius:0.4rem;font-size:0.75rem;color:#fca5a5;" data-testid="text-psychology-warning"></div>
+              <div id="psychology-log" style="margin-top:0.4rem;font-size:0.7rem;color:#6b7280;max-height:80px;overflow-y:auto;" data-testid="text-psychology-log"></div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div style="background:#1e293b;border-radius:0.6rem;padding:1rem;border:1px solid #334155;">
+              <h3 style="font-size:0.88rem;font-weight:700;color:#facc15;margin:0 0 0.7rem 0;display:flex;align-items:center;gap:0.4rem;">
+                <span style="font-size:1rem;">&#127919;</span> Personal Trading Goals
+              </h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                <div class="bt-field">
+                  <label for="plan-ba-target" style="color:#94a3b8;font-size:0.72rem;">Win Rate Target (%)</label>
+                  <input type="number" id="plan-ba-target" value="50" min="20" max="90" step="5" style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.35rem;border-radius:0.3rem;font-size:0.8rem;" data-testid="input-ba-target" />
+                </div>
+                <div class="bt-field">
+                  <label for="plan-weekly-target" style="color:#94a3b8;font-size:0.72rem;">Weekly Net Target ($)</label>
+                  <input type="number" id="plan-weekly-target" value="500" min="50" max="10000" step="50" style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.35rem;border-radius:0.3rem;font-size:0.8rem;" data-testid="input-weekly-target" />
+                </div>
+                <div class="bt-field">
+                  <label for="plan-daily-loss" style="color:#94a3b8;font-size:0.72rem;">Max Daily Loss ($)</label>
+                  <input type="number" id="plan-daily-loss" value="300" min="50" max="5000" step="50" style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.35rem;border-radius:0.3rem;font-size:0.8rem;" data-testid="input-plan-daily-loss" />
+                </div>
+                <div class="bt-field">
+                  <label for="plan-max-trades" style="color:#94a3b8;font-size:0.72rem;">Max Trades/Day</label>
+                  <input type="number" id="plan-max-trades" value="5" min="1" max="20" step="1" style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.35rem;border-radius:0.3rem;font-size:0.8rem;" data-testid="input-max-trades-day" />
+                </div>
+              </div>
+              <button onclick="saveTradingPlanGoals()" style="margin-top:0.5rem;width:100%;padding:0.4rem;background:#334155;color:#e2e8f0;border:none;border-radius:0.3rem;font-size:0.72rem;font-weight:600;cursor:pointer;" data-testid="button-save-goals">Save Goals</button>
+            </div>
+
+            <div style="background:#1e293b;border-radius:0.6rem;padding:1rem;border:1px solid #334155;">
+              <h3 style="font-size:0.88rem;font-weight:700;color:#22c55e;margin:0 0 0.7rem 0;display:flex;align-items:center;gap:0.4rem;">
+                <span style="font-size:1rem;">&#128200;</span> Live Performance
+              </h3>
+              <div id="plan-performance" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.4rem;" data-testid="plan-performance-stats">
+                <div style="text-align:center;background:#0f172a;padding:0.5rem;border-radius:0.3rem;">
+                  <div style="font-size:0.65rem;color:#6b7280;text-transform:uppercase;">Win Rate</div>
+                  <div id="live-ba" style="font-size:1.1rem;font-weight:800;color:#e2e8f0;" data-testid="text-live-ba">0%</div>
+                  <div id="live-ba-vs" style="font-size:0.62rem;color:#6b7280;" data-testid="text-live-ba-vs"></div>
+                </div>
+                <div style="text-align:center;background:#0f172a;padding:0.5rem;border-radius:0.3rem;">
+                  <div style="font-size:0.65rem;color:#6b7280;text-transform:uppercase;">Profit Factor</div>
+                  <div id="live-pf" style="font-size:1.1rem;font-weight:800;color:#e2e8f0;" data-testid="text-live-pf">0.00</div>
+                </div>
+                <div style="text-align:center;background:#0f172a;padding:0.5rem;border-radius:0.3rem;">
+                  <div style="font-size:0.65rem;color:#6b7280;text-transform:uppercase;">Total P&amp;L</div>
+                  <div id="live-pnl" style="font-size:1.1rem;font-weight:800;color:#e2e8f0;" data-testid="text-live-pnl">$0</div>
+                </div>
+                <div style="text-align:center;background:#0f172a;padding:0.5rem;border-radius:0.3rem;">
+                  <div style="font-size:0.65rem;color:#6b7280;text-transform:uppercase;">Expectancy</div>
+                  <div id="live-expectancy" style="font-size:1.1rem;font-weight:800;color:#e2e8f0;" data-testid="text-live-expectancy">$0</div>
+                </div>
+                <div style="text-align:center;background:#0f172a;padding:0.5rem;border-radius:0.3rem;">
+                  <div style="font-size:0.65rem;color:#6b7280;text-transform:uppercase;">Sharpe Ratio</div>
+                  <div id="live-sharpe" style="font-size:1.1rem;font-weight:800;color:#e2e8f0;" data-testid="text-live-sharpe">0.00</div>
+                </div>
+                <div style="text-align:center;background:#0f172a;padding:0.5rem;border-radius:0.3rem;">
+                  <div style="font-size:0.65rem;color:#6b7280;text-transform:uppercase;">Recovery Factor</div>
+                  <div id="live-recovery" style="font-size:1.1rem;font-weight:800;color:#e2e8f0;" data-testid="text-live-recovery">0.00</div>
+                </div>
+              </div>
+              <div id="plan-weekly-progress" style="margin-top:0.6rem;" data-testid="plan-weekly-progress"></div>
+              <div id="plan-streak" style="margin-top:0.4rem;font-size:0.72rem;color:#94a3b8;" data-testid="text-plan-streak"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#1e293b;border-radius:0.6rem;padding:1rem;border:1px solid #334155;margin-top:1rem;">
+          <h3 style="font-size:0.88rem;font-weight:700;color:#f97316;margin:0 0 0.5rem 0;display:flex;align-items:center;gap:0.4rem;">
+            <span style="font-size:1rem;">&#128293;</span> Trading Rules (Jared Wesley / Trading With An Edge)
+          </h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
+            <div style="background:#0f172a;padding:0.5rem 0.7rem;border-radius:0.3rem;font-size:0.74rem;color:#cbd5e1;">
+              <b style="color:#facc15;">1.</b> Only trade A+ setups (confluence &ge; 8)
+            </div>
+            <div style="background:#0f172a;padding:0.5rem 0.7rem;border-radius:0.3rem;font-size:0.74rem;color:#cbd5e1;">
+              <b style="color:#facc15;">2.</b> Risk max 1% per trade ($100 on $50K)
+            </div>
+            <div style="background:#0f172a;padding:0.5rem 0.7rem;border-radius:0.3rem;font-size:0.74rem;color:#cbd5e1;">
+              <b style="color:#facc15;">3.</b> Minimum 2:1 reward-to-risk ratio
+            </div>
+            <div style="background:#0f172a;padding:0.5rem 0.7rem;border-radius:0.3rem;font-size:0.74rem;color:#cbd5e1;">
+              <b style="color:#facc15;">4.</b> Stop trading after daily loss limit hit
+            </div>
+            <div style="background:#0f172a;padding:0.5rem 0.7rem;border-radius:0.3rem;font-size:0.74rem;color:#cbd5e1;">
+              <b style="color:#facc15;">5.</b> Trade with the trend (HTF alignment)
+            </div>
+            <div style="background:#0f172a;padding:0.5rem 0.7rem;border-radius:0.3rem;font-size:0.74rem;color:#cbd5e1;">
+              <b style="color:#facc15;">6.</b> No revenge trading &mdash; stick to the plan
+            </div>
+            <div style="background:#0f172a;padding:0.5rem 0.7rem;border-radius:0.3rem;font-size:0.74rem;color:#cbd5e1;">
+              <b style="color:#facc15;">7.</b> Journal every trade with emotions noted
+            </div>
+            <div style="background:#0f172a;padding:0.5rem 0.7rem;border-radius:0.3rem;font-size:0.74rem;color:#cbd5e1;">
+              <b style="color:#facc15;">8.</b> RTH only (9:30 AM &ndash; 4:00 PM ET)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: Edge Optimizer -->
+    <div id="panel-optimizer" class="tab-panel">
+      <div class="trader-card" style="border-top:3px solid #22c55e;">
+        <h2 style="display:flex;align-items:center;gap:0.5rem;">
+          <span style="font-size:1.3rem;">&#9889;</span> Edge Optimizer &mdash; Find the Highest Probability Setups
+        </h2>
+        <p class="card-sub">Scans every symbol &times; pattern &times; timeframe &times; R:R combination to find your statistically best trades. Results auto-save to Scan Archive.</p>
+
+        <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:end;margin-top:1rem;">
+          <div class="bt-field">
+            <label for="opt-months" style="color:#94a3b8;font-size:0.72rem;">Lookback</label>
+            <select id="opt-months" data-testid="select-opt-months" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.3rem;border-radius:0.3rem;font-size:0.75rem;">
+              <option value="3">3 months</option>
+              <option value="6" selected>6 months</option>
+              <option value="12">12 months</option>
+            </select>
+          </div>
+          <div class="bt-field">
+            <label for="opt-minconf" style="color:#94a3b8;font-size:0.72rem;">Min Confluence</label>
+            <select id="opt-minconf" data-testid="select-opt-minconf" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.3rem;border-radius:0.3rem;font-size:0.75rem;">
+              <option value="0" selected>Any</option>
+              <option value="4">4+ pt</option>
+              <option value="6">6+ pt</option>
+              <option value="8">8+ pt</option>
+            </select>
+          </div>
+          <div style="margin-bottom:0.15rem;">
+            <label style="font-size:0.72rem;font-weight:600;color:#94a3b8;">Timeframes:</label>
+            <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.15rem;">
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-tf" value="1min" /><span class="check-dot"></span><span>1m</span></label>
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-tf" value="2min" /><span class="check-dot"></span><span>2m</span></label>
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-tf" value="3min" /><span class="check-dot"></span><span>3m</span></label>
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-tf" value="5min" checked /><span class="check-dot"></span><span>5m</span></label>
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-tf" value="15min" checked /><span class="check-dot"></span><span>15m</span></label>
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-tf" value="1hour" /><span class="check-dot"></span><span>1h</span></label>
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-tf" value="daily" /><span class="check-dot"></span><span>Daily</span></label>
+            </div>
+          </div>
+          <div style="margin-bottom:0.15rem;">
+            <label style="font-size:0.72rem;font-weight:600;color:#94a3b8;">R:R Ratios:</label>
+            <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.15rem;">
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-rr" value="1.5" checked /><span class="check-dot"></span><span>1.5</span></label>
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-rr" value="2" checked /><span class="check-dot"></span><span>2.0</span></label>
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-rr" value="2.5" checked /><span class="check-dot"></span><span>2.5</span></label>
+              <label class="check-label" style="font-size:0.68rem;"><input type="checkbox" name="opt-rr" value="3" checked /><span class="check-dot"></span><span>3.0</span></label>
+            </div>
+          </div>
+          <button onclick="runEdgeOptimizer()" id="opt-run-btn" style="padding:0.6rem 1.5rem;background:linear-gradient(135deg,#059669,#22c55e);color:#fff;border:none;border-radius:0.5rem;font-weight:800;font-size:0.85rem;cursor:pointer;" data-testid="button-run-optimizer">
+            &#9889; Run Full Optimization Scan
+          </button>
+        </div>
+
+        <div id="opt-progress" style="margin-top:0.8rem;display:none;" data-testid="opt-progress">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
+            <span style="font-size:0.78rem;font-weight:600;color:#94a3b8;" id="opt-progress-label">Starting...</span>
+            <span style="font-size:0.72rem;color:#6b7280;" id="opt-progress-pct">0%</span>
+          </div>
+          <div style="background:#1e293b;border-radius:0.3rem;overflow:hidden;height:10px;">
+            <div id="opt-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#059669,#22c55e);border-radius:0.3rem;transition:width 0.3s;"></div>
+          </div>
+          <div style="font-size:0.68rem;color:#475569;margin-top:0.2rem;" id="opt-progress-detail"></div>
+        </div>
+
+        <div id="opt-results" style="margin-top:1rem;" data-testid="opt-results"></div>
+      </div>
+    </div>
+
   <div id="toast" class="toast"></div>
 
   <script>
@@ -1612,6 +1992,12 @@
     function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
 
     function esc(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
+    async function safeJson(resp) {
+      const text = await resp.text();
+      try { return JSON.parse(text); }
+      catch { throw new Error(text.slice(0, 80)); }
+    }
 
     /* ========== Skills Tab ========== */
     const form = document.getElementById('skill-form');
@@ -1670,7 +2056,7 @@
 
     async function checkTradingStatus() {
       try {
-        const d = await (await fetch('/api/trader/status')).json();
+        const d = await safeJson(await fetch('/api/trader/status'));
         const badge = document.getElementById('trader-status-badge');
         const text = document.getElementById('trader-status-text');
         if (d.forceActive) {
@@ -1700,7 +2086,7 @@
         }
 
         try {
-          const safety = await (await fetch('/api/trader/safety')).json();
+          const safety = await safeJson(await fetch('/api/trader/safety'));
           const rthBadge = document.getElementById('rth-status');
           const rthText = document.getElementById('rth-status-text');
           if (safety.rthActive) {
@@ -1713,7 +2099,7 @@
         } catch {}
 
         try {
-          const apex = await (await fetch('/api/trader/apex-eval')).json();
+          const apex = await safeJson(await fetch('/api/trader/apex-eval'));
           document.getElementById('apex-pnl').textContent = '$' + (apex.currentPnl || 0).toFixed(2);
           document.getElementById('apex-pnl').style.color = (apex.currentPnl || 0) >= 0 ? '#34d399' : '#ef4444';
           document.getElementById('apex-hwm').textContent = '$' + (apex.highWaterMark || 50000).toLocaleString();
@@ -1742,9 +2128,13 @@
       const riskDollars = parseFloat(document.getElementById('riskDollars').value) || 100;
       const rewardRatio = parseFloat(document.getElementById('rewardRatio').value) || 2;
       const maxOpenTrades = parseInt(document.getElementById('maxOpenTrades').value) || 3;
+      const dailyLossLimit = parseFloat(document.getElementById('dailyLossLimit').value) || 1500;
       const account = document.getElementById('tradeAccount').value;
+      const tradeAll = document.getElementById('tradeAllAccounts').checked;
+      const accounts = tradeAll ? [...document.getElementById('tradeAccount').options].map(o => o.value) : null;
       const customCondition = document.getElementById('customCondition').value;
       const forceTrading = document.getElementById('forceTrading').checked;
+      const fundingMode = document.getElementById('fundingMode').checked;
 
       if (!markets.length) { showToast('Select at least one market'); return; }
       if (!timeframes.length) { showToast('Select at least one timeframe'); return; }
@@ -1754,7 +2144,7 @@
       document.getElementById('btn-stop-trader').disabled = false;
 
       try {
-        const d = await (await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskDollars,rewardRatio,maxOpenTrades,account,patterns,customCondition,forceTrading}) })).json();
+        const d = await safeJson(await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskDollars,rewardRatio,maxOpenTrades,dailyLossLimit,account,accounts,patterns,customCondition,forceTrading,fundingMode}) }));
         if (d.success) {
           traderSessionId = d.sessionId;
           lastLogId = 0;
@@ -1782,6 +2172,125 @@
       if (traderPollInterval) clearInterval(traderPollInterval);
       traderPollInterval = null;
       pollTraderLogs();
+    }
+
+    const FUNDING_WHITELIST = [
+      { symbol: "CL", pattern: "wedge", patternName: "Wedge Breakout", winRate: 80.0, pf: 30.56, tf: "5min", minConf: 7 },
+      { symbol: "YM", pattern: "headshoulders", patternName: "Head & Shoulders", winRate: 66.7, pf: 10.47, tf: "5min", minConf: 5 },
+      { symbol: "MYM", pattern: "headshoulders", patternName: "Head & Shoulders", winRate: 66.7, pf: 10.47, tf: "5min", minConf: 5 },
+      { symbol: "CL", pattern: "doubletop", patternName: "Double Top", winRate: 66.7, pf: 6.43, tf: "5min", minConf: 7 },
+      { symbol: "MCL", pattern: "doubletop", patternName: "Double Top", winRate: 66.7, pf: 6.43, tf: "5min", minConf: 7 },
+      { symbol: "ZS", pattern: "4bar", patternName: "4 Bar Play", winRate: 66.7, pf: 2.33, tf: "1hour", minConf: 7 },
+      { symbol: "MBT", pattern: "cuphandle", patternName: "Cup & Handle", winRate: 66.7, pf: 7.56, tf: "5min", minConf: 5 },
+      { symbol: "YM", pattern: "doubletop", patternName: "Double Top", winRate: 58.3, pf: 2.75, tf: "5min", minConf: 6 },
+      { symbol: "MYM", pattern: "doubletop", patternName: "Double Top", winRate: 58.3, pf: 2.75, tf: "5min", minConf: 6 },
+      { symbol: "YM", pattern: "wedge", patternName: "Wedge Breakout", winRate: 57.1, pf: 8.92, tf: "5min", minConf: 6 },
+      { symbol: "MYM", pattern: "wedge", patternName: "Wedge Breakout", winRate: 57.1, pf: 8.92, tf: "5min", minConf: 6 },
+      { symbol: "ZS", pattern: "invheadshoulders", patternName: "Inverse H&S", winRate: 50.0, pf: 2.93, tf: "1hour", minConf: 5 },
+      { symbol: "ZS", pattern: "doublebottom", patternName: "Double Bottom", winRate: 50.0, pf: 20.0, tf: "1hour", minConf: 6 },
+      { symbol: "YM", pattern: "doublebottom", patternName: "Double Bottom", winRate: 50.0, pf: 2.88, tf: "1hour", minConf: 6 },
+      { symbol: "MYM", pattern: "doublebottom", patternName: "Double Bottom", winRate: 50.0, pf: 2.88, tf: "1hour", minConf: 6 },
+      { symbol: "YM", pattern: "invheadshoulders", patternName: "Inverse H&S", winRate: 50.0, pf: 2.66, tf: "1hour", minConf: 6 },
+      { symbol: "MYM", pattern: "invheadshoulders", patternName: "Inverse H&S", winRate: 50.0, pf: 2.66, tf: "1hour", minConf: 6 },
+      { symbol: "NQ", pattern: "breakout", patternName: "Pivot Breakout", winRate: 50.0, pf: 3.66, tf: "1hour", minConf: 6 },
+      { symbol: "MNQ", pattern: "breakout", patternName: "Pivot Breakout", winRate: 50.0, pf: 3.66, tf: "1hour", minConf: 6 },
+      { symbol: "ZC", pattern: "4bar", patternName: "4 Bar Play", winRate: 50.0, pf: 3.85, tf: "1hour", minConf: 6 },
+      { symbol: "ZS", pattern: "doublebottom", patternName: "Double Bottom", winRate: 50.0, pf: 2.40, tf: "15min", minConf: 5 },
+      { symbol: "ES", pattern: "doubletop", patternName: "Double Top", winRate: 50.0, pf: 1.22, tf: "1hour", minConf: 5 },
+      { symbol: "MES", pattern: "doubletop", patternName: "Double Top", winRate: 50.0, pf: 1.22, tf: "1hour", minConf: 5 },
+      { symbol: "RTY", pattern: "doubletop", patternName: "Double Top", winRate: 50.0, pf: 2.27, tf: "1hour", minConf: 5 },
+      { symbol: "M2K", pattern: "doubletop", patternName: "Double Top", winRate: 50.0, pf: 2.27, tf: "1hour", minConf: 5 },
+      { symbol: "MET", pattern: "headshoulders", patternName: "Head & Shoulders", winRate: 50.0, pf: 2.60, tf: "1hour", minConf: 5 },
+      { symbol: "MET", pattern: "doublebottom", patternName: "Double Bottom", winRate: 50.0, pf: 1.89, tf: "5min", minConf: 5 },
+      { symbol: "ZS", pattern: "wedge", patternName: "Wedge Breakout", winRate: 50.0, pf: 2.30, tf: "5min", minConf: 7 },
+      { symbol: "MET", pattern: "beartrap", patternName: "Bear Trap Reversal", winRate: 50.0, pf: 4.69, tf: "5min", minConf: 8 },
+      { symbol: "NQ", pattern: "headshoulders", patternName: "Head & Shoulders", winRate: 45.5, pf: 2.82, tf: "5min", minConf: 6 },
+      { symbol: "MNQ", pattern: "headshoulders", patternName: "Head & Shoulders", winRate: 45.5, pf: 2.82, tf: "5min", minConf: 6 },
+      { symbol: "ZS", pattern: "doublebottom", patternName: "Double Bottom", winRate: 45.5, pf: 2.13, tf: "5min", minConf: 5 },
+      { symbol: "ZS", pattern: "invheadshoulders", patternName: "Inverse H&S", winRate: 47.6, pf: 1.91, tf: "5min", minConf: 5 },
+      { symbol: "ZC", pattern: "invheadshoulders", patternName: "Inverse H&S", winRate: 45.2, pf: 4.10, tf: "15min", minConf: 5 },
+      { symbol: "ZC", pattern: "buysetup", patternName: "Buy Setup", winRate: 44.4, pf: 2.12, tf: "5min", minConf: 7 },
+    ];
+
+    function toggleFundingMode(enabled) {
+      const infoDiv = document.getElementById('funding-mode-info');
+      const section = document.getElementById('funding-mode-section');
+      infoDiv.style.display = enabled ? 'block' : 'none';
+      section.style.borderColor = enabled ? '#10b981' : '#10b98133';
+
+      if (enabled) {
+        document.getElementById('rewardRatio').value = '2';
+        document.getElementById('rewardRatio').disabled = true;
+        document.getElementById('maxOpenTrades').value = '2';
+        document.getElementById('maxOpenTrades').disabled = true;
+
+        const ntToPolygon = { 'MBT': 'BTC', 'MET': 'ETH' };
+        const fundingSymbols = [...new Set(FUNDING_WHITELIST.map(w => ntToPolygon[w.symbol] || w.symbol))];
+        document.querySelectorAll('input[name="market"]').forEach(cb => {
+          cb.checked = fundingSymbols.includes(cb.value);
+        });
+
+        const fundingPatterns = [...new Set(FUNDING_WHITELIST.map(w => w.pattern))];
+        const patternMap = {
+          'wedge': ['wedge_long','wedge_short'],
+          'doubletop': ['doubletop'],
+          'doublebottom': ['doublebottom'],
+          'headshoulders': ['headshoulders'],
+          'invheadshoulders': ['invheadshoulders'],
+          'buysetup': ['buysetup'],
+          'sellsetup': ['sellsetup'],
+          'breakout': ['breakout_long','breakout_short'],
+          'cuphandle': ['cuphandle_long','cuphandle_short'],
+          '4bar': ['4bar_long','4bar_short'],
+          'beartrap': ['beartrap'],
+        };
+        const enablePatterns = new Set();
+        fundingPatterns.forEach(p => (patternMap[p]||[]).forEach(v => enablePatterns.add(v)));
+        document.querySelectorAll('input[name="pattern"]').forEach(cb => {
+          cb.checked = enablePatterns.has(cb.value);
+        });
+
+        const fundingTFs = [...new Set(FUNDING_WHITELIST.map(w => w.tf))];
+        const tfMap = { '2min':'2min', '5min':'5min', '15min':'15min', '1hour':'1hour', '4hour':'4hour', 'daily':'daily' };
+        document.querySelectorAll('input[name="timeframe"]').forEach(cb => {
+          cb.checked = fundingTFs.includes(cb.value);
+        });
+
+        let html = '<table style="width:100%;font-size:0.75rem;color:#d1d5db;">';
+        html += '<tr style="color:#10b981;font-weight:600;"><td>Symbol</td><td>Pattern</td><td>TF</td><td>WR%</td><td>PF</td><td>MinConf</td></tr>';
+        FUNDING_WHITELIST.forEach(w => {
+          const wrColor = w.winRate >= 60 ? '#22c55e' : w.winRate >= 50 ? '#10b981' : w.winRate >= 45 ? '#eab308' : '#f97316';
+          html += '<tr><td style="font-weight:600;">' + w.symbol + '</td><td>' + w.patternName + '</td><td>' + w.tf + '</td><td style="color:' + wrColor + ';font-weight:700;">' + w.winRate + '%</td><td>' + w.pf.toFixed(2) + '</td><td>' + (w.minConf || 6) + '</td></tr>';
+        });
+        html += '</table>';
+        document.getElementById('funding-whitelist-display').innerHTML = html;
+
+        showToast('Funding Mode ON — only 45%+ WR setups will trade');
+      } else {
+        document.getElementById('rewardRatio').disabled = false;
+        document.getElementById('maxOpenTrades').disabled = false;
+        showToast('Funding Mode OFF — all setups enabled');
+      }
+    }
+
+    async function closeAllPositions() {
+      if (!confirm('Close ALL open positions? This is irreversible.')) return;
+      const account = document.getElementById('tradeAccount').value;
+      try {
+        const res = await fetch('/api/trader/close-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Close All: ' + data.message);
+        } else {
+          showToast('Close All failed: ' + (data.error || data.message));
+        }
+      } catch (err) {
+        showToast('Error closing positions: ' + err.message);
+      }
     }
 
     async function sendTestSignal() {
@@ -1845,6 +2354,23 @@
         }
       };
       setTimeout(poll, interval);
+    }
+
+    function toggleTradeAllAccounts() {
+      const cb = document.getElementById('tradeAllAccounts');
+      const sel = document.getElementById('tradeAccount');
+      const badge = document.getElementById('account-type-badge');
+      if (cb.checked) {
+        sel.disabled = true;
+        sel.style.opacity = '0.5';
+        badge.textContent = 'ALL';
+        badge.style.background = '#f59e0b';
+        document.getElementById('ct-account-display').textContent = 'ALL ACCOUNTS';
+      } else {
+        sel.disabled = false;
+        sel.style.opacity = '1';
+        syncAccountFields();
+      }
     }
 
     function syncAccountFields() {
@@ -1920,6 +2446,8 @@
       if (action === 'TRAIL UPDATED') return 'trail-update';
       if (action.startsWith('SIGNAL')) return 'signal';
       if (action === 'SCANNING') return 'scanning';
+      if (action === 'FUNDING BLOCKED') return 'funding-blocked';
+      if (action === 'FUNDING MODE') return 'funding-mode';
       if (action === 'TRADOVATE ORDER') return 'tradovate';
       if (action === 'TRADOVATE ERROR') return 'tradovate-err';
       return 'system';
@@ -2003,7 +2531,7 @@
       if (!traderSessionId) return;
       try {
         const url = `/api/trader/logs/${traderSessionId}${lastLogId ? '?after=' + lastLogId : ''}`;
-        const d = await (await fetch(url)).json();
+        const d = await safeJson(await fetch(url));
 
         if (d.status) {
           document.getElementById('stat-trades').textContent = d.status.tradeCount;
@@ -2048,7 +2576,7 @@
 
     async function loadJournalData() {
       try {
-        const d = await (await fetch('/api/journal')).json();
+        const d = await safeJson(await fetch('/api/journal'));
         journalData = d.entries || [];
         updateJournalStats(d.stats);
         populateJournalFilters();
@@ -2277,13 +2805,15 @@
     /* --- Settings --- */
     async function loadTraderSettings() {
       try {
-        const s = await (await fetch('/api/settings')).json();
+        const s = await safeJson(await fetch('/api/settings'));
         document.getElementById('set-risk').value = s.riskDollars || 100;
         document.getElementById('set-rr').value = s.rewardRatio || 2;
         document.getElementById('set-max-trades').value = s.maxOpenTrades || 3;
+        document.getElementById('set-daily-loss-limit').value = s.dailyLossLimit || 1500;
         document.getElementById('riskDollars').value = s.riskDollars || 100;
         document.getElementById('rewardRatio').value = s.rewardRatio || 2;
         document.getElementById('maxOpenTrades').value = s.maxOpenTrades || 3;
+        document.getElementById('dailyLossLimit').value = s.dailyLossLimit || 1500;
         if (s.enabledPatterns) {
           document.querySelectorAll('input[name="set-pattern"]').forEach(cb => {
             cb.checked = s.enabledPatterns.includes(cb.value);
@@ -2307,6 +2837,7 @@
       const riskDollars = parseFloat(document.getElementById('set-risk').value) || 100;
       const rewardRatio = parseFloat(document.getElementById('set-rr').value) || 2;
       const maxOpenTrades = parseInt(document.getElementById('set-max-trades').value) || 3;
+      const dailyLossLimit = parseFloat(document.getElementById('set-daily-loss-limit').value) || 1500;
       const enabledPatterns = [...document.querySelectorAll('input[name="set-pattern"]:checked')].map(c => c.value);
       const enabledTimeframes = [...document.querySelectorAll('input[name="set-tf"]:checked')].map(c => c.value);
       if (!enabledPatterns.length) { showToast('Select at least one pattern'); return; }
@@ -2314,11 +2845,12 @@
       try {
         await fetch('/api/settings', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ riskDollars, rewardRatio, maxOpenTrades, enabledPatterns, enabledTimeframes })
+          body: JSON.stringify({ riskDollars, rewardRatio, maxOpenTrades, dailyLossLimit, enabledPatterns, enabledTimeframes })
         });
         document.getElementById('riskDollars').value = riskDollars;
         document.getElementById('rewardRatio').value = rewardRatio;
         document.getElementById('maxOpenTrades').value = maxOpenTrades;
+        document.getElementById('dailyLossLimit').value = dailyLossLimit;
         document.querySelectorAll('input[name="pattern"]').forEach(cb => {
           cb.checked = enabledPatterns.includes(cb.value);
         });
@@ -2346,12 +2878,68 @@
     }
 
     /* ========== Edge Builder ========== */
+    let bulkPollInterval = null;
+    async function downloadBulkCache() {
+      const btn = document.getElementById('btn-bulk-cache');
+      const statusEl = document.getElementById('bulk-cache-status');
+      const progressDiv = document.getElementById('bulk-cache-progress');
+      btn.disabled = true;
+      btn.textContent = 'Downloading...';
+      statusEl.textContent = 'Starting bulk download...';
+      progressDiv.style.display = 'block';
+
+      try {
+        await fetch('/api/backtest/download-bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        bulkPollInterval = setInterval(pollBulkStatus, 2000);
+      } catch (e) {
+        statusEl.textContent = 'Error: ' + e.message;
+        btn.disabled = false;
+        btn.textContent = '\u{1F4E5} Download Historical Cache';
+      }
+    }
+
+    async function pollBulkStatus() {
+      try {
+        const d = await safeJson(await fetch('/api/backtest/cache-status'));
+        const bar = document.getElementById('bulk-cache-bar');
+        const detail = document.getElementById('bulk-cache-detail');
+        const statusEl = document.getElementById('bulk-cache-status');
+        const btn = document.getElementById('btn-bulk-cache');
+
+        if (d.total > 0) {
+          const pct = Math.round((d.progress / d.total) * 100);
+          bar.style.width = pct + '%';
+          detail.textContent = d.current ? ('Caching ' + d.current + ' (' + d.progress + '/' + d.total + ')') : (d.progress + '/' + d.total);
+        }
+
+        if (d.done || (!d.running && d.progress > 0)) {
+          bar.style.width = '100%';
+          statusEl.style.color = '#22c55e';
+          statusEl.textContent = '\u2705 Cache ready! ' + d.completed.length + ' datasets cached. All scans now run from disk.';
+          btn.textContent = '\u2705 Cache Complete';
+          btn.style.background = '#064e3b';
+          if (d.errors.length > 0) {
+            detail.textContent = d.errors.length + ' errors: ' + d.errors.slice(0, 3).join(', ');
+          } else {
+            detail.textContent = d.cachedFiles + ' total cached files on disk';
+          }
+          if (bulkPollInterval) { clearInterval(bulkPollInterval); bulkPollInterval = null; }
+        } else if (!d.running && d.progress === 0 && d.cachedFiles > 0) {
+          statusEl.style.color = '#22c55e';
+          statusEl.textContent = '\u2705 ' + d.cachedFiles + ' datasets already cached on disk';
+          btn.disabled = false;
+          btn.textContent = '\u{1F504} Re-download Cache';
+          if (bulkPollInterval) { clearInterval(bulkPollInterval); bulkPollInterval = null; }
+        }
+      } catch {}
+    }
+
     async function loadEdgeBuilder() {
       try {
         const ep = [...document.querySelectorAll('input[name="set-pattern"]:checked')].map(c => c.value).join(',');
         const et = [...document.querySelectorAll('input[name="set-tf"]:checked')].map(c => c.value).join(',');
         const qs = ep || et ? `?patterns=${encodeURIComponent(ep)}&timeframes=${encodeURIComponent(et)}` : '';
-        const d = await (await fetch('/api/journal/analytics' + qs)).json();
+        const d = await safeJson(await fetch('/api/journal/analytics' + qs));
         renderEdgeOverall(d.overall);
         renderEdgeGroupTable('edge-pattern-body', d.byPattern);
         renderEdgeGroupTable('edge-symbol-body', d.bySymbol);
@@ -2448,7 +3036,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence, timeframe })
         });
-        const d = await resp.json();
+        const d = await safeJson(resp);
 
         if (!d.success) {
           resultsDiv.innerHTML = `<div class="bt-status" style="color:#ef4444">Backtest failed: ${esc(d.error || 'Unknown error')}</div>`;
@@ -2518,6 +3106,155 @@
       } finally {
         btn.disabled = false;
         btn.textContent = 'Run Backtest';
+      }
+    }
+
+    async function runApexSim() {
+      const btn = document.getElementById('apex-sim-btn');
+      const resultsDiv = document.getElementById('apex-sim-results');
+
+      const symbol = document.getElementById('bt-symbol').value;
+      const pattern = document.getElementById('bt-pattern').value;
+      const timeframe = document.getElementById('bt-timeframe').value;
+      const from = document.getElementById('bt-from').value;
+      const to = document.getElementById('bt-to').value;
+      const rrRatio = parseFloat(document.getElementById('bt-rr').value);
+      const maxHold = parseInt(document.getElementById('bt-hold').value);
+      const minConfluence = parseInt(document.getElementById('bt-minconf').value) || 0;
+
+      const mode = document.getElementById('apex-sim-mode').value;
+      const accountSize = parseInt(document.getElementById('apex-sim-acct').value);
+      const profitTarget = parseInt(document.getElementById('apex-sim-target').value);
+      const trailingDrawdownMax = parseInt(document.getElementById('apex-sim-dd').value);
+      const dailyLossLimit = parseInt(document.getElementById('apex-sim-daily').value);
+      const minTradeDays = parseInt(document.getElementById('apex-sim-days').value) || 7;
+
+      btn.disabled = true;
+      btn.textContent = 'Simulating...';
+      resultsDiv.innerHTML = '<div class="bt-status">Running Apex ' + (mode === 'funded' ? 'Funded' : 'Evaluation') + ' simulation on ' + symbol + ' / ' + pattern + ' (' + timeframe + ')... This may take a moment.</div>';
+
+      try {
+        const resp = await fetch('/api/backtest/apex-sim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol, pattern, from, to, rrRatio, maxHold, minConfluence, timeframe,
+            accountSize, profitTarget, trailingDrawdownMax, dailyLossLimit, minTradeDays, riskPerTrade: 100, mode })
+        });
+        const d = await safeJson(resp);
+
+        if (!d.success) {
+          resultsDiv.innerHTML = `<div class="bt-status" style="color:#ef4444">Apex Sim failed: ${esc(d.error || 'Unknown error')}</div>`;
+          return;
+        }
+
+        if (!d.apexSim) {
+          resultsDiv.innerHTML = `<div class="bt-status">${esc(d.message || 'No trades found to simulate')}</div>`;
+          return;
+        }
+
+        const sim = d.apexSim;
+        const passIcon = sim.passed ? '&#9989;' : (sim.busted ? '&#10060;' : '&#9888;&#65039;');
+        const passLabel = sim.passed ? 'PASSED' : (sim.busted ? 'BUSTED' : 'DID NOT PASS');
+        const passColor = sim.passed ? '#22c55e' : '#ef4444';
+        const passBg = sim.passed ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
+
+        let html = `<div style="padding:0.8rem;background:${passBg};border:2px solid ${passColor};border-radius:0.6rem;margin-bottom:0.5rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+            <span style="font-size:1.5rem;">${passIcon}</span>
+            <span style="font-size:1.1rem;font-weight:800;color:${passColor};">${sim.mode.toUpperCase()} ${passLabel}</span>
+            <span style="font-size:0.72rem;color:#94a3b8;margin-left:auto;">
+              ${symbol} / ${pattern} / ${timeframe} | Acct: $${accountSize.toLocaleString()} | Target: $${profitTarget.toLocaleString()}
+            </span>
+          </div>`;
+
+        if (sim.passed) {
+          html += `<div style="color:#22c55e;font-size:0.82rem;font-weight:600;margin-bottom:0.3rem;">
+            Target $${profitTarget.toLocaleString()} reached on ${sim.passDate} in ${sim.totalTradeDays} trade days
+          </div>`;
+        }
+        if (sim.busted) {
+          html += `<div style="color:#ef4444;font-size:0.82rem;font-weight:600;margin-bottom:0.3rem;">
+            ${esc(sim.bustReason || 'Account busted')} on ${sim.bustDate || 'unknown date'}
+          </div>`;
+        }
+
+        html += `<div class="bt-metrics">
+          <div class="bt-metric"><div class="bt-label">Final Balance</div><div class="bt-val ${sim.finalPnl >= 0 ? 'pos' : 'neg'}">$${sim.finalBalance.toLocaleString()}</div></div>
+          <div class="bt-metric"><div class="bt-label">Total P&amp;L</div><div class="bt-val ${sim.finalPnl >= 0 ? 'pos' : 'neg'}">${sim.finalPnl >= 0 ? '+' : ''}$${sim.finalPnl.toLocaleString()}</div></div>
+          <div class="bt-metric"><div class="bt-label">Trade Days</div><div class="bt-val">${sim.totalTradeDays} / ${minTradeDays} min</div></div>
+          <div class="bt-metric"><div class="bt-label">Trades Taken</div><div class="bt-val">${sim.totalTradesTaken}</div></div>
+          <div class="bt-metric"><div class="bt-label">Trades Skipped</div><div class="bt-val">${sim.totalTradesSkipped}</div></div>
+          <div class="bt-metric"><div class="bt-label">High Water Mark</div><div class="bt-val">$${sim.highWaterMark.toLocaleString()}</div></div>
+          <div class="bt-metric"><div class="bt-label">Max DD from HWM</div><div class="bt-val neg">-$${sim.maxDrawdownFromHWM.toLocaleString()}</div></div>
+          <div class="bt-metric"><div class="bt-label">Trailing DD Limit</div><div class="bt-val">-$${trailingDrawdownMax.toLocaleString()}</div></div>
+          <div class="bt-metric"><div class="bt-label">Worst Day</div><div class="bt-val neg">$${sim.maxDailyLoss.toLocaleString()}</div></div>
+        </div>`;
+
+        if (sim.equityCurve && sim.equityCurve.length > 0) {
+          const maxBal = Math.max(...sim.equityCurve.map(e => e.balance));
+          const minBal = Math.min(...sim.equityCurve.map(e => e.balance));
+          const range = maxBal - minBal || 1;
+          const chartH = 120;
+          const chartW = Math.min(sim.equityCurve.length * 8, 600);
+          const barW = Math.max(chartW / sim.equityCurve.length - 1, 2);
+
+          html += `<div style="margin-top:0.5rem;">
+            <div style="font-size:0.72rem;font-weight:600;color:#94a3b8;margin-bottom:0.3rem;">Equity Curve</div>
+            <div style="position:relative;height:${chartH}px;width:100%;background:#0f172a;border-radius:0.3rem;overflow-x:auto;overflow-y:hidden;padding:0.2rem;">
+              <div style="display:flex;align-items:end;height:100%;gap:1px;min-width:${chartW}px;">`;
+
+          const targetLine = accountSize + profitTarget;
+          const bustLine = accountSize - trailingDrawdownMax;
+
+          for (const pt of sim.equityCurve) {
+            const h = Math.max(((pt.balance - minBal) / range) * (chartH - 10), 2);
+            const clr = pt.balance >= accountSize ? '#22c55e' : '#ef4444';
+            html += `<div title="${pt.date}: $${pt.balance.toLocaleString()}" style="width:${barW}px;height:${h}px;background:${clr};border-radius:1px;flex-shrink:0;"></div>`;
+          }
+
+          html += `</div>
+              <div style="position:absolute;top:0;left:0;right:0;font-size:0.6rem;color:#6b7280;display:flex;justify-content:space-between;padding:0 0.3rem;">
+                <span>$${minBal.toLocaleString()}</span>
+                <span style="color:#22c55e;">Target: $${targetLine.toLocaleString()}</span>
+                <span>$${maxBal.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>`;
+        }
+
+        if (sim.days && sim.days.length > 0) {
+          html += `<div style="margin-top:0.5rem;font-size:0.72rem;color:#6b7280;">Day-by-Day Breakdown (${sim.days.length} trading days):</div>`;
+          html += `<div class="bt-trades-wrap" style="max-height:200px;"><table class="bt-trades-table">
+            <thead><tr><th>Date</th><th>Trades</th><th>Day P&amp;L</th><th>Cum P&amp;L</th><th>Balance</th><th>HWM</th><th>DD from HWM</th><th>Flags</th></tr></thead>
+            <tbody>`;
+          for (const day of sim.days) {
+            const cls = day.dayPnl >= 0 ? 'bt-win' : 'bt-loss';
+            const cumCls = day.cumPnl >= 0 ? 'bt-win' : 'bt-loss';
+            let flags = '';
+            if (day.dailyLimitHit) flags += '<span style="color:#f59e0b;">&#9888; Daily Limit</span> ';
+            if (day.drawdownBusted) flags += '<span style="color:#ef4444;">&#10060; DD Busted</span> ';
+            if (day.targetReached) flags += '<span style="color:#22c55e;">&#9989; Target!</span> ';
+            html += `<tr>
+              <td>${esc(day.date)}</td>
+              <td>${day.trades}</td>
+              <td class="${cls}">${day.dayPnl >= 0 ? '+' : ''}$${day.dayPnl.toFixed(2)}</td>
+              <td class="${cumCls}">${day.cumPnl >= 0 ? '+' : ''}$${day.cumPnl.toFixed(2)}</td>
+              <td>$${day.balance.toLocaleString()}</td>
+              <td>$${day.highWaterMark.toLocaleString()}</td>
+              <td class="${day.drawdownFromHWM > 0 ? 'bt-loss' : ''}">${day.drawdownFromHWM > 0 ? '-' : ''}$${day.drawdownFromHWM.toFixed(2)}</td>
+              <td>${flags || '—'}</td>
+            </tr>`;
+          }
+          html += '</tbody></table></div>';
+        }
+
+        html += '</div>';
+        resultsDiv.innerHTML = html;
+      } catch (err) {
+        resultsDiv.innerHTML = `<div class="bt-status" style="color:#ef4444">Apex Sim Error: ${esc(err.message || 'Network error')}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '&#127942; Run Apex Sim';
       }
     }
 
@@ -2610,7 +3347,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ symbols, patterns, from, to, rrRatio, maxHold, minConfluence, timeframes })
         });
-        const d = await resp.json();
+        const d = await safeJson(resp);
         if (!d.success) {
           resultsDiv.innerHTML = '<div class="bt-status" style="color:#ef4444">Multi-scan failed: ' + esc(d.error || 'Unknown') + '</div>';
           return;
@@ -2723,20 +3460,649 @@
       URL.revokeObjectURL(url);
     }
 
+    let lastFullScanData = null;
+
+    async function runFullHistoricalScan() {
+      const btn = document.getElementById('btn-run-full-scan');
+      const status = document.getElementById('full-scan-status');
+      const symbols = ["ES","MES","NQ","MNQ","YM","MYM","RTY","M2K","CL","MCL","GC","MGC","SI","HG","BTC","ETH","ZB","ZN","ZC","ZS","ZW"];
+      const patterns = ["3bar","4bar","buysetup","retest","breakout","climax","cuphandle","inversecuphandle","doubletop","doublebottom","headshoulders","invheadshoulders","wedge"];
+      const timeframes = ["2min","5min","15min","1hour"];
+      const from = "2024-01-01";
+      const to = "2025-12-31";
+      const minConfluence = 8;
+      const rrRatio = 2;
+      const maxHold = 5;
+
+      btn.disabled = true;
+      btn.textContent = 'Scanning...';
+      status.innerHTML = '<span style="color:#facc15;">Running full historical scan: ' + symbols.length + ' symbols &times; ' + patterns.length + ' patterns &times; ' + timeframes.length + ' timeframes (2min, 5min, 15min, 1hr) at minConf 8... This may take several minutes.</span>';
+
+      try {
+        const resp = await fetch('/api/backtest/multi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbols, patterns, from, to, rrRatio, maxHold, minConfluence, timeframes })
+        });
+        const d = await safeJson(resp);
+        if (!d.success) {
+          status.innerHTML = '<span style="color:#ef4444;">Scan failed: ' + esc(d.error || 'Unknown') + '</span>';
+          return;
+        }
+
+        lastFullScanData = {
+          label: 'Full Scan 2024-2025 | 2m/5m/15m/1h | minConf 8',
+          params: { symbols, patterns, timeframes, from, to, minConfluence, rrRatio, maxHold },
+          summary: d.summary,
+          patternBreakdown: d.patternBreakdown,
+          heatmap: d.heatmap,
+          multiTfAlignments: d.multiTfAlignments,
+          results: (d.results || []).map(r => ({ symbol: r.symbol, tradeCount: r.tradeCount, winRate: r.winRate, profitFactor: r.profitFactor, totalPnL: r.totalPnlDollars || r.totalPnL, wins: r.wins, losses: r.losses, expectancy: r.expectancy }))
+        };
+
+        document.getElementById('btn-save-last-scan').disabled = false;
+        status.innerHTML = '<span style="color:#34d399;">Scan complete! ' + (d.summary.totalTrades || 0) + ' trades found. Click "Save Last Scan to Archive" to persist.</span>';
+        renderScanResult(lastFullScanData, 'full-scan-live-result');
+      } catch (err) {
+        status.innerHTML = '<span style="color:#ef4444;">Error: ' + esc(err.message || 'Network error') + '</span>';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Full Historical Scan (2024\u20132025)';
+      }
+    }
+
+    async function saveLastScanToArchive() {
+      if (!lastFullScanData) return;
+      try {
+        const resp = await fetch('/api/scan-archive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scan: lastFullScanData })
+        });
+        const d = await safeJson(resp);
+        if (d.success) {
+          document.getElementById('full-scan-status').innerHTML = '<span style="color:#34d399;">Scan saved to archive!</span>';
+          loadScanArchive();
+        }
+      } catch (err) {
+        document.getElementById('full-scan-status').innerHTML = '<span style="color:#ef4444;">Save failed: ' + esc(err.message) + '</span>';
+      }
+    }
+
+    async function deleteScanFromArchive(id) {
+      if (!confirm('Delete this saved scan?')) return;
+      try {
+        await fetch('/api/scan-archive/' + id, { method: 'DELETE' });
+        loadScanArchive();
+      } catch {}
+    }
+
+    function renderScanResult(scan, containerId) {
+      let container = document.getElementById(containerId);
+      if (!container) {
+        container = document.createElement('div');
+        container.id = containerId;
+        document.getElementById('scan-archive-list').prepend(container);
+      }
+
+      const s = scan.summary || {};
+      const patNames = { '3bar': '3 Bar Play', '4bar': '4 Bar Play', 'buysetup': 'Buy Setup', 'retest': 'Retest', 'breakout': 'Breakout', 'climax': 'Climax Reversal', 'cuphandle': 'Cup & Handle', 'inversecuphandle': 'Inv Cup & Handle', 'doubletop': 'Double Top', 'doublebottom': 'Double Bottom', 'headshoulders': 'Head & Shoulders', 'invheadshoulders': 'Inverse H&S', 'wedge': 'Wedge', 'all': 'All Patterns' };
+
+      let html = '<div style="background:#1e1b2e;border:1px solid #3b3560;border-radius:10px;padding:1rem;margin-bottom:1rem;" data-testid="scan-result-' + (scan.id || 'live') + '">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.7rem;">';
+      html += '<div style="font-size:0.85rem;font-weight:700;color:#c4b5fd;">' + esc(scan.label || 'Scan Results') + '</div>';
+      if (scan.savedAt) {
+        html += '<div style="font-size:0.68rem;color:#6b7280;">' + new Date(scan.savedAt).toLocaleString() + '</div>';
+      }
+      html += '</div>';
+
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:0.4rem;margin-bottom:0.8rem;">';
+      html += '<div class="edge-metric"><div class="em-label">Trades</div><div class="em-value">' + (s.totalTrades || 0) + '</div></div>';
+      html += '<div class="edge-metric"><div class="em-label">Win Rate</div><div class="em-value ' + ((s.winRate||0) >= 50 ? 'positive' : 'negative') + '">' + (s.winRate || 0) + '%</div></div>';
+      html += '<div class="edge-metric"><div class="em-label">Profit Factor</div><div class="em-value ' + ((s.profitFactor||0) >= 1.5 ? 'positive' : (s.profitFactor||0) < 1 ? 'negative' : '') + '">' + ((s.profitFactor||0) >= 99 ? '\u221E' : (s.profitFactor || 0)) + '</div></div>';
+      html += '<div class="edge-metric"><div class="em-label">Net P&L</div><div class="em-value ' + ((s.netPnL||0) >= 0 ? 'positive' : 'negative') + '">' + ((s.netPnL||0) >= 0 ? '+' : '') + '$' + (s.netPnL || 0).toLocaleString() + '</div></div>';
+      html += '<div class="edge-metric"><div class="em-label">Min Conf</div><div class="em-value">' + (s.minConfluence || 0) + 'pt</div></div>';
+      html += '<div class="edge-metric"><div class="em-label">Period</div><div class="em-value" style="font-size:0.7rem;">' + esc(s.period || '') + '</div></div>';
+      html += '</div>';
+
+      if (scan.patternBreakdown && Object.keys(scan.patternBreakdown).length > 0) {
+        html += '<div class="edge-section-title"><span class="est">&#127919;</span> Pattern Breakdown</div>';
+        html += '<div style="overflow-x:auto;border:1px solid #3b3560;border-radius:8px;margin-bottom:0.8rem;">';
+        html += '<table class="edge-group-table" style="background:#16132a;"><thead><tr><th>Pattern</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>PF</th><th>P&L</th><th>Exp</th></tr></thead><tbody>';
+        const sorted = Object.entries(scan.patternBreakdown).sort((a, b) => b[1].pnl - a[1].pnl);
+        for (const [key, v] of sorted) {
+          const wrCls = v.winRate >= 50 ? 'wr-high' : v.winRate < 40 ? 'wr-low' : '';
+          const pnlCls = v.pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+          html += '<tr><td><b>' + esc(patNames[key] || key) + '</b></td><td>' + v.count + '</td><td>' + v.wins + '</td><td class="' + wrCls + '">' + v.winRate + '%</td><td>' + (v.profitFactor >= 99 ? '\u221E' : v.profitFactor) + '</td><td class="' + pnlCls + '">' + (v.pnl >= 0 ? '+' : '') + '$' + v.pnl.toLocaleString() + '</td><td>' + (v.expectancy >= 0 ? '+' : '') + '$' + v.expectancy.toFixed(2) + '</td></tr>';
+        }
+        html += '</tbody></table></div>';
+      }
+
+      if (scan.results && scan.results.length > 0) {
+        html += '<div class="edge-section-title"><span class="est">&#128200;</span> Symbol Breakdown</div>';
+        html += '<div style="overflow-x:auto;border:1px solid #3b3560;border-radius:8px;margin-bottom:0.8rem;">';
+        html += '<table class="edge-group-table" style="background:#16132a;"><thead><tr><th>Symbol</th><th>Trades</th><th>Win Rate</th><th>PF</th><th>P&L</th><th>Exp</th></tr></thead><tbody>';
+        const symSorted = [...scan.results].filter(r => r.tradeCount > 0).sort((a, b) => (b.totalPnL || 0) - (a.totalPnL || 0));
+        for (const r of symSorted) {
+          const wrCls = r.winRate >= 50 ? 'wr-high' : r.winRate < 40 ? 'wr-low' : '';
+          const pnlCls = (r.totalPnL || 0) >= 0 ? 'pnl-pos' : 'pnl-neg';
+          const pf = r.profitFactor || 0;
+          html += '<tr><td style="font-weight:700">' + esc(r.symbol) + '</td><td>' + r.tradeCount + '</td><td class="' + wrCls + '">' + r.winRate + '%</td><td>' + (pf >= 99 ? '\u221E' : pf) + '</td><td class="' + pnlCls + '">' + ((r.totalPnL||0) >= 0 ? '+' : '') + '$' + (r.totalPnL||0).toLocaleString() + '</td><td>' + ((r.expectancy||0) >= 0 ? '+' : '') + '$' + (r.expectancy||0).toFixed(2) + '</td></tr>';
+        }
+        html += '</tbody></table></div>';
+      }
+
+      if (scan.heatmap && scan.heatmap.length > 0) {
+        html += '<div class="edge-section-title"><span class="est">&#128293;</span> Top Combos (Symbol &times; Pattern)</div>';
+        const topCombos = [...scan.heatmap].filter(c => c.trades > 0).sort((a, b) => b.pnl - a.pnl).slice(0, 15);
+        html += '<div style="overflow-x:auto;border:1px solid #3b3560;border-radius:8px;margin-bottom:0.8rem;">';
+        html += '<table class="edge-group-table" style="background:#16132a;"><thead><tr><th>Symbol</th><th>Pattern</th><th>Trades</th><th>Win %</th><th>PF</th><th>P&L</th></tr></thead><tbody>';
+        for (const c of topCombos) {
+          const wrCls = c.winRate >= 50 ? 'wr-high' : c.winRate < 40 ? 'wr-low' : '';
+          const pnlCls = c.pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+          html += '<tr><td style="font-weight:700">' + esc(c.symbol) + '</td><td>' + esc(patNames[c.pattern] || c.pattern) + '</td><td>' + c.trades + '</td><td class="' + wrCls + '">' + c.winRate + '%</td><td>' + (c.pf >= 99 ? '\u221E' : c.pf) + '</td><td class="' + pnlCls + '">' + (c.pnl >= 0 ? '+' : '') + '$' + c.pnl.toLocaleString() + '</td></tr>';
+        }
+        html += '</tbody></table></div>';
+
+        const worstCombos = [...scan.heatmap].filter(c => c.trades > 0 && c.pnl < 0).sort((a, b) => a.pnl - b.pnl).slice(0, 10);
+        if (worstCombos.length > 0) {
+          html += '<div class="edge-section-title"><span class="est">&#9888;</span> Worst Combos (Avoid)</div>';
+          html += '<div style="overflow-x:auto;border:1px solid #3b3560;border-radius:8px;margin-bottom:0.8rem;">';
+          html += '<table class="edge-group-table" style="background:#16132a;"><thead><tr><th>Symbol</th><th>Pattern</th><th>Trades</th><th>Win %</th><th>PF</th><th>P&L</th></tr></thead><tbody>';
+          for (const c of worstCombos) {
+            html += '<tr><td style="font-weight:700">' + esc(c.symbol) + '</td><td>' + esc(patNames[c.pattern] || c.pattern) + '</td><td>' + c.trades + '</td><td class="wr-low">' + c.winRate + '%</td><td>' + (c.pf >= 99 ? '\u221E' : c.pf) + '</td><td class="pnl-neg">' + (c.pnl >= 0 ? '+' : '') + '$' + c.pnl.toLocaleString() + '</td></tr>';
+          }
+          html += '</tbody></table></div>';
+        }
+      }
+
+      if (scan.multiTfAlignments && scan.multiTfAlignments.length > 0) {
+        html += '<div class="edge-section-title"><span class="est">&#9881;</span> Multi-TF Alignments (' + scan.multiTfAlignments.length + ')</div>';
+        html += '<div style="overflow-x:auto;border:1px solid #3b3560;border-radius:8px;">';
+        html += '<table class="edge-group-table" style="background:#16132a;"><thead><tr><th>Symbol</th><th>Pattern</th><th>Date</th><th>Timeframes</th><th>Bonus</th></tr></thead><tbody>';
+        for (const a of scan.multiTfAlignments.slice(0, 20)) {
+          html += '<tr><td style="font-weight:700">' + esc(a.symbol) + '</td><td>' + esc(a.pattern) + '</td><td>' + esc(a.entryDate) + '</td><td style="color:#60a5fa">' + esc(a.timeframes.join(', ')) + '</td><td style="color:#34d399">+' + a.bonus.toFixed(1) + 'pt</td></tr>';
+        }
+        html += '</tbody></table></div>';
+      }
+
+      if (scan.id) {
+        html += '<div style="text-align:right;margin-top:0.5rem;"><button onclick="deleteScanFromArchive(\'' + scan.id + '\')" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:0.3rem 0.7rem;font-size:0.7rem;cursor:pointer;" data-testid="button-delete-scan-' + scan.id + '">Delete</button></div>';
+      }
+
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    async function loadScanArchive() {
+      try {
+        const resp = await fetch('/api/scan-archive');
+        const d = await safeJson(resp);
+        if (d.success && d.scans && d.scans.length > 0) {
+          const list = document.getElementById('scan-archive-list');
+          list.innerHTML = '';
+          for (const scan of d.scans) {
+            const div = document.createElement('div');
+            div.id = 'scan-' + scan.id;
+            list.appendChild(div);
+            renderScanResult(scan, 'scan-' + scan.id);
+          }
+        }
+      } catch {}
+    }
+
+    loadScanArchive();
+
+    let optimizerPollTimer = null;
+
+    async function runEdgeOptimizer() {
+      const btn = document.getElementById('opt-run-btn');
+      const progressDiv = document.getElementById('opt-progress');
+      const resultsDiv = document.getElementById('opt-results');
+
+      const months = parseInt(document.getElementById('opt-months').value) || 6;
+      const minConfluence = parseInt(document.getElementById('opt-minconf').value) || 0;
+      const timeframes = [...document.querySelectorAll('input[name="opt-tf"]:checked')].map(c => c.value);
+      const rrRatios = [...document.querySelectorAll('input[name="opt-rr"]:checked')].map(c => parseFloat(c.value));
+
+      if (timeframes.length === 0) { showToast('Select at least one timeframe'); return; }
+      if (rrRatios.length === 0) { showToast('Select at least one R:R ratio'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Optimizer Running...';
+      progressDiv.style.display = 'block';
+      resultsDiv.innerHTML = '';
+
+      try {
+        const resp = await fetch('/api/optimizer/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ months, timeframes, rrRatios, minConfluence })
+        });
+        const d = await safeJson(resp);
+
+        if (!d.success) {
+          progressDiv.style.display = 'none';
+          resultsDiv.innerHTML = '<div style="color:#ef4444;font-size:0.82rem;">' + esc(d.error || 'Failed to start optimizer') + '</div>';
+          btn.disabled = false;
+          btn.innerHTML = '&#9889; Run Full Optimization Scan';
+          return;
+        }
+
+        document.getElementById('opt-progress-detail').textContent = d.message || '';
+        optimizerPollTimer = setInterval(pollOptimizerStatus, 3000);
+      } catch (err) {
+        progressDiv.style.display = 'none';
+        resultsDiv.innerHTML = '<div style="color:#ef4444;">Network error: ' + esc(err.message) + '</div>';
+        btn.disabled = false;
+        btn.innerHTML = '&#9889; Run Full Optimization Scan';
+      }
+    }
+
+    async function pollOptimizerStatus() {
+      try {
+        const resp = await fetch('/api/optimizer/status');
+        const d = await safeJson(resp);
+
+        document.getElementById('opt-progress-label').textContent = d.label || 'Processing...';
+        document.getElementById('opt-progress-pct').textContent = d.pct + '%';
+        document.getElementById('opt-progress-bar').style.width = d.pct + '%';
+        document.getElementById('opt-progress-detail').textContent = d.current + ' / ' + d.total + ' combos processed | ' + d.totalResults + ' with trades';
+
+        if (d.status === 'complete') {
+          clearInterval(optimizerPollTimer);
+          optimizerPollTimer = null;
+          document.getElementById('opt-run-btn').disabled = false;
+          document.getElementById('opt-run-btn').innerHTML = '&#9889; Run Full Optimization Scan';
+          document.getElementById('opt-progress-label').textContent = 'Optimization Complete!';
+          document.getElementById('opt-progress-label').style.color = '#22c55e';
+          renderOptimizerResults(d);
+        }
+      } catch {}
+    }
+
+    function loadOptimizerStatus() {
+      fetch('/api/optimizer/status').then(r => safeJson(r)).then(d => {
+        if (d.status === 'running') {
+          document.getElementById('opt-progress').style.display = 'block';
+          document.getElementById('opt-run-btn').disabled = true;
+          document.getElementById('opt-run-btn').textContent = 'Optimizer Running...';
+          if (!optimizerPollTimer) {
+            optimizerPollTimer = setInterval(pollOptimizerStatus, 3000);
+          }
+          pollOptimizerStatus();
+        } else if (d.status === 'complete' && d.totalResults > 0) {
+          renderOptimizerResults(d);
+        }
+      }).catch(() => {});
+    }
+
+    function renderOptimizerResults(d) {
+      const resultsDiv = document.getElementById('opt-results');
+      const top = d.top20 || [];
+      const worst = d.worst10 || [];
+      const patNames = { '3bar': '3 Bar Play', '4bar': '4 Bar Play', 'buysetup': 'Buy Setup', 'retest': 'Retest', 'breakout': 'Breakout', 'climax': 'Climax Reversal', 'cuphandle': 'Cup & Handle', 'inversecuphandle': 'Inv Cup & Handle', 'doubletop': 'Double Top', 'doublebottom': 'Double Bottom', 'headshoulders': 'Head & Shoulders', 'invheadshoulders': 'Inverse H&S', 'wedge': 'Wedge' };
+
+      let html = '';
+
+      if (top.length > 0) {
+        html += `<div style="background:linear-gradient(135deg,#052e16,#14532d);border:1px solid #22c55e;border-radius:0.6rem;padding:1rem;margin-bottom:1rem;">
+          <h3 style="color:#22c55e;font-size:0.95rem;margin:0 0 0.5rem 0;">&#127942; Top ${Math.min(top.length, 20)} Highest Probability Setups</h3>
+          <div class="bt-trades-wrap" style="max-height:350px;"><table class="bt-trades-table">
+            <thead><tr><th>#</th><th>Symbol</th><th>Pattern</th><th>TF</th><th>R:R</th><th>Trades</th><th>Win%</th><th>PF</th><th>P&amp;L</th><th>Expectancy</th><th>Max DD</th><th>Best</th><th>Worst</th></tr></thead>
+            <tbody>`;
+
+        top.forEach((r, i) => {
+          const pnlCls = r.pnl >= 0 ? 'bt-win' : 'bt-loss';
+          const wrCls = r.winRate >= 50 ? 'bt-win' : r.winRate >= 35 ? '' : 'bt-loss';
+          const pfCls = r.pf >= 1.5 ? 'bt-win' : r.pf >= 1 ? '' : 'bt-loss';
+          html += `<tr>
+            <td style="font-weight:800;color:#facc15;">${i + 1}</td>
+            <td style="font-weight:700;">${esc(r.symbol)}</td>
+            <td>${patNames[r.pattern] || esc(r.pattern)}</td>
+            <td>${esc(r.tf)}</td>
+            <td>1:${r.rr}</td>
+            <td>${r.trades}</td>
+            <td class="${wrCls}" style="font-weight:700;">${r.winRate}%</td>
+            <td class="${pfCls}" style="font-weight:700;">${r.pf >= 99 ? '∞' : r.pf}</td>
+            <td class="${pnlCls}" style="font-weight:700;">${r.pnl >= 0 ? '+' : ''}$${r.pnl.toLocaleString()}</td>
+            <td class="${r.expectancy >= 0 ? 'bt-win' : 'bt-loss'}">${r.expectancy >= 0 ? '+' : ''}$${r.expectancy.toFixed(2)}</td>
+            <td class="bt-loss">${r.maxDD}%</td>
+            <td class="bt-win">+$${r.bestTrade.toLocaleString()}</td>
+            <td class="bt-loss">$${r.worstTrade.toLocaleString()}</td>
+          </tr>`;
+        });
+
+        html += '</tbody></table></div></div>';
+      }
+
+      if (worst.length > 0) {
+        html += `<div style="background:linear-gradient(135deg,#450a0a,#7f1d1d);border:1px solid #ef4444;border-radius:0.6rem;padding:1rem;margin-bottom:1rem;">
+          <h3 style="color:#ef4444;font-size:0.95rem;margin:0 0 0.5rem 0;">&#9888;&#65039; Bottom 10 &mdash; AVOID These Setups</h3>
+          <div class="bt-trades-wrap" style="max-height:250px;"><table class="bt-trades-table">
+            <thead><tr><th>#</th><th>Symbol</th><th>Pattern</th><th>TF</th><th>R:R</th><th>Trades</th><th>Win%</th><th>PF</th><th>P&amp;L</th><th>Expectancy</th></tr></thead>
+            <tbody>`;
+
+        worst.forEach((r, i) => {
+          html += `<tr>
+            <td style="font-weight:800;color:#ef4444;">${i + 1}</td>
+            <td style="font-weight:700;">${esc(r.symbol)}</td>
+            <td>${patNames[r.pattern] || esc(r.pattern)}</td>
+            <td>${esc(r.tf)}</td>
+            <td>1:${r.rr}</td>
+            <td>${r.trades}</td>
+            <td class="bt-loss">${r.winRate}%</td>
+            <td class="bt-loss">${r.pf}</td>
+            <td class="bt-loss" style="font-weight:700;">$${r.pnl.toLocaleString()}</td>
+            <td class="bt-loss">$${r.expectancy.toFixed(2)}</td>
+          </tr>`;
+        });
+
+        html += '</tbody></table></div></div>';
+      }
+
+      html += `<div style="font-size:0.72rem;color:#6b7280;margin-top:0.3rem;">
+        Total combos: ${d.total || '?'} | With trades: ${d.totalResults || '?'} | Results auto-saved to Scan Archive
+      </div>`;
+
+      resultsDiv.innerHTML = html;
+    }
+
+    function loadTradingPlan() {
+      loadTradingPlanGoals();
+      loadChecklistState();
+      loadTradingPlanPerformance();
+      loadPsychologyTracker();
+    }
+
+    function loadTradingPlanGoals() {
+      try {
+        const saved = localStorage.getItem('tradingPlanGoals');
+        if (saved) {
+          const g = JSON.parse(saved);
+          if (g.baTarget) document.getElementById('plan-ba-target').value = g.baTarget;
+          if (g.weeklyTarget) document.getElementById('plan-weekly-target').value = g.weeklyTarget;
+          if (g.dailyLoss) document.getElementById('plan-daily-loss').value = g.dailyLoss;
+          if (g.maxTrades) document.getElementById('plan-max-trades').value = g.maxTrades;
+        }
+      } catch {}
+    }
+
+    function saveTradingPlanGoals() {
+      const goals = {
+        baTarget: parseInt(document.getElementById('plan-ba-target').value) || 50,
+        weeklyTarget: parseInt(document.getElementById('plan-weekly-target').value) || 500,
+        dailyLoss: parseInt(document.getElementById('plan-daily-loss').value) || 300,
+        maxTrades: parseInt(document.getElementById('plan-max-trades').value) || 5,
+      };
+      localStorage.setItem('tradingPlanGoals', JSON.stringify(goals));
+      showToast('Trading plan goals saved');
+      loadTradingPlanPerformance();
+    }
+
+    function loadChecklistState() {
+      const today = new Date().toISOString().slice(0, 10);
+      try {
+        const saved = localStorage.getItem('routineChecklist_' + today);
+        if (saved) {
+          const checks = JSON.parse(saved);
+          document.querySelectorAll('.routine-check').forEach(cb => {
+            cb.checked = checks[cb.id] || false;
+          });
+        }
+        const history = JSON.parse(localStorage.getItem('routineHistory') || '[]');
+        const histEl = document.getElementById('checklist-history');
+        if (history.length > 0) {
+          const recent = history.slice(-7).reverse();
+          histEl.innerHTML = 'Recent completions: ' + recent.map(d => '<span style="color:#22c55e;">' + d + '</span>').join(', ');
+        }
+        const statusEl = document.getElementById('checklist-status');
+        const completedToday = history.includes(today);
+        if (completedToday) {
+          statusEl.innerHTML = '<span style="color:#22c55e;">&#9989; Routine completed today</span>';
+        }
+      } catch {}
+
+      document.querySelectorAll('.routine-check').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const state = {};
+          document.querySelectorAll('.routine-check').forEach(c => { state[c.id] = c.checked; });
+          localStorage.setItem('routineChecklist_' + today, JSON.stringify(state));
+        });
+      });
+    }
+
+    function markChecklistComplete() {
+      const total = document.querySelectorAll('.routine-check').length;
+      const checked = document.querySelectorAll('.routine-check:checked').length;
+      const statusEl = document.getElementById('checklist-status');
+
+      if (checked < total) {
+        statusEl.innerHTML = '<span style="color:#f59e0b;">Complete all ' + total + ' items before marking complete (' + checked + '/' + total + ' done)</span>';
+        return;
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      const history = JSON.parse(localStorage.getItem('routineHistory') || '[]');
+      if (!history.includes(today)) {
+        history.push(today);
+        localStorage.setItem('routineHistory', JSON.stringify(history));
+      }
+      statusEl.innerHTML = '<span style="color:#22c55e;">&#9989; Daily routine complete! You may trade today.</span>';
+      showToast('Daily routine marked complete');
+      loadChecklistState();
+    }
+
+    function resetChecklist() {
+      document.querySelectorAll('.routine-check').forEach(cb => cb.checked = false);
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.removeItem('routineChecklist_' + today);
+      document.getElementById('checklist-status').innerHTML = '';
+    }
+
+    const DANGER_STATES = ['anxious', 'frustrated', 'revenge', 'fomo', 'tired'];
+    const STATE_LABELS = { focused: 'Focused', confident: 'Confident', calm: 'Calm', anxious: 'Anxious', frustrated: 'Frustrated', revenge: 'Revenge Trading', fomo: 'FOMO', tired: 'Tired/Fatigued' };
+
+    function logPsychology() {
+      const state = document.getElementById('emotional-state').value;
+      const today = new Date().toISOString().slice(0, 10);
+      const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const logs = JSON.parse(localStorage.getItem('psychLog_' + today) || '[]');
+      logs.push({ state, time: now });
+      localStorage.setItem('psychLog_' + today, JSON.stringify(logs));
+
+      const warning = document.getElementById('psychology-warning');
+      if (DANGER_STATES.includes(state)) {
+        warning.style.display = 'block';
+        warning.innerHTML = '<strong>WARNING:</strong> You logged "' + (STATE_LABELS[state] || state) + '" — consider stepping away or reducing size. Do NOT revenge trade.';
+      } else {
+        warning.style.display = 'none';
+      }
+
+      showToast('Psychology logged: ' + (STATE_LABELS[state] || state));
+      renderPsychologyLog(today);
+    }
+
+    function renderPsychologyLog(today) {
+      today = today || new Date().toISOString().slice(0, 10);
+      const logs = JSON.parse(localStorage.getItem('psychLog_' + today) || '[]');
+      const logDiv = document.getElementById('psychology-log');
+      if (logs.length === 0) {
+        logDiv.innerHTML = '<span style="color:#475569;">No entries today</span>';
+        return;
+      }
+      logDiv.innerHTML = logs.map(l => '<span style="color:#94a3b8;">' + esc(l.time) + '</span> — ' + esc(STATE_LABELS[l.state] || l.state)).join('<br/>');
+
+      const dangerCount = logs.filter(l => DANGER_STATES.includes(l.state)).length;
+      const warning = document.getElementById('psychology-warning');
+      if (dangerCount >= 2) {
+        warning.style.display = 'block';
+        warning.innerHTML = '<strong>TILT ALERT:</strong> ' + dangerCount + ' negative states logged today. Strongly consider stopping for the day.';
+      }
+    }
+
+    function loadPsychologyTracker() {
+      const today = new Date().toISOString().slice(0, 10);
+      renderPsychologyLog(today);
+    }
+
+    async function loadTradingPlanPerformance() {
+      try {
+        const resp = await fetch('/api/journal');
+        const data = await safeJson(resp);
+        const entries = data.entries || [];
+        const stats = data.stats || {};
+
+        const winRate = stats.winRate || 0;
+        const pf = stats.profitFactor || 0;
+        const totalPnl = stats.totalPnl || 0;
+
+        const wrColor = winRate >= 50 ? '#22c55e' : winRate >= 35 ? '#facc15' : '#ef4444';
+        const pfColor = pf >= 1.5 ? '#22c55e' : pf >= 1 ? '#facc15' : '#ef4444';
+        const pnlColor = totalPnl >= 0 ? '#22c55e' : '#ef4444';
+
+        document.getElementById('live-ba').style.color = wrColor;
+        document.getElementById('live-ba').textContent = winRate.toFixed(1) + '%';
+        document.getElementById('live-pf').style.color = pfColor;
+        document.getElementById('live-pf').textContent = pf.toFixed(2);
+        document.getElementById('live-pnl').style.color = pnlColor;
+        document.getElementById('live-pnl').textContent = (totalPnl >= 0 ? '+' : '') + '$' + totalPnl.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+        const goals = JSON.parse(localStorage.getItem('tradingPlanGoals') || '{}');
+        const baTarget = goals.baTarget || 50;
+        const baVsEl = document.getElementById('live-ba-vs');
+        const diff = winRate - baTarget;
+        baVsEl.style.color = diff >= 0 ? '#22c55e' : '#ef4444';
+        baVsEl.textContent = (diff >= 0 ? '+' : '') + diff.toFixed(1) + '% vs ' + baTarget + '% target';
+
+        let expectancy = 0;
+        if (entries.length > 0) {
+          const wins = entries.filter(e => e.outcome === 'WIN');
+          const losses = entries.filter(e => e.outcome === 'LOSS');
+          const avgWin = wins.length > 0 ? wins.reduce((s, e) => s + e.pnlDollars, 0) / wins.length : 0;
+          const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, e) => s + e.pnlDollars, 0) / losses.length) : 0;
+          const wr = entries.length > 0 ? wins.length / entries.length : 0;
+          expectancy = (wr * avgWin) - ((1 - wr) * avgLoss);
+        }
+        const expColor = expectancy >= 0 ? '#22c55e' : '#ef4444';
+        document.getElementById('live-expectancy').style.color = expColor;
+        document.getElementById('live-expectancy').textContent = (expectancy >= 0 ? '+' : '') + '$' + expectancy.toFixed(2);
+
+        let sharpe = 0;
+        if (entries.length >= 2) {
+          const returns = entries.map(e => e.pnlDollars);
+          const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+          const variance = returns.reduce((s, r) => s + Math.pow(r - mean, 2), 0) / (returns.length - 1);
+          const stdDev = Math.sqrt(variance);
+          sharpe = stdDev > 0 ? (mean / stdDev) * Math.sqrt(252) : 0;
+        }
+        const sharpeColor = sharpe >= 1 ? '#22c55e' : sharpe >= 0.5 ? '#facc15' : '#ef4444';
+        document.getElementById('live-sharpe').style.color = sharpeColor;
+        document.getElementById('live-sharpe').textContent = sharpe.toFixed(2);
+
+        let recoveryFactor = 0;
+        if (entries.length > 0) {
+          let equity = 0, peak = 0, maxDD = 0;
+          for (const e of entries) {
+            equity += e.pnlDollars;
+            if (equity > peak) peak = equity;
+            const dd = peak - equity;
+            if (dd > maxDD) maxDD = dd;
+          }
+          recoveryFactor = maxDD > 0 ? totalPnl / maxDD : (totalPnl > 0 ? 99 : 0);
+        }
+        const rfColor = recoveryFactor >= 2 ? '#22c55e' : recoveryFactor >= 1 ? '#facc15' : '#ef4444';
+        document.getElementById('live-recovery').style.color = rfColor;
+        document.getElementById('live-recovery').textContent = recoveryFactor.toFixed(2);
+
+        const weeklyTarget = goals.weeklyTarget || 500;
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+        weekStart.setHours(0, 0, 0, 0);
+        const weeklyPnl = entries
+          .filter(e => new Date(e.timestamp || 0) >= weekStart)
+          .reduce((s, e) => s + e.pnlDollars, 0);
+        const weekPct = Math.min(Math.max((weeklyPnl / weeklyTarget) * 100, 0), 100);
+        const progressEl = document.getElementById('plan-weekly-progress');
+        const wpColor = weeklyPnl >= weeklyTarget ? '#22c55e' : weeklyPnl >= 0 ? '#3b82f6' : '#ef4444';
+        progressEl.innerHTML = `<div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">Weekly Progress: $${weeklyPnl.toFixed(2)} / $${weeklyTarget}</div>
+          <div style="background:#1e293b;border-radius:0.3rem;overflow:hidden;height:8px;">
+            <div style="height:100%;width:${weekPct}%;background:${wpColor};border-radius:0.3rem;transition:width 0.3s;"></div>
+          </div>`;
+
+        let streak = 0;
+        if (entries.length > 0) {
+          const sorted = [...entries].reverse();
+          for (const e of sorted) {
+            if (e.outcome === 'WIN') streak++;
+            else break;
+          }
+        }
+        const streakEl = document.getElementById('plan-streak');
+        if (streak > 0) {
+          streakEl.innerHTML = 'Current Win Streak: <b style="color:#22c55e;">' + streak + '</b> trades';
+        } else {
+          const lossStreak = entries.length > 0 ? (() => { let s = 0; const sorted = [...entries].reverse(); for (const e of sorted) { if (e.outcome === 'LOSS') s++; else break; } return s; })() : 0;
+          if (lossStreak > 0) {
+            streakEl.innerHTML = 'Current Loss Streak: <b style="color:#ef4444;">' + lossStreak + '</b> trades';
+          } else {
+            streakEl.innerHTML = '';
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load performance:', err);
+      }
+    }
+
+    async function updateApexAccounts() {
+      try {
+        const res = await fetch('/api/apex/eval-status');
+        const accounts = await res.json();
+        const sel = document.getElementById('tradeAccount');
+        const saved = localStorage.getItem('selectedAccount') || sel.value;
+        sel.innerHTML = '';
+
+        let activeCount = 0;
+        accounts.forEach(acc => {
+          if (acc.status !== 'failed') {
+            const opt = document.createElement('option');
+            opt.value = acc.id;
+            opt.setAttribute('data-type', acc.type);
+            const typeLabel = acc.type.toUpperCase();
+            opt.textContent = `${acc.id} — ${acc.name} (${typeLabel})`;
+            if (acc.id === saved) opt.selected = true;
+            sel.appendChild(opt);
+            activeCount++;
+          } else {
+            console.log(`[apex] Removed failed account: ${acc.name} (${acc.reason})`);
+            showToast(`Account removed: ${acc.name} — ${acc.reason}`, true);
+          }
+        });
+
+        if (activeCount === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'No active accounts';
+          sel.appendChild(opt);
+          showToast('All Apex accounts failed. Add new account in NinjaTrader.', true);
+        }
+
+        if (sel.options.length > 0 && !sel.value) {
+          sel.selectedIndex = 0;
+        }
+        syncAccountFields();
+      } catch (err) {
+        console.warn('[apex] Failed to fetch account status:', err);
+      }
+    }
+
+    updateApexAccounts();
     loadJournalData();
     loadTraderSettings();
     setInterval(loadJournalData, 10000);
-
-    (function restoreAccount() {
-      const saved = localStorage.getItem('selectedAccount');
-      if (saved) {
-        const sel = document.getElementById('tradeAccount');
-        for (let i = 0; i < sel.options.length; i++) {
-          if (sel.options[i].value === saved) { sel.selectedIndex = i; break; }
-        }
-        syncAccountFields();
-      }
-    })();
+    setInterval(updateApexAccounts, 60000);
   </script>
 </body>
 </html>

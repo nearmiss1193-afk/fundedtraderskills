@@ -1,7 +1,8 @@
 import { addJournalEntry, type JournalEntry } from "./journal";
 import { connectTradovate, isTradovateConnected, getTradovateStatus, placeBracketOrder } from "./tradovate";
 import { enqueueSignal } from "./supabase";
-import { sendToCrossTrade } from "./services/crosstrade";
+import { sendToCrossTrade, sendClosePosition } from "./services/crosstrade";
+import { isAccountFailed } from "./account-status";
 import { randomBytes } from "crypto";
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
@@ -9,11 +10,12 @@ const POLYGON_BASE = "https://api.polygon.io";
 
 const LIVE_CONFLUENCE_MIN = 8;
 const MAX_RISK_PCT = 0.01;
-const DAILY_LOSS_LIMIT_PCT = -0.03;
+const DEFAULT_DAILY_LOSS_LIMIT = 1500;
 const DEFAULT_ACCOUNT_SIZE = 50000;
 
 let dailyPnlTracker = 0;
 let dailyPnlDate = new Date().toDateString();
+let configuredDailyLossLimit = DEFAULT_DAILY_LOSS_LIMIT;
 
 function resetDailyPnlIfNeeded() {
   const today = new Date().toDateString();
@@ -24,14 +26,18 @@ function resetDailyPnlIfNeeded() {
   }
 }
 
-function isDailyLossLimitHit(accountSize: number = DEFAULT_ACCOUNT_SIZE): boolean {
+function isDailyLossLimitHit(): boolean {
   resetDailyPnlIfNeeded();
-  const limitDollars = accountSize * DAILY_LOSS_LIMIT_PCT;
-  if (dailyPnlTracker <= limitDollars) {
-    console.log(`[safety] DAILY LOSS LIMIT HIT: $${dailyPnlTracker.toFixed(2)} <= ${(DAILY_LOSS_LIMIT_PCT * 100).toFixed(1)}% of $${accountSize} ($${limitDollars.toFixed(2)})`);
+  if (dailyPnlTracker <= -configuredDailyLossLimit) {
+    console.log(`[safety] DAILY LOSS LIMIT HIT: $${dailyPnlTracker.toFixed(2)} <= -$${configuredDailyLossLimit.toFixed(2)}`);
     return true;
   }
   return false;
+}
+
+export function setDailyLossLimit(limitDollars: number) {
+  configuredDailyLossLimit = limitDollars;
+  console.log(`[safety] Daily loss limit set to $${limitDollars}`);
 }
 
 function isRiskTooHigh(riskDollars: number, accountSize: number = DEFAULT_ACCOUNT_SIZE): boolean {
@@ -55,8 +61,8 @@ const APEX_RULES = {
   rthEnd: { hour: 16, minute: 0 },
   maxContractsPerSymbol: {
     ES: 10, MES: 50, NQ: 8, MNQ: 40, YM: 10, MYM: 50,
-    RTY: 10, M2K: 50, CL: 5, MCL: 25, GC: 3, MGC: 15,
-    SI: 5, HG: 5, BTC: 2, ETH: 2, ZB: 10, ZN: 10,
+    RTY: 10, M2K: 50, CL: 5, MCL: 25,
+    MBT: 10, MET: 10, BTC: 10, ETH: 10,
     ZC: 5, ZS: 5, ZW: 5,
   } as Record<string, number>,
   maxContractsDefault: 5,
@@ -93,7 +99,7 @@ function isRTH(now?: Date): boolean {
 }
 
 function checkApexRules(direction: string, qty: number, symbol?: string, accountSize: number = DEFAULT_ACCOUNT_SIZE): { allowed: boolean; reason?: string; adjustedQty: number } {
-  if (isDailyLossLimitHit(accountSize)) {
+  if (isDailyLossLimitHit()) {
     return { allowed: false, reason: "Apex daily loss limit hit", adjustedQty: qty };
   }
 
@@ -162,16 +168,126 @@ export function forwardSignalToSupabase(payload: { symbol: string; direction: st
   });
 }
 
-function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string, account: string): void {
+const HIGH_IMPACT_KEYWORDS = [
+  "non-farm", "nonfarm", "NFP", "FOMC", "fed rate", "federal reserve",
+  "CPI", "consumer price index", "PPI", "producer price",
+  "GDP", "gross domestic", "unemployment", "jobless claims",
+  "retail sales", "ISM manufacturing", "ISM services",
+  "PCE", "personal consumption", "jackson hole", "powell speaks",
+];
+
+let newsBlockedUntil = 0;
+let lastNewsCheck = 0;
+
+async function checkNewsFilter(): Promise<{ blocked: boolean; reason: string }> {
+  const now = Date.now();
+
+  if (now < newsBlockedUntil) {
+    return { blocked: true, reason: "High-impact news window active" };
+  }
+
+  if (now - lastNewsCheck < 600000) {
+    return { blocked: false, reason: "" };
+  }
+
+  lastNewsCheck = now;
+
+  if (!POLYGON_API_KEY) return { blocked: false, reason: "" };
+
+  try {
+    const resp = await fetchWithTimeout(
+      `${POLYGON_BASE}/v2/reference/news?limit=10&apiKey=${POLYGON_API_KEY}`,
+      5000
+    );
+    if (!resp.ok) return { blocked: false, reason: "" };
+
+    const data: any = await resp.json();
+    const articles = data.results || [];
+
+    for (const article of articles) {
+      const title = (article.title || "").toLowerCase();
+      const desc = (article.description || "").toLowerCase();
+      const text = title + " " + desc;
+
+      const match = HIGH_IMPACT_KEYWORDS.find(kw => text.includes(kw.toLowerCase()));
+      if (match) {
+        const pubTime = new Date(article.published_utc || "").getTime();
+        if (now - pubTime < 3600000) {
+          newsBlockedUntil = now + 1800000;
+          console.log(`[news] HIGH-IMPACT NEWS DETECTED: "${article.title}" (keyword: ${match}) — blocking trades for 30 min`);
+          return { blocked: true, reason: `High-impact: ${match} — "${article.title}"` };
+        }
+      }
+    }
+  } catch (err: any) {
+    console.log(`[news] News check failed (allowing trades): ${err.message}`);
+  }
+
+  return { blocked: false, reason: "" };
+}
+
+export function getNewsFilterStatus(): { blocked: boolean; blockedUntil: number; lastCheck: number } {
+  return { blocked: Date.now() < newsBlockedUntil, blockedUntil: newsBlockedUntil, lastCheck: lastNewsCheck };
+}
+
+const MARKET_SESSIONS_CT: Record<string, { open: number; close: number }[]> = {
+  "ES":  [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "MES": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "NQ":  [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "MNQ": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "YM":  [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "MYM": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "RTY": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "M2K": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "CL":  [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "MCL": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "ZC":  [{ open: 19*60, close: 24*60 }, { open: 0, close: 7*60+45 }, { open: 8*60+30, close: 13*60+20 }],
+  "ZS":  [{ open: 19*60, close: 24*60 }, { open: 0, close: 7*60+45 }, { open: 8*60+30, close: 13*60+20 }],
+  "ZW":  [{ open: 19*60, close: 24*60 }, { open: 0, close: 7*60+45 }, { open: 8*60+30, close: 13*60+20 }],
+  "MBT": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "MET": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+};
+
+function isMarketOpen(symbol: string): boolean {
+  const ntSymbol = POLYGON_TO_NT_SYMBOL[symbol] || symbol;
+  const sessions = MARKET_SESSIONS_CT[ntSymbol];
+  if (!sessions) return true;
+
+  const ct = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Chicago" }));
+  const dow = ct.getDay();
+  if (dow === 6) return false;
+  if (dow === 0 && ct.getHours() < 17) return false;
+
+  const minOfDay = ct.getHours() * 60 + ct.getMinutes();
+  return sessions.some(s => minOfDay >= s.open && minOfDay < s.close);
+}
+
+async function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string, account: string): Promise<{ sent: boolean; rejected: boolean; reason?: string }> {
+  if (isAccountFailed(account)) {
+    console.warn(`[apex] BLOCKED: Account ${account} has failed eval — signal rejected`);
+    return { sent: false, rejected: true, reason: `Account ${account} failed eval` };
+  }
+
   if (!account.toUpperCase().startsWith("SIM") && process.env.ALLOW_LIVE_TRADES !== "true") {
     console.warn(`[safety] BLOCKED: Non-SIM account "${account}" requires ALLOW_LIVE_TRADES=true`);
-    return;
+    return { sent: false, rejected: true, reason: "ALLOW_LIVE_TRADES not enabled" };
+  }
+
+  const ntSymbol = POLYGON_TO_NT_SYMBOL[symbol] || symbol;
+  if (!account.toUpperCase().startsWith("SIM") && !TRADOVATE_SUPPORTED.has(ntSymbol)) {
+    console.warn(`[tradovate] BLOCKED: ${symbol} (→${ntSymbol}) not available on Tradovate/Apex — ${direction} ${pattern}`);
+    return { sent: false, rejected: true, reason: `${symbol} not on Tradovate` };
+  }
+
+  if (!account.toUpperCase().startsWith("SIM") && !isMarketOpen(symbol)) {
+    console.warn(`[market-hours] BLOCKED: ${symbol} market closed — ${direction} ${pattern}`);
+    return { sent: false, rejected: true, reason: `${symbol} market closed` };
   }
 
   const apexCheck = checkApexRules(direction, 1, symbol);
   if (!apexCheck.allowed) {
     console.warn(`[apex] BLOCKED: ${apexCheck.reason} — ${direction} ${symbol} ${pattern}`);
-    return;
+    return { sent: false, rejected: true, reason: apexCheck.reason };
   }
 
   const signalId = generateSignalId();
@@ -210,17 +326,19 @@ function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: num
     console.error(`[trader] Failed to queue signal ${signalId}: ${err.message}`);
   });
 
-  sendToCrossTrade({ symbol: instrument, direction: dir, orderType: "MARKET", account })
-    .then((res) => {
-      if (res.success) {
-        console.log(`[trader] CrossTrade order sent: ${dir} ${instrument} → ${res.message}`);
-      } else {
-        console.warn(`[trader] CrossTrade skipped: ${res.message}`);
-      }
-    })
-    .catch((err) => {
-      console.error(`[trader] CrossTrade error: ${err.message}`);
-    });
+  try {
+    const ctResult = await sendToCrossTrade({ symbol: instrument, direction: dir, orderType: "MARKET", account });
+    if (ctResult.success) {
+      console.log(`[trader] CrossTrade order sent: ${dir} ${instrument} → ${ctResult.message}`);
+      return { sent: true, rejected: false };
+    } else {
+      console.warn(`[trader] CrossTrade REJECTED: ${ctResult.message}`);
+      return { sent: true, rejected: true, reason: ctResult.message };
+    }
+  } catch (err: any) {
+    console.error(`[trader] CrossTrade error: ${err.message}`);
+    return { sent: true, rejected: true, reason: err.message };
+  }
 }
 
 interface PolygonPrice {
@@ -277,24 +395,49 @@ function getSpec(market: string): FuturesSpec {
   return FUTURES_SPECS[market] || FUTURES_SPECS["ES"];
 }
 
+const POLYGON_TO_NT_SYMBOL: Record<string, string> = {
+  "BTC": "MBT", "ETH": "MET",
+};
+
+const TRADOVATE_SUPPORTED = new Set([
+  "ES", "MES", "NQ", "MNQ", "YM", "MYM", "RTY", "M2K",
+  "CL", "MCL", "ZC", "ZS", "ZW",
+  "MBT", "MET",
+]);
+
+const CONTRACT_CYCLES: Record<string, number[]> = {
+  "ES":  [3, 6, 9, 12], "MES": [3, 6, 9, 12],
+  "NQ":  [3, 6, 9, 12], "MNQ": [3, 6, 9, 12],
+  "YM":  [3, 6, 9, 12], "MYM": [3, 6, 9, 12],
+  "RTY": [3, 6, 9, 12], "M2K": [3, 6, 9, 12],
+  "CL":  [1,2,3,4,5,6,7,8,9,10,11,12], "MCL": [1,2,3,4,5,6,7,8,9,10,11,12],
+  "ZC":  [3, 5, 7, 9, 12], "ZS": [1, 3, 5, 7, 8, 9, 11],
+  "ZW":  [3, 5, 7, 9, 12],
+  "MBT": [1,2,3,4,5,6,7,8,9,10,11,12], "MET": [1,2,3,4,5,6,7,8,9,10,11,12],
+};
+
 function getNTInstrument(symbol: string): string {
+  const ntSymbol = POLYGON_TO_NT_SYMBOL[symbol] || symbol;
+
+  if (process.env.NT_USE_CONTINUOUS === "true") return `${ntSymbol} 1!`;
+
   const now = new Date();
-  const month = now.getMonth();
-  const year = now.getFullYear() % 100;
-  const contractMonths: Record<string, number[]> = {
-    quarterly: [3, 6, 9, 12],
-    monthly: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-  };
-  const quarterlySymbols = ["ES", "MES", "NQ", "MNQ", "YM", "MYM", "RTY", "M2K", "ZB", "ZN", "ZT", "ZF"];
-  const months = quarterlySymbols.includes(symbol) ? contractMonths.quarterly : contractMonths.monthly;
-  let contractMonth = months.find(m => m > month + 1) || months[0];
-  let contractYear = year;
-  if (contractMonth <= month + 1) contractYear = year + 1;
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  const cycle = CONTRACT_CYCLES[ntSymbol];
+  if (!cycle) return `${ntSymbol} ${String(currentMonth).padStart(2, "0")}-${String(currentYear).slice(-2)}`;
+
+  let contractMonth = cycle.find(m => m >= currentMonth);
+  let contractYear = currentYear;
+  if (!contractMonth) {
+    contractMonth = cycle[0];
+    contractYear = currentYear + 1;
+  }
+
   const mm = String(contractMonth).padStart(2, "0");
-  const specific = `${symbol} ${mm}-${contractYear}`;
-  const continuous = `${symbol} 1!`;
-  const useContinuous = process.env.NT_USE_CONTINUOUS === "true";
-  return useContinuous ? continuous : specific;
+  const yy = String(contractYear).slice(-2);
+  return `${ntSymbol} ${mm}-${yy}`;
 }
 
 function getNTInstrumentContinuous(symbol: string): string {
@@ -331,7 +474,9 @@ async function fetchPolygonPrice(market: string): Promise<PolygonPrice | null> {
       return null;
     }
     if (resp.ok) {
-      const data = await resp.json();
+      const rawText = await resp.text();
+      let data: any;
+      try { data = JSON.parse(rawText); } catch { data = null; }
       if (data?.results?.p) {
         polygonErrorCount = 0;
         const spyPrice = data.results.p;
@@ -352,7 +497,9 @@ async function fetchPolygonPrice(market: string): Promise<PolygonPrice | null> {
       return null;
     }
     if (resp.ok) {
-      const data = await resp.json();
+      const rawText = await resp.text();
+      let data: any;
+      try { data = JSON.parse(rawText); } catch { data = null; }
       if (data?.results?.length > 0) {
         polygonErrorCount = 0;
         const r = data.results[0];
@@ -462,9 +609,11 @@ interface TraderSession {
   rewardRatio: number;
   maxOpenTrades: number;
   account: string;
+  accounts: string[];
   patterns: string[];
   customCondition: string;
   forceTrading: boolean;
+  fundingMode: boolean;
   logs: TradeLog[];
   cumPnl: number;
   timeout: ReturnType<typeof setTimeout> | null;
@@ -475,6 +624,67 @@ interface TraderSession {
   createdAt: number;
   wins: number;
   losses: number;
+}
+
+const FUNDING_MIN_CONFLUENCE = 6;
+
+const FUNDING_MODE_WHITELIST: Array<{ symbol: string; pattern: string; winRate: number; profitFactor: number; timeframe: string; minConf: number }> = [
+  // === TIER 1: 60%+ WR, confluence-verified edges ===
+  // NOTE: Only Tradovate-supported symbols (ES,MES,NQ,MNQ,YM,MYM,RTY,M2K,CL,MCL,ZC,ZS,ZW,MBT,MET)
+  // GC,MGC,SI,HG,ZN,ZB,ZF,ZT removed — not available on Tradovate/Apex
+  { symbol: "CL", pattern: "Wedge Breakout", winRate: 80.0, profitFactor: 30.56, timeframe: "5min", minConf: 7 },
+  { symbol: "YM", pattern: "Head & Shoulders", winRate: 66.7, profitFactor: 10.47, timeframe: "5min", minConf: 5 },
+  { symbol: "MYM", pattern: "Head & Shoulders", winRate: 66.7, profitFactor: 10.47, timeframe: "5min", minConf: 5 },
+  { symbol: "CL", pattern: "Double Top", winRate: 66.7, profitFactor: 6.43, timeframe: "5min", minConf: 7 },
+  { symbol: "MCL", pattern: "Double Top", winRate: 66.7, profitFactor: 6.43, timeframe: "5min", minConf: 7 },
+  { symbol: "ZS", pattern: "4 Bar Play", winRate: 66.7, profitFactor: 2.33, timeframe: "1hour", minConf: 7 },
+  { symbol: "MBT", pattern: "Cup & Handle", winRate: 66.7, profitFactor: 7.56, timeframe: "5min", minConf: 5 },
+
+  // === TIER 2: 50-59% WR, solid PF, high confluence ===
+  { symbol: "YM", pattern: "Double Top", winRate: 58.3, profitFactor: 2.75, timeframe: "5min", minConf: 6 },
+  { symbol: "MYM", pattern: "Double Top", winRate: 58.3, profitFactor: 2.75, timeframe: "5min", minConf: 6 },
+  { symbol: "YM", pattern: "Wedge Breakout", winRate: 57.1, profitFactor: 8.92, timeframe: "5min", minConf: 6 },
+  { symbol: "MYM", pattern: "Wedge Breakout", winRate: 57.1, profitFactor: 8.92, timeframe: "5min", minConf: 6 },
+  { symbol: "ZS", pattern: "Inverse H&S", winRate: 50.0, profitFactor: 2.93, timeframe: "1hour", minConf: 5 },
+  { symbol: "ZS", pattern: "Double Bottom", winRate: 50.0, profitFactor: 20.0, timeframe: "1hour", minConf: 6 },
+  { symbol: "YM", pattern: "Double Bottom", winRate: 50.0, profitFactor: 2.88, timeframe: "1hour", minConf: 6 },
+  { symbol: "MYM", pattern: "Double Bottom", winRate: 50.0, profitFactor: 2.88, timeframe: "1hour", minConf: 6 },
+  { symbol: "YM", pattern: "Inverse H&S", winRate: 50.0, profitFactor: 2.66, timeframe: "1hour", minConf: 6 },
+  { symbol: "MYM", pattern: "Inverse H&S", winRate: 50.0, profitFactor: 2.66, timeframe: "1hour", minConf: 6 },
+  { symbol: "NQ", pattern: "Pivot Breakout", winRate: 50.0, profitFactor: 3.66, timeframe: "1hour", minConf: 6 },
+  { symbol: "MNQ", pattern: "Pivot Breakout", winRate: 50.0, profitFactor: 3.66, timeframe: "1hour", minConf: 6 },
+  { symbol: "ZC", pattern: "4 Bar Play", winRate: 50.0, profitFactor: 3.85, timeframe: "1hour", minConf: 6 },
+  { symbol: "ZS", pattern: "Double Bottom", winRate: 50.0, profitFactor: 2.40, timeframe: "15min", minConf: 5 },
+  { symbol: "ES", pattern: "Double Top", winRate: 50.0, profitFactor: 1.22, timeframe: "1hour", minConf: 5 },
+  { symbol: "MES", pattern: "Double Top", winRate: 50.0, profitFactor: 1.22, timeframe: "1hour", minConf: 5 },
+  { symbol: "RTY", pattern: "Double Top", winRate: 50.0, profitFactor: 2.27, timeframe: "1hour", minConf: 5 },
+  { symbol: "M2K", pattern: "Double Top", winRate: 50.0, profitFactor: 2.27, timeframe: "1hour", minConf: 5 },
+  { symbol: "MET", pattern: "Head & Shoulders", winRate: 50.0, profitFactor: 2.60, timeframe: "1hour", minConf: 5 },
+  { symbol: "MET", pattern: "Double Bottom", winRate: 50.0, profitFactor: 1.89, timeframe: "5min", minConf: 5 },
+  { symbol: "ZS", pattern: "Wedge Breakout", winRate: 50.0, profitFactor: 2.30, timeframe: "5min", minConf: 7 },
+
+  // === TIER 3: 45-49% WR, but high PF (profitable) ===
+  { symbol: "NQ", pattern: "Head & Shoulders", winRate: 45.5, profitFactor: 2.82, timeframe: "5min", minConf: 6 },
+  { symbol: "MNQ", pattern: "Head & Shoulders", winRate: 45.5, profitFactor: 2.82, timeframe: "5min", minConf: 6 },
+  { symbol: "ZS", pattern: "Double Bottom", winRate: 45.5, profitFactor: 2.13, timeframe: "5min", minConf: 5 },
+  { symbol: "ZS", pattern: "Inverse H&S", winRate: 47.6, profitFactor: 1.91, timeframe: "5min", minConf: 5 },
+  { symbol: "ZC", pattern: "Buy Setup", winRate: 44.4, profitFactor: 2.12, timeframe: "5min", minConf: 7 },
+  { symbol: "ZC", pattern: "Inverse H&S", winRate: 45.2, profitFactor: 4.10, timeframe: "15min", minConf: 5 },
+
+  // === TIER 4: Bear Trap (high confluence required) ===
+  { symbol: "MET", pattern: "Bear Trap Reversal", winRate: 50.0, profitFactor: 4.69, timeframe: "5min", minConf: 8 },
+];
+
+function isFundingApproved(market: string, pattern: string, confluence?: number): boolean {
+  const ntSymbol = POLYGON_TO_NT_SYMBOL[market] || market;
+  const entry = FUNDING_MODE_WHITELIST.find(w => (w.symbol === market || w.symbol === ntSymbol) && w.pattern === pattern);
+  if (!entry) return false;
+  if (confluence !== undefined && confluence < (entry.minConf || FUNDING_MIN_CONFLUENCE)) return false;
+  return true;
+}
+
+export function getFundingWhitelist() {
+  return FUNDING_MODE_WHITELIST;
 }
 
 const sessions: Record<string, TraderSession> = {};
@@ -785,6 +995,38 @@ function isNearMA(price: number, ma: number): boolean {
   return distanceFromMA(price, ma) < 0.003;
 }
 
+function calculateRSI(bars: Bar[], period: number = 14): number {
+  if (bars.length < period + 1) return 50;
+  const closes = bars.slice(-(period + 1)).map(b => b.close);
+  let gains = 0, losses = 0;
+  for (let i = 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) gains += diff;
+    else losses += Math.abs(diff);
+  }
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
+function getRSIConfluence(bars: Bar[], direction: "LONG" | "SHORT"): { bonus: number; rsi: number; label: string } {
+  const rsi = calculateRSI(bars);
+  let bonus = 0;
+  let label = "";
+  if (direction === "LONG") {
+    if (rsi >= 30 && rsi <= 45) { bonus = 2; label = `RSI oversold bounce (${rsi.toFixed(1)})`; }
+    else if (rsi >= 45 && rsi <= 55) { bonus = 1; label = `RSI neutral-bull (${rsi.toFixed(1)})`; }
+    else if (rsi > 80) { bonus = -1; label = `RSI overbought risk (${rsi.toFixed(1)})`; }
+  } else {
+    if (rsi >= 55 && rsi <= 70) { bonus = 1; label = `RSI neutral-bear (${rsi.toFixed(1)})`; }
+    else if (rsi >= 70) { bonus = 2; label = `RSI overbought reversal (${rsi.toFixed(1)})`; }
+    else if (rsi < 20) { bonus = -1; label = `RSI oversold risk (${rsi.toFixed(1)})`; }
+  }
+  return { bonus, rsi, label };
+}
+
 function isNearPivot(price: number, pivot: number, basePrice: number): boolean {
   return Math.abs(price - pivot) < basePrice * 0.0015;
 }
@@ -825,6 +1067,135 @@ function howDidItGetHere(bars: Bar[], direction: "LONG" | "SHORT"): { barsInMove
   const hasLargeAcceleration = recent.filter(b => isWideRangeBar(b, avgRange)).length >= Math.max(2, barsInMove * 0.4);
   const isExtended = barsInMove >= 5;
   return { barsInMove, hasLargeAcceleration, isExtended };
+}
+
+function getVolumeProfileConfluence(bars: Bar[], currentPrice: number): number {
+  if (bars.length < 50) return 0;
+
+  const volumeMap: Record<string, number> = {};
+  let totalVolume = 0;
+
+  bars.forEach(bar => {
+    const price = (Math.round(bar.close * 100) / 100).toFixed(2);
+    volumeMap[price] = (volumeMap[price] || 0) + bar.volume;
+    totalVolume += bar.volume;
+  });
+
+  if (totalVolume === 0) return 0;
+
+  const pocPrice = parseFloat(Object.keys(volumeMap).reduce((a, b) => volumeMap[a] > volumeMap[b] ? a : b));
+
+  const sortedPrices = Object.keys(volumeMap).sort((a, b) => volumeMap[b] - volumeMap[a]);
+  let valueAreaVolume = 0;
+  let vaHigh = pocPrice;
+  let vaLow = pocPrice;
+
+  for (const price of sortedPrices) {
+    valueAreaVolume += volumeMap[price];
+    const p = parseFloat(price);
+    if (p > vaHigh) vaHigh = p;
+    if (p < vaLow) vaLow = p;
+    if (valueAreaVolume >= totalVolume * 0.7) break;
+  }
+
+  const recentBars = bars.slice(-10);
+  const avgVol = recentBars.reduce((s, b) => s + b.volume, 0) / recentBars.length;
+  const lastBar = bars[bars.length - 1];
+  const hasVolSurge = lastBar.volume > avgVol * 1.3;
+
+  const priceRange = Math.max(...bars.map(b => b.high)) - Math.min(...bars.map(b => b.low));
+  const pocThreshold = priceRange * 0.005;
+
+  let vpBonus = 0;
+
+  if (Math.abs(currentPrice - pocPrice) < pocThreshold && hasVolSurge) {
+    vpBonus += 1;
+  }
+
+  if (currentPrice > vaHigh && hasVolSurge) {
+    vpBonus += 1;
+  } else if (currentPrice < vaLow && hasVolSurge) {
+    vpBonus += 1;
+  }
+
+  if (currentPrice >= vaLow && currentPrice <= vaHigh && Math.abs(currentPrice - pocPrice) > pocThreshold) {
+    vpBonus += 0.5;
+  }
+
+  return Math.min(vpBonus, 2);
+}
+
+function getOrderFlowConfluence(bars: Bar[], direction: "LONG" | "SHORT"): number {
+  if (bars.length < 20) return 0;
+
+  const recent = bars.slice(-20);
+  let cumulativeDelta = 0;
+  let buyVolume = 0;
+  let sellVolume = 0;
+
+  recent.forEach(bar => {
+    const barDelta = bar.bullish ? bar.volume : -bar.volume;
+    cumulativeDelta += barDelta;
+    if (bar.bullish) buyVolume += bar.volume;
+    else sellVolume += bar.volume;
+  });
+
+  const totalVol = buyVolume + sellVolume;
+  if (totalVol === 0) return 0;
+
+  const imbalance = Math.abs(buyVolume - sellVolume) / totalVol;
+
+  const last10 = recent.slice(-10);
+  const avgVol = last10.reduce((s, b) => s + b.volume, 0) / last10.length;
+  const avgRange = last10.reduce((s, b) => s + b.range, 0) / last10.length;
+  const lastBar = recent[recent.length - 1];
+
+  const priceMove = recent[recent.length - 1].close - recent[0].open;
+  const avgDelta = cumulativeDelta / recent.length;
+
+  let ofBonus = 0;
+
+  if (imbalance > 0.6) {
+    const imbalanceBullish = buyVolume > sellVolume;
+    if ((direction === "LONG" && imbalanceBullish) || (direction === "SHORT" && !imbalanceBullish)) {
+      ofBonus += 1;
+    }
+  }
+
+  if (Math.sign(avgDelta) !== Math.sign(priceMove)) {
+    ofBonus += 1;
+  }
+
+  if (lastBar.volume > avgVol * 1.5 && lastBar.body < avgRange * 0.5) {
+    ofBonus += 1;
+  }
+
+  return Math.min(ofBonus, 3);
+}
+
+function calculateVWAP(bars: Bar[]): number {
+  const lookback = bars.slice(-50);
+  if (lookback.length === 0) return 0;
+  let cumPV = 0;
+  let cumVol = 0;
+  lookback.forEach(bar => {
+    const tp = (bar.high + bar.low + bar.close) / 3;
+    cumPV += tp * bar.volume;
+    cumVol += bar.volume;
+  });
+  return cumVol > 0 ? r2(cumPV / cumVol) : 0;
+}
+
+function getVWAPConfluence(bars: Bar[], direction: "LONG" | "SHORT"): { bonus: number; vwap: number; position: string } {
+  if (bars.length < 20) return { bonus: 0, vwap: 0, position: "N/A" };
+  const vwap = calculateVWAP(bars);
+  if (vwap === 0) return { bonus: 0, vwap: 0, position: "N/A" };
+  const price = bars[bars.length - 1].close;
+  const aboveVWAP = price > vwap;
+  let bonus = 0;
+  if (aboveVWAP && direction === "LONG") bonus = 1;
+  if (!aboveVWAP && direction === "SHORT") bonus = 1;
+  return { bonus, vwap, position: aboveVWAP ? "Above" : "Below" };
 }
 
 function detect3BarPlayBuy(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
@@ -1639,6 +2010,408 @@ function detectInverseHeadAndShouldersLong(bars: Bar[], state: MarketState): { d
   return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
 }
 
+function detectBullFlagPullback(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 12) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  const window = bars.slice(-12);
+  const avgRange = getAvgRange(window.slice(0, 5));
+  const avgVol = recentAvgVolume(bars, 20);
+
+  const ignitingBar = window[0];
+  const ignitingBody = Math.abs(ignitingBar.close - ignitingBar.open);
+  if (!ignitingBar.bullish || ignitingBody < avgRange * 1.5 || ignitingBar.volume < avgVol * 1.5) {
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  }
+
+  const pullbackBars = window.slice(1, -1);
+  const pullbackDown = pullbackBars.filter(b => !b.bullish).length;
+  if (pullbackDown < 2) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const flagHigh = Math.max(...pullbackBars.map(b => b.high));
+  const flagLow = Math.min(...pullbackBars.map(b => b.low));
+  const pullbackDepth = (ignitingBar.high - flagLow) / (ignitingBar.high - ignitingBar.low);
+  if (pullbackDepth > 0.8) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const breakoutBar = window[window.length - 1];
+  if (!breakoutBar.bullish || breakoutBar.close <= flagHigh) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const volSurge = breakoutBar.volume > avgVol * 1.3;
+  const quality = barFormationQuality(breakoutBar, "LONG");
+
+  const factors = [
+    volSurge,
+    breakoutBar.volume > pullbackBars[pullbackBars.length - 1].volume * 1.2,
+    breakoutBar.close > state.ema9,
+    breakoutBar.close > state.ema21,
+    breakoutBar.close > state.sma200,
+    hasBottomingTail(pullbackBars[pullbackBars.length - 1]) || hasBottomingTail(breakoutBar),
+    state.bias !== "DOWNTREND",
+    isNearMA(flagLow, state.ema21) || isNearMA(flagLow, state.ema9),
+    quality >= 3,
+    pullbackDepth < 0.5,
+    isWideRangeBar(ignitingBar, avgRange),
+  ];
+  const conf = calcConfluence(factors);
+  const reasons: string[] = [`Bull Flag breakout (${pullbackBars.length} bar pullback, depth ${(pullbackDepth * 100).toFixed(0)}%)`];
+  if (volSurge) reasons.push("vol surge on breakout");
+  if (breakoutBar.close > state.ema21) reasons.push("above 21 EMA");
+  if (state.bias === "UPTREND") reasons.push("trend aligned");
+  if (pullbackDepth < 0.5) reasons.push("shallow pullback");
+  return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+}
+
+function detectBearFlagPullback(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 12) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  const window = bars.slice(-12);
+  const avgRange = getAvgRange(window.slice(0, 5));
+  const avgVol = recentAvgVolume(bars, 20);
+
+  const ignitingBar = window[0];
+  const ignitingBody = Math.abs(ignitingBar.close - ignitingBar.open);
+  if (ignitingBar.bullish || ignitingBody < avgRange * 1.5 || ignitingBar.volume < avgVol * 1.5) {
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  }
+
+  const pullbackBars = window.slice(1, -1);
+  const pullbackUp = pullbackBars.filter(b => b.bullish).length;
+  if (pullbackUp < 2) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const flagHigh = Math.max(...pullbackBars.map(b => b.high));
+  const flagLow = Math.min(...pullbackBars.map(b => b.low));
+  const pullbackDepth = (flagHigh - ignitingBar.low) / (ignitingBar.open - ignitingBar.low);
+  if (pullbackDepth > 0.8) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const breakoutBar = window[window.length - 1];
+  if (breakoutBar.bullish || breakoutBar.close >= flagLow) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const volSurge = breakoutBar.volume > avgVol * 1.3;
+  const quality = barFormationQuality(breakoutBar, "SHORT");
+
+  const factors = [
+    volSurge,
+    breakoutBar.volume > pullbackBars[pullbackBars.length - 1].volume * 1.2,
+    breakoutBar.close < state.ema9,
+    breakoutBar.close < state.ema21,
+    breakoutBar.close < state.sma200,
+    hasToppingTail(pullbackBars[pullbackBars.length - 1]) || hasToppingTail(breakoutBar),
+    state.bias !== "UPTREND",
+    isNearMA(flagHigh, state.ema21) || isNearMA(flagHigh, state.ema9),
+    quality >= 3,
+    pullbackDepth < 0.5,
+    isWideRangeBar(ignitingBar, avgRange),
+  ];
+  const conf = calcConfluence(factors);
+  const reasons: string[] = [`Bear Flag breakdown (${pullbackBars.length} bar pullback, depth ${(pullbackDepth * 100).toFixed(0)}%)`];
+  if (volSurge) reasons.push("vol surge on breakdown");
+  if (breakoutBar.close < state.ema21) reasons.push("below 21 EMA");
+  if (state.bias === "DOWNTREND") reasons.push("trend aligned");
+  if (pullbackDepth < 0.5) reasons.push("shallow pullback");
+  return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+}
+
+function detectBearTrapReversal(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 10) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  const window = bars.slice(-10);
+  const avgVol = recentAvgVolume(bars, 20);
+  const avgRange = getAvgRange(window.slice(0, 5));
+
+  const trapBar = window[window.length - 3];
+  const reversalBar = window[window.length - 2];
+  const entryBar = window[window.length - 1];
+
+  const priorLow = Math.min(...window.slice(0, -3).map(b => b.low));
+  if (trapBar.low >= priorLow) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  if (trapBar.volume > avgVol * 0.9) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  if (!reversalBar.bullish) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  if (!hasBottomingTail(reversalBar)) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  if (!entryBar.bullish || entryBar.volume < avgVol * 1.2) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const quality = barFormationQuality(entryBar, "LONG");
+
+  const factors = [
+    trapBar.low < priorLow,
+    trapBar.volume < avgVol * 0.8,
+    reversalBar.bullish,
+    hasBottomingTail(reversalBar),
+    entryBar.volume > avgVol * 1.3,
+    entryBar.close > reversalBar.high,
+    entryBar.close > state.ema9 || isNearMA(entryBar.close, state.ema9),
+    isNearMA(trapBar.low, state.pivotLow) || trapBar.low < state.recentSwingLow,
+    quality >= 3,
+    state.bias !== "DOWNTREND" || state.consecutiveBars >= 5,
+    Math.abs(entryBar.close - entryBar.open) > avgRange * 0.8,
+  ];
+  const conf = calcConfluence(factors);
+  const reasons: string[] = [`Bear Trap (new low on low vol, reversal bar w/ tail)`];
+  if (entryBar.volume > avgVol * 1.5) reasons.push("igniting vol on entry");
+  if (hasBottomingTail(reversalBar)) reasons.push("bottoming tail reversal");
+  if (entryBar.close > reversalBar.high) reasons.push("entry above reversal high");
+  if (state.consecutiveBars >= 5) reasons.push("extended move ripe for reversal");
+  return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+}
+
+function detectVWAPBounce(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string; dir: "LONG" | "SHORT" } {
+  if (bars.length < 10) return { detected: false, confluence: 0, confluenceLabel: "", reason: "", dir: "LONG" };
+  const window = bars.slice(-10);
+  const avgVol = recentAvgVolume(bars, 20);
+  const avgRange = getAvgRange(window.slice(0, 5));
+
+  const prices = window.map(b => b.close);
+  const volumes = window.map(b => b.volume);
+  let cumPV = 0, cumVol = 0;
+  for (let i = 0; i < prices.length; i++) {
+    const typical = (window[i].high + window[i].low + window[i].close) / 3;
+    cumPV += typical * volumes[i];
+    cumVol += volumes[i];
+  }
+  const vwap = cumVol > 0 ? cumPV / cumVol : state.ema21;
+
+  const testBar = window[window.length - 2];
+  const bounceBar = window[window.length - 1];
+
+  const vwapRange = avgRange * 0.5;
+  const nearVWAP = Math.abs(testBar.low - vwap) < vwapRange || Math.abs(testBar.close - vwap) < vwapRange;
+  if (!nearVWAP) {
+    const nearVWAPShort = Math.abs(testBar.high - vwap) < vwapRange || Math.abs(testBar.close - vwap) < vwapRange;
+    if (!nearVWAPShort) return { detected: false, confluence: 0, confluenceLabel: "", reason: "", dir: "LONG" };
+
+    if (!testBar.bullish && bounceBar.close < testBar.close && !bounceBar.bullish && bounceBar.volume > avgVol * 1.2) {
+      const quality = barFormationQuality(bounceBar, "SHORT");
+      const factors = [
+        Math.abs(testBar.high - vwap) < vwapRange,
+        hasToppingTail(testBar) || hasToppingTail(bounceBar),
+        bounceBar.volume > avgVol * 1.3,
+        !bounceBar.bullish,
+        bounceBar.close < state.ema9,
+        bounceBar.close < vwap,
+        state.bias !== "UPTREND",
+        quality >= 3,
+        Math.abs(bounceBar.close - bounceBar.open) > avgRange * 0.6,
+        isWideRangeBar(bounceBar, avgRange),
+        bounceBar.close < state.ema21,
+      ];
+      const conf = calcConfluence(factors);
+      const reasons: string[] = [`VWAP Bounce Short (rejection at VWAP ${vwap.toFixed(2)})`];
+      if (hasToppingTail(testBar)) reasons.push("topping tail at VWAP");
+      if (bounceBar.volume > avgVol * 1.5) reasons.push("vol surge on rejection");
+      if (state.bias === "DOWNTREND") reasons.push("trend aligned");
+      return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + "), dir: "SHORT" };
+    }
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "", dir: "LONG" };
+  }
+
+  if (bounceBar.bullish && bounceBar.close > testBar.close && bounceBar.volume > avgVol * 1.2) {
+    const quality = barFormationQuality(bounceBar, "LONG");
+    const factors = [
+      Math.abs(testBar.low - vwap) < vwapRange,
+      hasBottomingTail(testBar) || hasBottomingTail(bounceBar),
+      bounceBar.volume > avgVol * 1.3,
+      bounceBar.bullish,
+      bounceBar.close > state.ema9,
+      bounceBar.close > vwap,
+      state.bias !== "DOWNTREND",
+      quality >= 3,
+      Math.abs(bounceBar.close - bounceBar.open) > avgRange * 0.6,
+      isWideRangeBar(bounceBar, avgRange),
+      bounceBar.close > state.ema21,
+    ];
+    const conf = calcConfluence(factors);
+    const reasons: string[] = [`VWAP Bounce Long (support at VWAP ${vwap.toFixed(2)})`];
+    if (hasBottomingTail(testBar)) reasons.push("bottoming tail at VWAP");
+    if (bounceBar.volume > avgVol * 1.5) reasons.push("vol surge on bounce");
+    if (state.bias === "UPTREND") reasons.push("trend aligned");
+    return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + "), dir: "LONG" };
+  }
+
+  return { detected: false, confluence: 0, confluenceLabel: "", reason: "", dir: "LONG" };
+}
+
+function detect4BarPlayLong(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 5) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  const window = bars.slice(-4);
+  const [igniting, rest1, rest2, trigger] = window;
+  const avgRange = getAvgRange(bars.slice(-10));
+  const avgVol = recentAvgVolume(bars, 20);
+
+  const ignitingBody = Math.abs(igniting.close - igniting.open);
+  if (!igniting.bullish || igniting.range < avgRange * 1.5 || igniting.volume < avgVol * 1.5 || ignitingBody < igniting.range * 0.5)
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  if (rest1.range > igniting.range * 0.5 || rest2.range > igniting.range * 0.5)
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  if (rest1.low < igniting.low - igniting.range * 0.1 || rest2.low < igniting.low - igniting.range * 0.1)
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const restingHigh = Math.max(rest1.high, rest2.high);
+  if (!trigger.bullish || trigger.close <= restingHigh || trigger.volume < avgVol * 1.3)
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const vwap = calculateVWAP(bars);
+  const rsi = calculateRSI(bars);
+
+  const factors = [
+    trigger.volume > Math.max(rest1.volume, rest2.volume),
+    isIgnitingVolume(bars, avgVol),
+    hasBottomingTail(rest1) || hasBottomingTail(rest2),
+    trigger.close > state.ema9,
+    trigger.close > state.ema21,
+    trigger.body > trigger.range * 0.5,
+    state.bias === "UPTREND",
+    vwap > 0 && trigger.close > vwap,
+    rsi >= 30 && rsi <= 60,
+    isWideRangeBar(igniting, avgRange),
+  ];
+  const conf = calcConfluence(factors);
+  const reasons: string[] = ["4 Bar Play Long (ignite→rest→rest→trigger)"];
+  if (trigger.close > state.ema21) reasons.push("above 21 EMA");
+  if (state.bias === "UPTREND") reasons.push("trend aligned");
+  if (vwap > 0 && trigger.close > vwap) reasons.push("above VWAP");
+  if (rsi >= 30 && rsi <= 45) reasons.push(`RSI oversold (${rsi.toFixed(0)})`);
+  return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+}
+
+function detect4BarPlayShort(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 5) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  const window = bars.slice(-4);
+  const [igniting, rest1, rest2, trigger] = window;
+  const avgRange = getAvgRange(bars.slice(-10));
+  const avgVol = recentAvgVolume(bars, 20);
+
+  const ignitingBody = Math.abs(igniting.close - igniting.open);
+  if (igniting.bullish || igniting.range < avgRange * 1.5 || igniting.volume < avgVol * 1.5 || ignitingBody < igniting.range * 0.5)
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  if (rest1.range > igniting.range * 0.5 || rest2.range > igniting.range * 0.5)
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  if (rest1.high > igniting.high + igniting.range * 0.1 || rest2.high > igniting.high + igniting.range * 0.1)
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const restingLow = Math.min(rest1.low, rest2.low);
+  if (trigger.bullish || trigger.close >= restingLow || trigger.volume < avgVol * 1.3)
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const vwap = calculateVWAP(bars);
+  const rsi = calculateRSI(bars);
+
+  const factors = [
+    trigger.volume > Math.max(rest1.volume, rest2.volume),
+    isIgnitingVolume(bars, avgVol),
+    hasToppingTail(rest1) || hasToppingTail(rest2),
+    trigger.close < state.ema9,
+    trigger.close < state.ema21,
+    trigger.body > trigger.range * 0.5,
+    state.bias === "DOWNTREND",
+    vwap > 0 && trigger.close < vwap,
+    rsi >= 55 && rsi <= 80,
+    isWideRangeBar(igniting, avgRange),
+  ];
+  const conf = calcConfluence(factors);
+  const reasons: string[] = ["4 Bar Play Short (ignite→rest→rest→trigger)"];
+  if (trigger.close < state.ema21) reasons.push("below 21 EMA");
+  if (state.bias === "DOWNTREND") reasons.push("trend aligned");
+  if (vwap > 0 && trigger.close < vwap) reasons.push("below VWAP");
+  if (rsi >= 70) reasons.push(`RSI overbought (${rsi.toFixed(0)})`);
+  return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+}
+
+function detectRetestLong(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 20) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  const curr = bars[bars.length - 1];
+  const avgVol = recentAvgVolume(bars, 20);
+  const avgRange = getAvgRange(bars.slice(-10));
+
+  const lookback = bars.slice(-20, -1);
+  const priorLow = Math.min(...lookback.map(b => b.low));
+  const avgPrice = state.ema21 || curr.close;
+  const nearPriorLow = Math.abs(curr.low - priorLow) / avgPrice < 0.005;
+  if (!nearPriorLow) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const pullback = bars.slice(-4, -1);
+  const pullbackDown = pullback.filter(b => b.close < b.open).length >= 2;
+  if (!pullbackDown) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  if (!curr.bullish || curr.close <= bars[bars.length - 2].high)
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const lowTouches = lookback.filter(b => Math.abs(b.low - priorLow) / avgPrice < 0.003).length;
+  const isDoubleBottom = lowTouches >= 2;
+  const vwap = calculateVWAP(bars);
+  const rsi = calculateRSI(bars);
+
+  const factors = [
+    curr.volume > avgVol * 1.2,
+    hasBottomingTail(curr) || hasBottomingTail(bars[bars.length - 2]),
+    isNearMA(curr.close, state.ema21),
+    curr.body > curr.range * 0.4,
+    curr.close > state.ema9,
+    state.bias === "UPTREND",
+    isDoubleBottom,
+    vwap > 0 && curr.close > vwap,
+    rsi >= 30 && rsi <= 50,
+    isIgnitingVolume(bars, avgVol),
+  ];
+  const conf = calcConfluence(factors);
+  if (conf < 3) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const patternName = isDoubleBottom ? "Double Bottom Retest" : "Retest Buy";
+  const reasons: string[] = [`${patternName} at support ${priorLow.toFixed(2)}`];
+  if (isDoubleBottom) reasons.push(`${lowTouches} touches`);
+  if (curr.close > state.ema9) reasons.push("above 9 EMA");
+  if (vwap > 0 && curr.close > vwap) reasons.push("above VWAP");
+  if (rsi >= 30 && rsi <= 45) reasons.push(`RSI bouncing (${rsi.toFixed(0)})`);
+  return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+}
+
+function detectRetestShort(bars: Bar[], state: MarketState): { detected: boolean; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 20) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+  const curr = bars[bars.length - 1];
+  const avgVol = recentAvgVolume(bars, 20);
+  const avgRange = getAvgRange(bars.slice(-10));
+
+  const lookback = bars.slice(-20, -1);
+  const priorHigh = Math.max(...lookback.map(b => b.high));
+  const avgPrice = state.ema21 || curr.close;
+  const nearPriorHigh = Math.abs(curr.high - priorHigh) / avgPrice < 0.005;
+  if (!nearPriorHigh) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const pullback = bars.slice(-4, -1);
+  const pullbackUp = pullback.filter(b => b.close > b.open).length >= 2;
+  if (!pullbackUp) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  if (curr.bullish || curr.close >= bars[bars.length - 2].low)
+    return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const highTouches = lookback.filter(b => Math.abs(b.high - priorHigh) / avgPrice < 0.003).length;
+  const isDoubleTop = highTouches >= 2;
+  const vwap = calculateVWAP(bars);
+  const rsi = calculateRSI(bars);
+
+  const factors = [
+    curr.volume > avgVol * 1.2,
+    hasToppingTail(curr) || hasToppingTail(bars[bars.length - 2]),
+    isNearMA(curr.close, state.ema21),
+    curr.body > curr.range * 0.4,
+    curr.close < state.ema9,
+    state.bias === "DOWNTREND",
+    isDoubleTop,
+    vwap > 0 && curr.close < vwap,
+    rsi >= 60 && rsi <= 80,
+    isIgnitingVolume(bars, avgVol),
+  ];
+  const conf = calcConfluence(factors);
+  if (conf < 3) return { detected: false, confluence: 0, confluenceLabel: "", reason: "" };
+
+  const patternName = isDoubleTop ? "Double Top Retest" : "Retest Sell";
+  const reasons: string[] = [`${patternName} at resistance ${priorHigh.toFixed(2)}`];
+  if (isDoubleTop) reasons.push(`${highTouches} touches`);
+  if (curr.close < state.ema9) reasons.push("below 9 EMA");
+  if (vwap > 0 && curr.close < vwap) reasons.push("below VWAP");
+  if (rsi >= 70) reasons.push(`RSI overbought (${rsi.toFixed(0)})`);
+  return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
+}
+
 function sentimentLabel(s: MarketState): string {
   if (s.sentiment === "BUYERS_CONTROL") return "GREED";
   if (s.sentiment === "SELLERS_CONTROL") return "FEAR";
@@ -1754,7 +2527,22 @@ async function simulateTick(session: TraderSession) {
     return;
   }
 
+  const newsCheck = await checkNewsFilter();
+  if (newsCheck.blocked) {
+    const lastLog = session.logs[session.logs.length - 1];
+    if (!lastLog || lastLog.action !== "NEWS BLOCKED") {
+      session.logs.push(makeLog({
+        id: logIdCounter++, timestamp: ts, cumPnl: session.cumPnl,
+        action: "NEWS BLOCKED", reason: newsCheck.reason,
+      }));
+    }
+    return;
+  }
+
   for (const mk of session.markets) {
+    if (!session.forceTrading && !isMarketOpen(mk)) {
+      continue;
+    }
     const spec = getSpec(mk);
     const pointValue = spec.pointValue;
 
@@ -1950,6 +2738,38 @@ async function simulateTick(session: TraderSession) {
         const r = detectInverseHeadAndShouldersLong(bars, state);
         if (r.detected) candidates.push({ pattern: "Inverse H&S", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
       }
+      if (session.patterns.includes("bullflag")) {
+        const r = detectBullFlagPullback(bars, state);
+        if (r.detected) candidates.push({ pattern: "Bull Flag", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("bearflag")) {
+        const r = detectBearFlagPullback(bars, state);
+        if (r.detected) candidates.push({ pattern: "Bear Flag", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("beartrap")) {
+        const r = detectBearTrapReversal(bars, state);
+        if (r.detected) candidates.push({ pattern: "Bear Trap Reversal", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("vwapbounce")) {
+        const r = detectVWAPBounce(bars, state);
+        if (r.detected) candidates.push({ pattern: "VWAP Bounce", dir: r.dir, conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("4bar_long")) {
+        const r = detect4BarPlayLong(bars, state);
+        if (r.detected) candidates.push({ pattern: "4 Bar Play", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("4bar_short")) {
+        const r = detect4BarPlayShort(bars, state);
+        if (r.detected) candidates.push({ pattern: "4 Bar Play", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("retest_long")) {
+        const r = detectRetestLong(bars, state);
+        if (r.detected) candidates.push({ pattern: r.reason.split(" at ")[0] || "Retest Buy", dir: "LONG", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
+      if (session.patterns.includes("retest_short")) {
+        const r = detectRetestShort(bars, state);
+        if (r.detected) candidates.push({ pattern: r.reason.split(" at ")[0] || "Retest Sell", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
+      }
 
       if (candidates.length > 0) {
         candidates.sort((a, b) => b.conf - a.conf);
@@ -1970,7 +2790,49 @@ async function simulateTick(session: TraderSession) {
         }
       }
 
+      if (session.fundingMode && detectedPattern && !isFundingApproved(mk, detectedPattern, confluence)) {
+        console.log(`[funding] BLOCKED: ${mk} ${detectedPattern} conf=${confluence} not in funding whitelist or below min confluence`);
+        session.logs.push(makeLog({
+          id: logIdCounter++, timestamp: ts, market: mk, timeframe: tf, pattern: detectedPattern,
+          action: "FUNDING BLOCKED", direction,
+          entry: null, stop: null, target: null, trail: null,
+          cumPnl: session.cumPnl,
+          volume: bar.volume, bias: state.bias, confluence, confluenceLabel,
+          sentiment: sentimentLabel(state), dataSource, volumeType: volType,
+          reason: `${mk}/${detectedPattern} conf=${confluence} not in funding whitelist or below min confluence`,
+        }));
+        continue;
+      }
+
       if (detectedPattern && confluence > 0) {
+        const vpBonus = getVolumeProfileConfluence(bars, state.price);
+        if (vpBonus > 0) {
+          confluence += vpBonus;
+          confluenceLabel = `${confluenceLabel} [VP+${vpBonus.toFixed(1)}]`;
+          console.log(`[trader] Volume Profile boost: ${mk} +${vpBonus.toFixed(1)}pt → ${confluence}pt`);
+        }
+
+        const ofBonus = getOrderFlowConfluence(bars, direction as "LONG" | "SHORT");
+        if (ofBonus > 0) {
+          confluence += ofBonus;
+          confluenceLabel = `${confluenceLabel} [OF+${ofBonus}]`;
+          console.log(`[trader] Order Flow boost: ${mk} +${ofBonus}pt → ${confluence}pt`);
+        }
+
+        const vwapResult = getVWAPConfluence(bars, direction as "LONG" | "SHORT");
+        if (vwapResult.bonus > 0) {
+          confluence += vwapResult.bonus;
+          confluenceLabel = `${confluenceLabel} [VWAP ${vwapResult.position} +${vwapResult.bonus}]`;
+          console.log(`[trader] VWAP boost: ${mk} ${vwapResult.position} VWAP +${vwapResult.bonus}pt → ${confluence}pt`);
+        }
+
+        const rsiResult = getRSIConfluence(bars, direction as "LONG" | "SHORT");
+        if (rsiResult.bonus !== 0) {
+          confluence += rsiResult.bonus;
+          confluenceLabel = `${confluenceLabel} [${rsiResult.label}]`;
+          console.log(`[trader] RSI boost: ${mk} ${rsiResult.label} ${rsiResult.bonus > 0 ? '+' : ''}${rsiResult.bonus}pt → ${confluence}pt`);
+        }
+
         const edgeBoostCombos: Record<string, { patterns: string[]; boost: number }> = {
           "NQ":  { patterns: ["Double Top"], boost: 2 },
           "MNQ": { patterns: ["Double Top"], boost: 2 },
@@ -2068,7 +2930,6 @@ async function simulateTick(session: TraderSession) {
           };
 
         if (allPassed) {
-
           session.openTrades[tradeKey] = {
             entry, stop, target, trail: stop, initialStop: stop,
             market: mk, timeframe: tf, pattern: detectedPattern,
@@ -2090,7 +2951,32 @@ async function simulateTick(session: TraderSession) {
             reason: entryReason || null,
           }));
 
-          emitTradeSignal(mk, direction, entry, stop, target, session.rewardRatio, confluence, detectedPattern, session.account);
+          for (const acctId of session.accounts) {
+            emitTradeSignal(mk, direction, entry, stop, target, session.rewardRatio, confluence, detectedPattern, acctId)
+              .then(async (result) => {
+                if (result && result.rejected && session.openTrades[tradeKey]) {
+                  console.warn(`[trader] Order rejected for ${mk} — removing open trade: ${result.reason}`);
+                  delete session.openTrades[tradeKey];
+                  session.logs.push(makeLog({
+                    id: logIdCounter++, timestamp: getESTTime(), market: mk, timeframe: tf, pattern: detectedPattern,
+                    action: "ORDER REJECTED", direction,
+                    entry, stop, target, trail: null,
+                    cumPnl: session.cumPnl,
+                    volume: null, bias: state.bias, confluence, confluenceLabel,
+                    sentiment: sentimentLabel(state), dataSource, volumeType: null,
+                    reason: result.reason || "CrossTrade/NinjaTrader rejection",
+                  }));
+                  if (result.sent) {
+                    const instrument = getNTInstrument(mk);
+                    console.log(`[trader] Sending CLOSEPOSITION to CrossTrade for rejected ${instrument} on ${acctId}`);
+                    sendClosePosition(instrument, acctId).catch((err) => {
+                      console.error(`[trader] Failed to close rejected position on CrossTrade: ${err.message}`);
+                    });
+                  }
+                }
+              })
+              .catch(() => {});
+          }
 
           if (isTradovateConnected()) {
             placeBracketOrder(mk, direction, entry, stop, target, 1).then(result => {
@@ -2158,30 +3044,38 @@ export function startTrader(config: {
   rewardRatio: number;
   maxOpenTrades: number;
   account: string;
+  accounts?: string[];
   patterns: string[];
   customCondition: string;
   forceTrading: boolean;
+  fundingMode?: boolean;
 }): string {
   const id = "session_" + Date.now();
-  const rr = Math.max(1, Math.min(config.rewardRatio || 2, 5));
-  const maxOpen = Math.max(1, Math.min(config.maxOpenTrades || 3, 10));
+  const isFunding = config.fundingMode || false;
+  const rr = isFunding ? 2 : Math.max(1, Math.min(config.rewardRatio || 2, 5));
+  const maxOpen = isFunding ? 2 : Math.max(1, Math.min(config.maxOpenTrades || 3, 10));
   const riskAmt = Math.max(10, Math.min(config.riskDollars || 100, 10000));
   const acct = config.account || process.env.CROSSTRADE_ACCOUNT || "SIM101";
+  const allAccounts = config.accounts && config.accounts.length > 0 ? config.accounts : [acct];
   const session: TraderSession = {
     id, running: true,
     markets: config.markets, timeframes: config.timeframes,
-    riskDollars: riskAmt, rewardRatio: rr, maxOpenTrades: maxOpen, account: acct, patterns: config.patterns,
+    riskDollars: riskAmt, rewardRatio: rr, maxOpenTrades: maxOpen, account: acct, accounts: allAccounts, patterns: config.patterns,
     customCondition: config.customCondition,
     forceTrading: config.forceTrading || false,
+    fundingMode: config.fundingMode || false,
     logs: [], cumPnl: 0, timeout: null,
     marketState: {}, bars: {}, tickCount: {},
     openTrades: {}, createdAt: Date.now(),
     wins: 0, losses: 0,
   };
 
+  const acctLabel = allAccounts.length > 1 ? `ALL (${allAccounts.join(", ")})` : acct;
+  console.log(`[trader] Starting session ${id} — accounts: ${acctLabel}, markets: ${config.markets.join(",")}, patterns: ${config.patterns.length}`);
+
   session.logs.push(makeLog({
     id: logIdCounter++, timestamp: getESTTime(),
-    action: "TRADER STARTED", cumPnl: 0,
+    action: `TRADER STARTED (${acctLabel})`, cumPnl: 0,
     dataSource: POLYGON_API_KEY ? "POLYGON" : "SIM",
   }));
 
@@ -2194,6 +3088,8 @@ export function startTrader(config: {
     "cuphandle_long": "Cup & Handle", "cuphandle_short": "Inverse Cup & Handle",
     "doublebottom": "Double Bottom", "doubletop": "Double Top",
     "headshoulders": "Head & Shoulders", "invheadshoulders": "Inverse H&S",
+    "bullflag": "Bull Flag", "bearflag": "Bear Flag",
+    "beartrap": "Bear Trap Reversal", "vwapbounce": "VWAP Bounce",
   };
   const enabledNames = config.patterns.map(p => patternNames[p] || p).join(", ");
   const enabledTFs = config.timeframes.join(", ");
@@ -2202,6 +3098,16 @@ export function startTrader(config: {
     action: "SCANNING",
     reason: `Enabled patterns: ${enabledNames} | Timeframes: ${enabledTFs}`,
   }));
+
+  if (session.fundingMode) {
+    const approved = FUNDING_MODE_WHITELIST.filter(w => config.markets.includes(w.symbol)).map(w => `${w.symbol}/${w.pattern}@${w.timeframe} (${w.winRate}%WR PF${w.profitFactor})`).join(", ");
+    session.logs.push(makeLog({
+      id: logIdCounter++, timestamp: getESTTime(),
+      action: "FUNDING MODE",
+      reason: `Active — only 45%+ WR setups at 1:2 R:R. Approved: ${approved || "None matching selected markets"}`,
+    }));
+    console.log(`[funding] Mode active. Approved combos: ${approved}`);
+  }
 
   const delay = () => Math.floor(rand(8000, 15000));
   function loop() {
@@ -2257,11 +3163,12 @@ export function isForceTradeActive(): boolean {
   return Object.values(sessions).some(s => s.running && s.forceTrading);
 }
 
-export function getSafetyStatus(): { dailyPnl: number; dailyLossLimit: number; maxRiskPct: number; confluenceMin: number; accountSize: number; dailyLimitHit: boolean; rthActive: boolean; apexRules: typeof APEX_RULES } {
+export function getSafetyStatus(): { dailyPnl: number; dailyLossLimit: number; dailyLossLimitDollars: number; maxRiskPct: number; confluenceMin: number; accountSize: number; dailyLimitHit: boolean; rthActive: boolean; apexRules: typeof APEX_RULES } {
   resetDailyPnlIfNeeded();
   return {
     dailyPnl: dailyPnlTracker,
-    dailyLossLimit: DAILY_LOSS_LIMIT_PCT,
+    dailyLossLimit: -configuredDailyLossLimit / DEFAULT_ACCOUNT_SIZE,
+    dailyLossLimitDollars: configuredDailyLossLimit,
     maxRiskPct: MAX_RISK_PCT,
     confluenceMin: LIVE_CONFLUENCE_MIN,
     accountSize: DEFAULT_ACCOUNT_SIZE,
