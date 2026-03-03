@@ -917,28 +917,10 @@
           <label class="check-label"><input type="checkbox" name="market" value="MCL" /><span class="check-dot"></span><span>Micro Crude (MCL)</span></label>
         </div>
 
-        <label>Metals Futures</label>
-        <div class="check-group">
-          <label class="check-label"><input type="checkbox" name="market" value="GC" /><span class="check-dot"></span><span>Gold (GC)</span></label>
-          <label class="check-label"><input type="checkbox" name="market" value="MGC" /><span class="check-dot"></span><span>Micro Gold (MGC)</span></label>
-          <label class="check-label"><input type="checkbox" name="market" value="SI" /><span class="check-dot"></span><span>Silver (SI)</span></label>
-          <label class="check-label"><input type="checkbox" name="market" value="HG" /><span class="check-dot"></span><span>Copper (HG)</span></label>
-          <label class="check-label"><input type="checkbox" name="market" value="PL" /><span class="check-dot"></span><span>Platinum (PL)</span></label>
-          <label class="check-label"><input type="checkbox" name="market" value="PA" /><span class="check-dot"></span><span>Palladium (PA)</span></label>
-        </div>
-
         <label>Crypto Futures</label>
         <div class="check-group">
-          <label class="check-label"><input type="checkbox" name="market" value="BTC" /><span class="check-dot"></span><span>Bitcoin (BTC)</span></label>
-          <label class="check-label"><input type="checkbox" name="market" value="ETH" /><span class="check-dot"></span><span>Ether (ETH)</span></label>
-        </div>
-
-        <label>Treasury Futures</label>
-        <div class="check-group">
-          <label class="check-label"><input type="checkbox" name="market" value="ZB" /><span class="check-dot"></span><span>30-Yr Bond (ZB)</span></label>
-          <label class="check-label"><input type="checkbox" name="market" value="ZN" /><span class="check-dot"></span><span>10-Yr Note (ZN)</span></label>
-          <label class="check-label"><input type="checkbox" name="market" value="ZF" /><span class="check-dot"></span><span>5-Yr Note (ZF)</span></label>
-          <label class="check-label"><input type="checkbox" name="market" value="ZT" /><span class="check-dot"></span><span>2-Yr Note (ZT)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="MBT" /><span class="check-dot"></span><span>Micro Bitcoin (MBT)</span></label>
+          <label class="check-label"><input type="checkbox" name="market" value="MET" /><span class="check-dot"></span><span>Micro Ether (MET)</span></label>
         </div>
 
         <label>Agricultural Futures</label>
@@ -984,11 +966,64 @@
           </div>
         </div>
 
+        <div id="eval-presets-section" style="margin-bottom:1rem;padding:0.75rem;border-radius:10px;border:2px solid #8b5cf633;background:linear-gradient(135deg,#0f172a,#3b076422);">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">
+            <span style="font-size:1.1rem;">&#x1f680;</span>
+            <span style="color:#c4b5fd;font-weight:700;font-size:0.95rem;">Apex Eval Presets</span>
+            <span style="color:#6b7280;font-size:0.72rem;margin-left:auto;">1:2 R:R &bull; Backtested 1,300+ trades</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.5rem;">
+            <button onclick="applyEvalPreset('maxspeed500')" data-testid="button-preset-maxspeed500" style="flex:1;min-width:140px;position:relative;background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;border:2px solid #f87171;padding:0.55rem 0.7rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.78rem;text-align:left;line-height:1.3;box-shadow:0 0 12px #dc262644;">
+              <div>&#x1f525; MAX SPEED 500</div>
+              <div style="font-weight:400;font-size:0.68rem;opacity:0.85;">$500 risk &bull; 5 markets &bull; Pass Day 2-3</div>
+              <div style="font-weight:400;font-size:0.65rem;opacity:0.7;">NQ+CL+YM+MBT+MET &bull; HIGH RISK</div>
+            </button>
+            <button onclick="applyEvalPreset('maxspeed300')" data-testid="button-preset-maxspeed300" style="flex:1;min-width:140px;position:relative;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border:2px solid #fb923c;padding:0.55rem 0.7rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.78rem;text-align:left;line-height:1.3;box-shadow:0 0 12px #f9731644;">
+              <div>&#x26a1; MAX SPEED 300</div>
+              <div style="font-weight:400;font-size:0.68rem;opacity:0.85;">$300 risk &bull; 5 markets &bull; Pass Day 3-5</div>
+              <div style="font-weight:400;font-size:0.65rem;opacity:0.7;">NQ+CL+YM+MBT+MET &bull; 5+15min</div>
+            </button>
+            <button onclick="applyEvalPreset('speedking')" data-testid="button-preset-speedking" style="flex:1;min-width:140px;position:relative;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:2px solid #a78bfa;padding:0.55rem 0.7rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.78rem;text-align:left;line-height:1.3;box-shadow:0 0 12px #7c3aed44;">
+              <div>&#x1f451; SPEED KING</div>
+              <div style="font-weight:400;font-size:0.68rem;opacity:0.85;">NQ+CL &bull; $100 risk &bull; Pass Day 5</div>
+              <div style="font-weight:400;font-size:0.65rem;opacity:0.7;">CL Wedge 80% WR &bull; 8-12 ET</div>
+            </button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
+            <button onclick="applyEvalPreset('nqsniper')" data-testid="button-preset-nqsniper" style="flex:1;min-width:140px;background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:0.55rem 0.7rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.78rem;text-align:left;line-height:1.3;">
+              <div>&#x1f3af; NQ SNIPER</div>
+              <div style="font-weight:400;font-size:0.68rem;opacity:0.85;">NQ only &bull; $100 risk &bull; Pass Day 9</div>
+              <div style="font-weight:400;font-size:0.65rem;opacity:0.7;">40% WR &bull; PF 3.06 &bull; 9-13 ET</div>
+            </button>
+            <button onclick="applyEvalPreset('safest')" data-testid="button-preset-safest" style="flex:1;min-width:140px;background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:0.55rem 0.7rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.78rem;text-align:left;line-height:1.3;">
+              <div>&#x1f6e1;&#xfe0f; SAFEST</div>
+              <div style="font-weight:400;font-size:0.68rem;opacity:0.85;">CL only &bull; $100 risk &bull; Lowest DD</div>
+              <div style="font-weight:400;font-size:0.65rem;opacity:0.7;">Wedge 80% WR &bull; PF 30.56 &bull; 10-13 ET</div>
+            </button>
+            <button onclick="applyEvalPreset('balanced')" data-testid="button-preset-balanced" style="flex:1;min-width:140px;background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:0.55rem 0.7rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.78rem;text-align:left;line-height:1.3;">
+              <div>&#x2696;&#xfe0f; BALANCED</div>
+              <div style="font-weight:400;font-size:0.68rem;opacity:0.85;">NQ+YM &bull; $100 risk &bull; Pass Day 9</div>
+              <div style="font-weight:400;font-size:0.65rem;opacity:0.7;">YM H&amp;S 66.7% WR &bull; 10-13 ET</div>
+            </button>
+            <button onclick="applyEvalPreset('widenet')" data-testid="button-preset-widenet" style="flex:1;min-width:140px;background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:0.55rem 0.7rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.78rem;text-align:left;line-height:1.3;">
+              <div>&#x1f310; WIDE NET</div>
+              <div style="font-weight:400;font-size:0.68rem;opacity:0.85;">NQ+YM+CL+MBT &bull; $100 risk</div>
+              <div style="font-weight:400;font-size:0.65rem;opacity:0.7;">4 uncorrelated markets &bull; 8-12 ET</div>
+            </button>
+            <button onclick="applyEvalPreset('scalper')" data-testid="button-preset-scalper" style="flex:1;min-width:140px;position:relative;background:linear-gradient(135deg,#ec4899,#be185d);color:#fff;border:2px solid #f472b6;padding:0.55rem 0.7rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.78rem;text-align:left;line-height:1.3;box-shadow:0 0 12px #ec489944;">
+              <div>&#x1fa84; SCALPER</div>
+              <div style="font-weight:400;font-size:0.68rem;opacity:0.85;">NQ+CL &bull; $200 risk &bull; 1:1 R:R</div>
+              <div style="font-weight:400;font-size:0.65rem;opacity:0.7;">Scalp Tail Only &bull; Vol Surge &bull; 8-13 ET</div>
+            </button>
+          </div>
+          <div id="active-preset-banner" style="display:none;margin-top:0.5rem;padding:0.4rem 0.6rem;border-radius:6px;font-size:0.78rem;font-weight:600;text-align:center;" data-testid="text-active-preset"></div>
+        </div>
+
         <label for="riskDollars">Risk Per Trade ($)</label>
         <input id="riskDollars" type="number" value="100" min="10" max="10000" step="10" style="max-width:160px;" data-testid="input-risk-dollars" />
 
         <label for="dailyLossLimit">Daily Loss Limit ($)</label>
-        <input id="dailyLossLimit" type="number" value="1500" min="100" max="10000" step="50" style="max-width:160px;" data-testid="input-daily-loss-limit" />
+        <input id="dailyLossLimit" type="number" value="800" min="100" max="10000" step="50" style="max-width:160px;" data-testid="input-daily-loss-limit" />
 
         <label for="maxOpenTrades">Max Open Trades</label>
         <select id="maxOpenTrades" style="max-width:160px;" data-testid="select-max-open-trades">
@@ -1001,10 +1036,45 @@
           <option value="10">10</option>
         </select>
 
-        <label for="tradeAccount">NinjaTrader Account</label>
+        <label for="tradeAccount">Trading Account</label>
         <select id="tradeAccount" style="max-width:320px;" data-testid="select-trade-account" onchange="syncAccountFields()">
         </select>
         <span id="account-type-badge" data-testid="text-account-type" style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;margin-left:4px;background:#22c55e;color:#fff;">SIM</span>
+        <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.3rem;flex-wrap:wrap;">
+          <button type="button" onclick="toggleAddAccountForm()" style="background:#334155;color:#94a3b8;border:1px solid #475569;padding:3px 10px;border-radius:6px;font-size:0.75rem;cursor:pointer;" data-testid="button-add-account">+ Add Account</button>
+          <button type="button" onclick="removeSelectedAccount()" style="background:#1e293b;color:#ef4444;border:1px solid #ef4444;padding:3px 10px;border-radius:6px;font-size:0.75rem;cursor:pointer;" data-testid="button-remove-account">Remove Selected</button>
+          <button type="button" onclick="resetSelectedAccount()" style="background:#1e293b;color:#22c55e;border:1px solid #22c55e;padding:3px 10px;border-radius:6px;font-size:0.75rem;cursor:pointer;" data-testid="button-reset-account">Reset Status</button>
+        </div>
+        <div id="add-account-form" style="display:none;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:0.6rem;margin-top:0.3rem;">
+          <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:end;">
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <label style="font-size:0.65rem;color:#64748b;">Account ID</label>
+              <input id="new-acct-id" type="text" placeholder="e.g. APEX22106300000116" style="width:200px;font-size:0.8rem;" data-testid="input-new-account-id" />
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <label style="font-size:0.65rem;color:#64748b;">Display Name</label>
+              <input id="new-acct-name" type="text" placeholder="e.g. Rithmic Eval 50k" style="width:180px;font-size:0.8rem;" data-testid="input-new-account-name" />
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <label style="font-size:0.65rem;color:#64748b;">Type</label>
+              <select id="new-acct-type" style="font-size:0.8rem;" data-testid="select-new-account-type">
+                <option value="eval">Eval</option>
+                <option value="funded">Funded</option>
+                <option value="test">Test</option>
+                <option value="sim">Sim</option>
+              </select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <label style="font-size:0.65rem;color:#64748b;">Provider</label>
+              <select id="new-acct-provider" style="font-size:0.8rem;" data-testid="select-new-account-provider">
+                <option value="rithmic">Rithmic</option>
+                <option value="tradovate">Tradovate</option>
+                <option value="ninjatrader">NinjaTrader</option>
+              </select>
+            </div>
+            <button type="button" onclick="addNewAccount()" style="background:#22c55e;color:#fff;border:none;padding:5px 14px;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;" data-testid="button-confirm-add-account">Add</button>
+          </div>
+        </div>
         <label class="check-label" style="margin-top:0.3rem;">
           <input type="checkbox" id="tradeAllAccounts" data-testid="checkbox-trade-all-accounts" onchange="toggleTradeAllAccounts()" />
           <span class="check-dot"></span>
@@ -1071,15 +1141,25 @@
           <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
             <label class="check-label"><input type="checkbox" name="pattern" value="retest_long" checked /><span class="check-dot"></span><span>Retest Buy Long</span></label>
             <label class="check-label"><input type="checkbox" name="pattern" value="retest_short" checked /><span class="check-dot"></span><span>Retest Sell Short</span></label>
+            <label class="check-label"><input type="checkbox" name="pattern" value="scalp_tail" checked /><span class="check-dot"></span><span>Scalp Tail Reversal (1:1)</span></label>
           </div>
         </div>
 
         <label for="customCondition">Custom Buy Condition (optional)</label>
         <textarea id="customCondition" placeholder="e.g. Only enter if price is above VWAP and volume spike > 1.5x avg..."></textarea>
 
+        <div id="account-trader-panel" style="background:#0f1219;border:1px solid #1e293b;border-radius:10px;padding:0.8rem;margin-bottom:0.6rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+            <h4 style="margin:0;font-size:0.85rem;color:#94a3b8;">Per-Account Trader Controls</h4>
+            <div style="display:flex;gap:0.4rem;">
+              <button onclick="startAllAccounts()" style="background:#22c55e;color:#fff;border:none;padding:4px 12px;border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;" data-testid="button-start-all">Start All</button>
+              <button onclick="stopAllAccounts()" style="background:#ef4444;color:#fff;border:none;padding:4px 12px;border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;" data-testid="button-stop-all">Stop All</button>
+            </div>
+          </div>
+          <div id="account-instances" data-testid="account-instances"></div>
+        </div>
+
         <div class="trader-actions">
-          <button id="btn-start-trader" class="btn-start" onclick="startTrader()" data-testid="button-start-trader">Start Autonomous Trader</button>
-          <button id="btn-stop-trader" class="btn-stop" onclick="stopTrader()" disabled data-testid="button-stop-trader">Stop Trading</button>
           <button class="btn-test-signal" onclick="sendTestSignal()" data-testid="button-test-signal">&#x1f4e1; Test Signal</button>
           <button id="btn-close-all" style="background:#ef4444;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.85rem;" onclick="closeAllPositions()" data-testid="button-close-all">Close All Positions</button>
         </div>
@@ -1109,6 +1189,7 @@
       </div>
 
       <div id="trader-dashboard" style="display:none;">
+        <div id="account-tabs" style="display:flex;gap:0.3rem;margin-bottom:0.5rem;flex-wrap:wrap;" data-testid="account-tabs"></div>
         <div class="trader-stats" id="trader-stats">
           <div class="t-stat"><div class="t-stat-label">Trades</div><div class="t-stat-value" id="stat-trades">0</div></div>
           <div class="t-stat"><div class="t-stat-label">Wins</div><div class="t-stat-value positive" id="stat-wins">0</div></div>
@@ -1122,7 +1203,7 @@
 
         <div class="trade-log-wrap">
           <div class="trade-log-header">
-            <h3>Live Trading Log</h3>
+            <h3>Live Trading Log <span id="log-account-label" style="font-size:0.75rem;color:#94a3b8;font-weight:400;"></span></h3>
             <div class="log-live-dot" id="log-live-dot"></div>
           </div>
           <div class="trade-log" id="trade-log">
@@ -1389,19 +1470,9 @@
                   <option value="CL">CL (Crude Oil)</option>
                   <option value="MCL">MCL (Micro Crude)</option>
                 </optgroup>
-                <optgroup label="Metals">
-                  <option value="GC">GC (Gold)</option>
-                  <option value="MGC">MGC (Micro Gold)</option>
-                  <option value="SI">SI (Silver)</option>
-                  <option value="HG">HG (Copper)</option>
-                </optgroup>
                 <optgroup label="Crypto">
-                  <option value="BTC">BTC (Bitcoin)</option>
-                  <option value="ETH">ETH (Ethereum)</option>
-                </optgroup>
-                <optgroup label="Treasury">
-                  <option value="ZB">ZB (30Y Bond)</option>
-                  <option value="ZN">ZN (10Y Note)</option>
+                  <option value="MBT">MBT (Micro Bitcoin)</option>
+                  <option value="MET">MET (Micro Ether)</option>
                 </optgroup>
                 <optgroup label="Agriculture">
                   <option value="ZC">ZC (Corn)</option>
@@ -1534,7 +1605,7 @@
                   <option value="1500" selected>-$1,500 (50K)</option>
                   <option value="2500">-$2,500 (100K)</option>
                   <option value="3000">-$3,000 (150K)</option>
-                  <option value="625">-$625 (PA 25K)</option>
+                  <option value="625">-$625 (25K)</option>
                 </select>
               </div>
               <div class="bt-field">
@@ -2053,6 +2124,89 @@
     let traderSessionId = null;
     let traderPollInterval = null;
     let lastLogId = 0;
+    const accountSessions = {};
+    let activeViewAccount = null;
+
+    const DEFAULT_ACCOUNT_PRESETS = {
+      'APEX22106300000123': 'speedking',
+      'APEX22106300000124': 'widenet',
+    };
+    const PRESET_VERSION = 6;
+    const storedVersion = parseInt(localStorage.getItem('presetVersion') || '0');
+    if (storedVersion < PRESET_VERSION) {
+      localStorage.removeItem('accountPresets');
+      localStorage.setItem('presetVersion', String(PRESET_VERSION));
+    }
+    const accountPresets = Object.assign({}, DEFAULT_ACCOUNT_PRESETS, JSON.parse(localStorage.getItem('accountPresets') || '{}'));
+
+    function getAccountColor(idx) {
+      const colors = ['#7c3aed','#f59e0b','#22c55e','#3b82f6','#06b6d4','#ec4899','#f97316'];
+      return colors[idx % colors.length];
+    }
+
+    function getPresetOptionsHtml(accountId) {
+      const current = accountPresets[accountId] || 'global';
+      let html = `<option value="global" ${current === 'global' ? 'selected' : ''}>Global Config</option>`;
+      for (const [id, p] of Object.entries(EVAL_PRESETS)) {
+        html += `<option value="${id}" ${current === id ? 'selected' : ''}>${p.name}</option>`;
+      }
+      return html;
+    }
+
+    function getPresetBadgeHtml(accountId) {
+      const s = accountSessions[accountId];
+      const presetId = s && s.preset ? s.preset : (accountPresets[accountId] || 'global');
+      if (presetId === 'global') {
+        return `<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:0.65rem;font-weight:700;background:#334155;color:#94a3b8;white-space:nowrap;">GLOBAL</span>`;
+      }
+      const p = EVAL_PRESETS[presetId];
+      if (!p) return '';
+      const mkts = p.markets.join('+');
+      return `<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:0.65rem;font-weight:700;background:${p.color}22;color:${p.color};border:1px solid ${p.color}44;white-space:nowrap;">${p.name} · $${p.riskDollars} · ${mkts}</span>`;
+    }
+
+    function onPresetChange(accountId, value) {
+      if (value === 'global') {
+        delete accountPresets[accountId];
+      } else {
+        accountPresets[accountId] = value;
+      }
+      localStorage.setItem('accountPresets', JSON.stringify(accountPresets));
+      renderAccountInstances();
+    }
+
+    function renderAccountInstances() {
+      const container = document.getElementById('account-instances');
+      if (!container) return;
+      const sel = document.getElementById('tradeAccount');
+      if (!sel) return;
+      const accounts = [...sel.options].map(o => ({ id: o.value, name: o.textContent }));
+      container.innerHTML = accounts.map((acct, idx) => {
+        const s = accountSessions[acct.id];
+        const running = s && s.running;
+        const color = getAccountColor(idx);
+        const shortId = acct.id.length > 12 ? acct.id.slice(-6) : acct.id;
+        const presetBadge = running ? getPresetBadgeHtml(acct.id) : '';
+        const presetSelect = !running ? `<select onchange="onPresetChange('${acct.id}', this.value)" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:2px 4px;border-radius:4px;font-size:0.68rem;max-width:140px;" data-testid="select-preset-${acct.id}">${getPresetOptionsHtml(acct.id)}</select>` : '';
+        return `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.6rem;background:${running ? '#0f1f0f' : '#0f1219'};border:1px solid ${running ? '#22c55e55' : '#1e293b'};border-left:3px solid ${color};border-radius:6px;margin-bottom:0.3rem;flex-wrap:wrap;" data-testid="account-row-${acct.id}">
+          <div style="display:flex;align-items:center;gap:0.4rem;flex:1;min-width:150px;">
+            <span style="width:8px;height:8px;border-radius:50%;background:${running ? '#22c55e' : '#475569'};display:inline-block;${running ? 'animation:pulse 1.5s infinite;' : ''}"></span>
+            <span style="font-weight:700;font-size:0.8rem;color:#e2e8f0;">${esc(acct.name)}</span>
+            <span style="font-size:0.65rem;color:#64748b;">${shortId}</span>
+          </div>
+          <div style="display:flex;gap:0.3rem;align-items:center;flex-wrap:wrap;">
+            ${presetSelect}
+            ${presetBadge}
+            ${running
+              ? `<span style="font-size:0.7rem;color:#94a3b8;">P&L: <span id="acct-pnl-${acct.id}" style="font-weight:700;">$0</span> | Trades: <span id="acct-trades-${acct.id}">0</span></span>`
+              : ''}
+            <button onclick="startAccountTrader('${acct.id}')" ${running ? 'disabled' : ''} style="background:${running ? '#1e293b' : '#22c55e'};color:${running ? '#475569' : '#fff'};border:none;padding:4px 12px;border-radius:6px;font-size:0.72rem;font-weight:700;cursor:${running ? 'default' : 'pointer'};" data-testid="button-start-${acct.id}">${running ? 'Running' : 'Start'}</button>
+            <button onclick="stopAccountTrader('${acct.id}')" ${!running ? 'disabled' : ''} style="background:${!running ? '#1e293b' : '#ef4444'};color:${!running ? '#475569' : '#fff'};border:none;padding:4px 12px;border-radius:6px;font-size:0.72rem;font-weight:700;cursor:${!running ? 'default' : 'pointer'};" data-testid="button-stop-${acct.id}">Stop</button>
+            ${running ? `<button onclick="viewAccountLogs('${acct.id}')" style="background:#334155;color:#94a3b8;border:1px solid #475569;padding:4px 10px;border-radius:6px;font-size:0.72rem;cursor:pointer;" data-testid="button-view-${acct.id}">View Logs</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
 
     async function checkTradingStatus() {
       try {
@@ -2089,12 +2243,15 @@
           const safety = await safeJson(await fetch('/api/trader/safety'));
           const rthBadge = document.getElementById('rth-status');
           const rthText = document.getElementById('rth-status-text');
+          const rthS = safety.apexRules ? safety.apexRules.rthStart : {hour:8,minute:0};
+          const rthE = safety.apexRules ? safety.apexRules.rthEnd : {hour:16,minute:0};
+          const rthLabel = rthS.hour + ':' + String(rthS.minute).padStart(2,'0') + ' – ' + rthE.hour + ':' + String(rthE.minute).padStart(2,'0') + ' ET';
           if (safety.rthActive) {
             rthBadge.className = 'trading-status open';
-            rthText.textContent = 'RTH Active (9:30 AM – 4:00 PM ET) | Daily P&L: $' + (safety.dailyPnl || 0).toFixed(2) + (safety.dailyLimitHit ? ' ⚠ LIMIT HIT' : '');
+            rthText.textContent = 'RTH Active (' + rthLabel + ') | Daily P&L: $' + (safety.dailyPnl || 0).toFixed(2) + (safety.dailyLimitHit ? ' LIMIT HIT' : '');
           } else {
             rthBadge.className = 'trading-status closed';
-            rthText.textContent = 'Outside RTH (signals blocked by Apex rules) | Daily P&L: $' + (safety.dailyPnl || 0).toFixed(2);
+            rthText.textContent = 'Outside RTH (' + rthLabel + ') | Daily P&L: $' + (safety.dailyPnl || 0).toFixed(2);
           }
         } catch {}
 
@@ -2121,56 +2278,204 @@
       return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(c => c.value);
     }
 
-    async function startTrader() {
-      const markets = getChecked('market');
-      const timeframes = getChecked('tf');
-      const patterns = getChecked('pattern');
-      const riskDollars = parseFloat(document.getElementById('riskDollars').value) || 100;
-      const rewardRatio = parseFloat(document.getElementById('rewardRatio').value) || 2;
-      const maxOpenTrades = parseInt(document.getElementById('maxOpenTrades').value) || 3;
-      const dailyLossLimit = parseFloat(document.getElementById('dailyLossLimit').value) || 1500;
-      const account = document.getElementById('tradeAccount').value;
-      const tradeAll = document.getElementById('tradeAllAccounts').checked;
-      const accounts = tradeAll ? [...document.getElementById('tradeAccount').options].map(o => o.value) : null;
-      const customCondition = document.getElementById('customCondition').value;
-      const forceTrading = document.getElementById('forceTrading').checked;
-      const fundingMode = document.getElementById('fundingMode').checked;
-
-      if (!markets.length) { showToast('Select at least one market'); return; }
-      if (!timeframes.length) { showToast('Select at least one timeframe'); return; }
-      if (!patterns.length) { showToast('Select at least one pattern'); return; }
-
-      document.getElementById('btn-start-trader').disabled = true;
-      document.getElementById('btn-stop-trader').disabled = false;
-
-      try {
-        const d = await safeJson(await fetch('/api/trader/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({markets,timeframes,riskDollars,rewardRatio,maxOpenTrades,dailyLossLimit,account,accounts,patterns,customCondition,forceTrading,fundingMode}) }));
-        if (d.success) {
-          traderSessionId = d.sessionId;
-          lastLogId = 0;
-          document.getElementById('trade-log').innerHTML = '<div class="log-empty">Waiting for first signal...</div>';
-          document.getElementById('trader-dashboard').style.display = 'block';
-          document.getElementById('log-live-dot').className = 'log-live-dot';
-          document.getElementById('stat-rr').textContent = '1:' + rewardRatio;
-          document.getElementById('stat-risk-amt').textContent = '$' + riskDollars;
-          document.getElementById('stat-max-open').textContent = maxOpenTrades;
-          showToast('Autonomous trader started!');
-          traderPollInterval = setInterval(pollTraderLogs, 2000);
-        } else { showToast('Failed to start'); document.getElementById('btn-start-trader').disabled = false; }
-      } catch { showToast('Network error'); document.getElementById('btn-start-trader').disabled = false; }
+    function getTraderConfig() {
+      return {
+        markets: getChecked('market'),
+        timeframes: getChecked('tf'),
+        patterns: getChecked('pattern'),
+        riskDollars: parseFloat(document.getElementById('riskDollars').value) || 100,
+        rewardRatio: parseFloat(document.getElementById('rewardRatio').value) || 2,
+        maxOpenTrades: parseInt(document.getElementById('maxOpenTrades').value) || 3,
+        dailyLossLimit: parseFloat(document.getElementById('dailyLossLimit').value) || 800,
+        customCondition: document.getElementById('customCondition').value,
+        forceTrading: document.getElementById('forceTrading').checked,
+        fundingMode: document.getElementById('fundingMode').checked,
+        rthStartHour: window._presetRthStart || 8,
+        rthEndHour: window._presetRthEnd || 16,
+      };
     }
 
-    async function stopTrader() {
-      if (!traderSessionId) return;
+    function getConfigForAccount(accountId) {
+      const presetId = accountPresets[accountId];
+      if (!presetId || presetId === 'global') {
+        return getTraderConfig();
+      }
+      const preset = EVAL_PRESETS[presetId];
+      if (!preset) return getTraderConfig();
+      const patterns = preset.patterns || getChecked('pattern');
+      return {
+        markets: preset.markets,
+        timeframes: preset.timeframes,
+        patterns: patterns,
+        riskDollars: preset.riskDollars,
+        rewardRatio: preset.rewardRatio,
+        maxOpenTrades: preset.maxOpenTrades,
+        dailyLossLimit: preset.dailyLossLimit,
+        rthStartHour: preset.rthStartHour,
+        rthEndHour: preset.rthEndHour,
+        customCondition: '',
+        forceTrading: document.getElementById('forceTrading').checked,
+        fundingMode: false,
+      };
+    }
+
+    async function startAccountTrader(accountId) {
+      const presetId = accountPresets[accountId] || 'global';
+      const cfg = getConfigForAccount(accountId);
+      if (!cfg.markets.length) { showToast('Select at least one market'); return; }
+      if (!cfg.timeframes.length) { showToast('Select at least one timeframe'); return; }
+      if (!cfg.patterns.length) { showToast('Select at least one pattern'); return; }
+
       try {
-        await fetch('/api/trader/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sessionId:traderSessionId}) });
-        showToast('Trader stopped');
+        const d = await safeJson(await fetch('/api/trader/start', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            ...cfg,
+            account: accountId,
+            accounts: [accountId],
+          })
+        }));
+        if (d.success) {
+          accountSessions[accountId] = {
+            sessionId: d.sessionId,
+            running: true,
+            lastLogId: 0,
+            preset: presetId,
+          };
+          if (!activeViewAccount) {
+            activeViewAccount = accountId;
+          }
+          showDashboard();
+          renderAccountInstances();
+          renderAccountTabs();
+          startMultiPoll();
+          const label = presetId !== 'global' && EVAL_PRESETS[presetId] ? EVAL_PRESETS[presetId].name + ' ($' + EVAL_PRESETS[presetId].riskDollars + ')' : 'Global Config';
+          showToast(accountId.slice(-6) + ' started with ' + label);
+        } else {
+          showToast('Failed to start: ' + (d.error || 'unknown'));
+        }
+      } catch (e) {
+        showToast('Network error starting trader');
+      }
+    }
+
+    async function stopAccountTrader(accountId) {
+      const s = accountSessions[accountId];
+      if (!s || !s.running) return;
+      try {
+        await fetch('/api/trader/stop', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ sessionId: s.sessionId })
+        });
       } catch {}
-      document.getElementById('btn-start-trader').disabled = false;
-      document.getElementById('btn-stop-trader').disabled = true;
-      document.getElementById('log-live-dot').className = 'log-live-dot stopped';
-      if (traderPollInterval) clearInterval(traderPollInterval);
-      traderPollInterval = null;
+      s.running = false;
+      renderAccountInstances();
+      renderAccountTabs();
+      showToast('Trader stopped for ' + accountId);
+
+      const anyRunning = Object.values(accountSessions).some(x => x.running);
+      if (!anyRunning) {
+        stopMultiPoll();
+        document.getElementById('log-live-dot').className = 'log-live-dot stopped';
+      }
+    }
+
+    async function startAllAccounts() {
+      const sel = document.getElementById('tradeAccount');
+      const ids = [...sel.options].map(o => o.value);
+      for (const id of ids) {
+        if (!accountSessions[id] || !accountSessions[id].running) {
+          await startAccountTrader(id);
+        }
+      }
+    }
+
+    async function stopAllAccounts() {
+      for (const id of Object.keys(accountSessions)) {
+        if (accountSessions[id].running) {
+          await stopAccountTrader(id);
+        }
+      }
+    }
+
+    function startTrader() {
+      const account = document.getElementById('tradeAccount').value;
+      startAccountTrader(account);
+    }
+
+    function stopTrader() {
+      const account = document.getElementById('tradeAccount').value;
+      stopAccountTrader(account);
+    }
+
+    function showDashboard() {
+      document.getElementById('trader-dashboard').style.display = 'block';
+      document.getElementById('log-live-dot').className = 'log-live-dot';
+    }
+
+    function viewAccountLogs(accountId) {
+      activeViewAccount = accountId;
+      const s = accountSessions[accountId];
+      if (s) s.lastLogId = 0;
+      lastLogId = 0;
+      document.getElementById('trade-log').innerHTML = '<div class="log-empty">Loading logs...</div>';
+      renderAccountTabs();
+      showDashboard();
+      pollTraderLogs();
+    }
+
+    function renderAccountTabs() {
+      const container = document.getElementById('account-tabs');
+      if (!container) return;
+      const running = Object.entries(accountSessions).filter(([_,s]) => s.running || s.sessionId);
+      if (running.length <= 1) { container.innerHTML = ''; return; }
+      container.innerHTML = running.map(([id, s]) => {
+        const isActive = id === activeViewAccount;
+        const sel = document.getElementById('tradeAccount');
+        const opt = [...sel.options].find(o => o.value === id);
+        const label = opt ? opt.textContent : id;
+        return `<button onclick="viewAccountLogs('${id}')" style="padding:4px 12px;border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;border:1px solid ${isActive ? '#7c3aed' : '#334155'};background:${isActive ? '#7c3aed22' : '#0f1219'};color:${isActive ? '#a78bfa' : '#94a3b8'};" data-testid="tab-${id}">${esc(label)} ${s.running ? '●' : '○'}</button>`;
+      }).join('');
+    }
+
+    let multiPollInterval = null;
+    function startMultiPoll() {
+      if (multiPollInterval) return;
+      multiPollInterval = setInterval(pollAllSessions, 2000);
+    }
+    function stopMultiPoll() {
+      if (multiPollInterval) clearInterval(multiPollInterval);
+      multiPollInterval = null;
+    }
+
+    async function pollAllSessions() {
+      for (const [accountId, s] of Object.entries(accountSessions)) {
+        if (!s.running) continue;
+        try {
+          const url = `/api/trader/logs/${s.sessionId}${s.lastLogId ? '?after=' + s.lastLogId : ''}`;
+          const d = await safeJson(await fetch(url));
+          if (d.status) {
+            const pnlEl = document.getElementById('acct-pnl-' + accountId);
+            const trEl = document.getElementById('acct-trades-' + accountId);
+            if (pnlEl) {
+              pnlEl.textContent = (d.status.cumPnl >= 0 ? '+' : '') + '$' + d.status.cumPnl.toFixed(2);
+              pnlEl.style.color = d.status.cumPnl >= 0 ? '#34d399' : '#ef4444';
+            }
+            if (trEl) trEl.textContent = d.status.tradeCount;
+          }
+          if (d.logs) {
+            d.logs.forEach(log => {
+              if (log.id > s.lastLogId) s.lastLogId = log.id;
+            });
+          }
+          if (!s.running && d.status && !d.status.running) {
+            s.running = false;
+            renderAccountInstances();
+          }
+        } catch {}
+      }
       pollTraderLogs();
     }
 
@@ -2271,6 +2576,288 @@
         document.getElementById('maxOpenTrades').disabled = false;
         showToast('Funding Mode OFF — all setups enabled');
       }
+    }
+
+    const EVAL_PRESETS = {
+      maxspeed500: {
+        name: 'MAX SPEED 500',
+        markets: ['NQ', 'CL', 'YM', 'MBT', 'MET'],
+        timeframes: ['5min', '15min'],
+        patterns: null,
+        rewardRatio: 2,
+        maxOpenTrades: 3,
+        dailyLossLimit: 800,
+        riskDollars: 500,
+        rthStartHour: 8,
+        rthEndHour: 13,
+        description: '$500 risk | NQ+CL+YM+MBT+MET | 5+15min | 8-13 ET | $800 max loss | HIGH RISK',
+        color: '#dc2626',
+        bgColor: 'linear-gradient(135deg,#dc2626,#991b1b)',
+        borderColor: '#f87171'
+      },
+      maxspeed300: {
+        name: 'MAX SPEED 300',
+        markets: ['NQ', 'CL', 'YM', 'MBT', 'MET'],
+        timeframes: ['5min', '15min'],
+        patterns: null,
+        rewardRatio: 2,
+        maxOpenTrades: 3,
+        dailyLossLimit: 800,
+        riskDollars: 300,
+        rthStartHour: 8,
+        rthEndHour: 13,
+        description: '$300 risk | NQ+CL+YM+MBT+MET | 5+15min | 8-13 ET | $800 max loss',
+        color: '#f97316',
+        bgColor: 'linear-gradient(135deg,#f97316,#ea580c)',
+        borderColor: '#fb923c'
+      },
+      speedking: {
+        name: 'SPEED KING',
+        markets: ['NQ', 'CL'],
+        timeframes: ['5min'],
+        patterns: null,
+        rewardRatio: 2,
+        maxOpenTrades: 2,
+        dailyLossLimit: 800,
+        riskDollars: 200,
+        rthStartHour: 8,
+        rthEndHour: 12,
+        description: '$200 risk | NQ+CL | 8-12 ET | $800 max loss | CL Wedge 80% WR',
+        color: '#7c3aed',
+        bgColor: 'linear-gradient(135deg,#7c3aed,#4f46e5)',
+        borderColor: '#a78bfa'
+      },
+      nqsniper: {
+        name: 'NQ SNIPER',
+        markets: ['NQ'],
+        timeframes: ['5min'],
+        patterns: null,
+        rewardRatio: 2,
+        maxOpenTrades: 1,
+        dailyLossLimit: 800,
+        riskDollars: 200,
+        rthStartHour: 9,
+        rthEndHour: 13,
+        description: '$200 risk | NQ only | 9-13 ET | $800 max loss',
+        color: '#f59e0b',
+        bgColor: '#1e293b',
+        borderColor: '#f59e0b'
+      },
+      safest: {
+        name: 'SAFEST',
+        markets: ['CL'],
+        timeframes: ['5min'],
+        patterns: null,
+        rewardRatio: 2,
+        maxOpenTrades: 1,
+        dailyLossLimit: 800,
+        riskDollars: 200,
+        rthStartHour: 10,
+        rthEndHour: 13,
+        description: '$200 risk | CL only | Wedge 80% WR | 10-13 ET | $800 max loss',
+        color: '#22c55e',
+        bgColor: '#1e293b',
+        borderColor: '#22c55e'
+      },
+      balanced: {
+        name: 'BALANCED',
+        markets: ['NQ', 'YM'],
+        timeframes: ['5min'],
+        patterns: null,
+        rewardRatio: 2,
+        maxOpenTrades: 2,
+        dailyLossLimit: 800,
+        riskDollars: 200,
+        rthStartHour: 10,
+        rthEndHour: 13,
+        description: '$200 risk | NQ+YM | 10-13 ET | $800 max loss',
+        color: '#3b82f6',
+        bgColor: '#1e293b',
+        borderColor: '#3b82f6'
+      },
+      widenet: {
+        name: 'WIDE NET',
+        markets: ['NQ', 'YM', 'CL', 'MBT'],
+        timeframes: ['5min'],
+        patterns: null,
+        rewardRatio: 2,
+        maxOpenTrades: 2,
+        dailyLossLimit: 800,
+        riskDollars: 200,
+        rthStartHour: 8,
+        rthEndHour: 12,
+        description: '$200 risk | NQ+YM+CL+MBT | 8-12 ET | $800 max loss',
+        color: '#06b6d4',
+        bgColor: '#1e293b',
+        borderColor: '#06b6d4'
+      },
+      scalper: {
+        name: 'SCALPER',
+        markets: ['NQ', 'CL'],
+        timeframes: ['2min', '5min'],
+        patterns: ['scalp_tail'],
+        rewardRatio: 1,
+        maxOpenTrades: 2,
+        dailyLossLimit: 800,
+        riskDollars: 200,
+        rthStartHour: 8,
+        rthEndHour: 13,
+        description: '$200 risk | Scalp Tail Only | 1:1 R:R | Vol Surge | NQ+CL | 2+5min | 8-13 ET',
+        color: '#ec4899',
+        bgColor: 'linear-gradient(135deg,#ec4899,#be185d)',
+        borderColor: '#f472b6'
+      },
+      widenet_scalper: {
+        name: 'WIDE NET + SCALPER',
+        markets: ['NQ', 'YM', 'CL', 'MBT'],
+        timeframes: ['2min', '5min', '15min'],
+        patterns: null,
+        rewardRatio: 2,
+        maxOpenTrades: 3,
+        dailyLossLimit: 800,
+        riskDollars: 200,
+        rthStartHour: 8,
+        rthEndHour: 13,
+        description: '$200 risk | NQ+YM+CL+MBT | All patterns + Scalp Tail | 2+5+15min | 8-13 ET',
+        color: '#14b8a6',
+        bgColor: 'linear-gradient(135deg,#14b8a6,#0d9488)',
+        borderColor: '#2dd4bf'
+      },
+      speedking_scalper: {
+        name: 'SPEED KING + SCALPER',
+        markets: ['NQ', 'CL'],
+        timeframes: ['2min', '5min'],
+        patterns: null,
+        rewardRatio: 2,
+        maxOpenTrades: 2,
+        dailyLossLimit: 800,
+        riskDollars: 200,
+        rthStartHour: 8,
+        rthEndHour: 12,
+        description: '$200 risk | NQ+CL | All patterns + Scalp Tail | 2+5min | 8-12 ET',
+        color: '#a855f7',
+        bgColor: 'linear-gradient(135deg,#a855f7,#ec4899)',
+        borderColor: '#c084fc'
+      }
+    };
+
+    let activePresets = new Set();
+
+    function applyEvalPreset(presetId) {
+      const preset = EVAL_PRESETS[presetId];
+      if (!preset) return;
+
+      const fundingEl = document.getElementById('fundingMode');
+      if (fundingEl && fundingEl.checked) {
+        if (!confirm('Funding Mode is active. Applying presets will disable Funding Mode. Continue?')) return;
+        fundingEl.checked = false;
+        toggleFundingMode(false);
+      }
+
+      if (activePresets.has(presetId)) {
+        activePresets.delete(presetId);
+      } else {
+        activePresets.add(presetId);
+      }
+
+      applyMergedPresets();
+    }
+
+    function applyMergedPresets() {
+      const banner = document.getElementById('active-preset-banner');
+
+      if (activePresets.size === 0) {
+        banner.style.display = 'none';
+        document.querySelectorAll('#eval-presets-section button').forEach(btn => {
+          btn.style.outline = 'none';
+          btn.style.outlineOffset = '0';
+        });
+        showToast('All presets cleared');
+        return;
+      }
+
+      const mergedMarkets = new Set();
+      const mergedTimeframes = new Set();
+      const mergedPatterns = new Set();
+      let hasExplicitPatterns = false;
+      let maxOpenTrades = 0;
+      let rr = 2;
+      let dailyLoss = 800;
+      let risk = 0;
+      let mergedRthStart = 24;
+      let mergedRthEnd = 0;
+      const names = [];
+
+      for (const id of activePresets) {
+        const p = EVAL_PRESETS[id];
+        if (!p) continue;
+        p.markets.forEach(m => mergedMarkets.add(m));
+        p.timeframes.forEach(tf => mergedTimeframes.add(tf));
+        if (p.maxOpenTrades > maxOpenTrades) maxOpenTrades = p.maxOpenTrades;
+        if (p.riskDollars > risk) risk = p.riskDollars;
+        if (p.rewardRatio < rr) rr = p.rewardRatio;
+        if (p.rthStartHour < mergedRthStart) mergedRthStart = p.rthStartHour;
+        if (p.rthEndHour > mergedRthEnd) mergedRthEnd = p.rthEndHour;
+        if (p.patterns) {
+          hasExplicitPatterns = true;
+          p.patterns.forEach(pat => mergedPatterns.add(pat));
+        }
+        names.push(p.name);
+      }
+      if (!risk) risk = 200;
+      window._presetRthStart = mergedRthStart < 24 ? mergedRthStart : 8;
+      window._presetRthEnd = mergedRthEnd > 0 ? mergedRthEnd : 16;
+
+      document.querySelectorAll('input[name="market"]').forEach(cb => {
+        cb.checked = mergedMarkets.has(cb.value);
+      });
+      document.querySelectorAll('input[name="tf"]').forEach(cb => {
+        cb.checked = mergedTimeframes.has(cb.value);
+      });
+      if (hasExplicitPatterns) {
+        document.querySelectorAll('input[name="pattern"]').forEach(cb => {
+          cb.checked = mergedPatterns.has(cb.value);
+        });
+      }
+
+      const rrEl = document.getElementById('rewardRatio');
+      const motEl = document.getElementById('maxOpenTrades');
+      if (rrEl) { rrEl.value = rr; rrEl.disabled = false; }
+      if (motEl) { motEl.value = maxOpenTrades; motEl.disabled = false; }
+      document.getElementById('dailyLossLimit').value = dailyLoss;
+      document.getElementById('riskDollars').value = risk;
+
+      document.querySelectorAll('#eval-presets-section button').forEach(btn => {
+        btn.style.outline = 'none';
+        btn.style.outlineOffset = '0';
+      });
+      for (const id of activePresets) {
+        const btn = document.querySelector('[data-testid="button-preset-' + id + '"]');
+        if (btn) {
+          const p = EVAL_PRESETS[id];
+          btn.style.outline = '2px solid ' + (p ? p.borderColor : '#fff');
+          btn.style.outlineOffset = '2px';
+        }
+      }
+
+      const marketList = [...mergedMarkets].join('+');
+      if (activePresets.size === 1) {
+        const id = [...activePresets][0];
+        const p = EVAL_PRESETS[id];
+        banner.style.display = 'block';
+        banner.style.background = p.bgColor;
+        banner.style.border = '1px solid ' + p.borderColor;
+        banner.style.color = '#fff';
+        banner.innerHTML = '<div style="font-size:0.85rem;">' + p.name + ' preset loaded</div><div style="font-size:0.7rem;opacity:0.8;margin-top:2px;">' + p.description + '</div>';
+      } else {
+        banner.style.display = 'block';
+        banner.style.background = 'linear-gradient(135deg,#1e293b,#312e81)';
+        banner.style.border = '1px solid #818cf8';
+        banner.style.color = '#fff';
+        banner.innerHTML = '<div style="font-size:0.85rem;">' + names.join(' + ') + '</div><div style="font-size:0.7rem;opacity:0.8;margin-top:2px;">Combined: ' + marketList + ' | 1:' + rr + ' R:R | Max ' + maxOpenTrades + ' open | $' + dailyLoss + ' daily limit</div>';
+      }
+
+      showToast(names.join(' + ') + ' — ' + marketList + ' at 1:' + rr + ' R:R');
     }
 
     async function closeAllPositions() {
@@ -2377,13 +2964,17 @@
       const sel = document.getElementById('tradeAccount');
       const acct = sel.value;
       const opt = sel.options[sel.selectedIndex];
-      const acctType = opt.getAttribute('data-type') || 'sim';
-      document.getElementById('ct-account-display').textContent = acct;
+      const acctType = opt ? opt.getAttribute('data-type') || 'sim' : 'sim';
+      const ctDisplay = document.getElementById('ct-account-display');
+      if (ctDisplay) ctDisplay.textContent = acct;
 
       const badge = document.getElementById('account-type-badge');
       if (acctType === 'funded') {
         badge.textContent = 'FUNDED';
         badge.style.background = '#ef4444';
+      } else if (acctType === 'eval') {
+        badge.textContent = 'EVAL';
+        badge.style.background = '#a855f7';
       } else if (acctType === 'test') {
         badge.textContent = 'TEST';
         badge.style.background = '#f59e0b';
@@ -2393,6 +2984,7 @@
       }
 
       localStorage.setItem('selectedAccount', acct);
+      if (!acct) return;
       fetch('/api/config/set-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2528,9 +3120,13 @@
     }
 
     async function pollTraderLogs() {
-      if (!traderSessionId) return;
+      const viewAcct = activeViewAccount;
+      const s = viewAcct ? accountSessions[viewAcct] : null;
+      const sid = s ? s.sessionId : traderSessionId;
+      if (!sid) return;
       try {
-        const url = `/api/trader/logs/${traderSessionId}${lastLogId ? '?after=' + lastLogId : ''}`;
+        const afterId = s ? s.lastLogId : lastLogId;
+        const url = `/api/trader/logs/${sid}${afterId ? '?after=' + afterId : ''}`;
         const d = await safeJson(await fetch(url));
 
         if (d.status) {
@@ -2542,11 +3138,20 @@
           pnlEl.textContent = (d.status.cumPnl >= 0 ? '+' : '') + '$' + d.status.cumPnl.toFixed(2);
           pnlEl.className = 't-stat-value ' + (d.status.cumPnl >= 0 ? 'positive' : 'negative');
           if (d.status.rewardRatio) document.getElementById('stat-rr').textContent = '1:' + d.status.rewardRatio;
+          if (d.status.riskDollars) document.getElementById('stat-risk-amt').textContent = '$' + d.status.riskDollars;
+          if (d.status.maxOpenTrades) document.getElementById('stat-max-open').textContent = d.status.maxOpenTrades;
+        }
+
+        const labelEl = document.getElementById('log-account-label');
+        if (labelEl && viewAcct) {
+          const selOpt = [...document.getElementById('tradeAccount').options].find(o => o.value === viewAcct);
+          labelEl.textContent = '— ' + (selOpt ? selOpt.textContent : viewAcct);
         }
 
         if (d.logs && d.logs.length > 0) {
           const logEl = document.getElementById('trade-log');
-          if (lastLogId === 0) logEl.innerHTML = '';
+          const currentAfter = s ? s.lastLogId : lastLogId;
+          if (currentAfter === 0) logEl.innerHTML = '';
 
           d.logs.forEach(log => {
             const row = document.createElement('div');
@@ -2561,7 +3166,9 @@
               <span class="log-cell log-detail">${buildLogDetail(log)}</span>
             `;
             logEl.appendChild(row);
-            lastLogId = Math.max(lastLogId, log.id);
+            const newId = Math.max(s ? s.lastLogId : lastLogId, log.id);
+            if (s) s.lastLogId = newId;
+            else lastLogId = newId;
           });
 
           logEl.scrollTop = logEl.scrollHeight;
@@ -2809,11 +3416,11 @@
         document.getElementById('set-risk').value = s.riskDollars || 100;
         document.getElementById('set-rr').value = s.rewardRatio || 2;
         document.getElementById('set-max-trades').value = s.maxOpenTrades || 3;
-        document.getElementById('set-daily-loss-limit').value = s.dailyLossLimit || 1500;
+        document.getElementById('set-daily-loss-limit').value = s.dailyLossLimit || 800;
         document.getElementById('riskDollars').value = s.riskDollars || 100;
         document.getElementById('rewardRatio').value = s.rewardRatio || 2;
         document.getElementById('maxOpenTrades').value = s.maxOpenTrades || 3;
-        document.getElementById('dailyLossLimit').value = s.dailyLossLimit || 1500;
+        document.getElementById('dailyLossLimit').value = s.dailyLossLimit || 800;
         if (s.enabledPatterns) {
           document.querySelectorAll('input[name="set-pattern"]').forEach(cb => {
             cb.checked = s.enabledPatterns.includes(cb.value);
@@ -2837,7 +3444,7 @@
       const riskDollars = parseFloat(document.getElementById('set-risk').value) || 100;
       const rewardRatio = parseFloat(document.getElementById('set-rr').value) || 2;
       const maxOpenTrades = parseInt(document.getElementById('set-max-trades').value) || 3;
-      const dailyLossLimit = parseFloat(document.getElementById('set-daily-loss-limit').value) || 1500;
+      const dailyLossLimit = parseFloat(document.getElementById('set-daily-loss-limit').value) || 800;
       const enabledPatterns = [...document.querySelectorAll('input[name="set-pattern"]:checked')].map(c => c.value);
       const enabledTimeframes = [...document.querySelectorAll('input[name="set-tf"]:checked')].map(c => c.value);
       if (!enabledPatterns.length) { showToast('Select at least one pattern'); return; }
@@ -3328,7 +3935,7 @@
       const rrRatio = parseFloat(document.getElementById('bt-rr').value);
       const maxHold = parseInt(document.getElementById('bt-hold').value);
       const minConfluence = parseInt(document.getElementById('bt-minconf').value) || 0;
-      const symbols = ["ES","MES","NQ","MNQ","YM","MYM","RTY","M2K","CL","MCL","GC","MGC","SI","HG","BTC","ETH","ZB","ZN","ZC","ZS","ZW"];
+      const symbols = ["ES","MES","NQ","MNQ","YM","MYM","RTY","M2K","CL","MCL","MBT","MET","ZC","ZS","ZW"];
       const allPatterns = ["3bar","4bar","buysetup","retest","breakout","climax","cuphandle","inversecuphandle","doubletop","doublebottom","headshoulders","invheadshoulders","wedge"];
       const patterns = patternSel === 'all' ? allPatterns : [patternSel];
 
@@ -3465,7 +4072,7 @@
     async function runFullHistoricalScan() {
       const btn = document.getElementById('btn-run-full-scan');
       const status = document.getElementById('full-scan-status');
-      const symbols = ["ES","MES","NQ","MNQ","YM","MYM","RTY","M2K","CL","MCL","GC","MGC","SI","HG","BTC","ETH","ZB","ZN","ZC","ZS","ZW"];
+      const symbols = ["ES","MES","NQ","MNQ","YM","MYM","RTY","M2K","CL","MCL","MBT","MET","ZC","ZS","ZW"];
       const patterns = ["3bar","4bar","buysetup","retest","breakout","climax","cuphandle","inversecuphandle","doubletop","doublebottom","headshoulders","invheadshoulders","wedge"];
       const timeframes = ["2min","5min","15min","1hour"];
       const from = "2024-01-01";
@@ -4056,6 +4663,76 @@
       }
     }
 
+    function toggleAddAccountForm() {
+      const form = document.getElementById('add-account-form');
+      form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function addNewAccount() {
+      const id = document.getElementById('new-acct-id').value.trim();
+      const name = document.getElementById('new-acct-name').value.trim();
+      const type = document.getElementById('new-acct-type').value;
+      const provider = document.getElementById('new-acct-provider').value;
+      if (!id || !name) { showToast('Account ID and Name are required', true); return; }
+      try {
+        const res = await fetch('/api/accounts/add', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, name, type, provider })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`Added account: ${name} (${type.toUpperCase()} / ${provider})`);
+          document.getElementById('new-acct-id').value = '';
+          document.getElementById('new-acct-name').value = '';
+          document.getElementById('add-account-form').style.display = 'none';
+          await updateApexAccounts();
+        } else {
+          showToast('Add failed: ' + data.error, true);
+        }
+      } catch (err) { showToast('Add account error: ' + err.message, true); }
+    }
+
+    async function removeSelectedAccount() {
+      const sel = document.getElementById('tradeAccount');
+      const id = sel.value;
+      if (!id) return;
+      const opt = sel.options[sel.selectedIndex];
+      const label = opt ? opt.textContent : id;
+      if (!confirm(`Remove account "${label}" from the system?`)) return;
+      try {
+        const res = await fetch('/api/accounts/remove', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`Removed account: ${data.removed.name}`);
+          await updateApexAccounts();
+        } else {
+          showToast('Remove failed: ' + data.error, true);
+        }
+      } catch (err) { showToast('Remove error: ' + err.message, true); }
+    }
+
+    async function resetSelectedAccount() {
+      const sel = document.getElementById('tradeAccount');
+      const id = sel.value;
+      if (!id) return;
+      try {
+        const res = await fetch('/api/apex/reset-account', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accountId: id })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`Account ${id} reset to active`);
+          await updateApexAccounts();
+        } else {
+          showToast('Reset failed: ' + data.error, true);
+        }
+      } catch (err) { showToast('Reset error: ' + err.message, true); }
+    }
+
     async function updateApexAccounts() {
       try {
         const res = await fetch('/api/apex/eval-status');
@@ -4065,34 +4742,40 @@
         sel.innerHTML = '';
 
         let activeCount = 0;
+        const providerLabels = { rithmic: 'RTH', tradovate: 'TDV', ninjatrader: 'NT' };
         accounts.forEach(acc => {
           if (acc.status !== 'failed') {
             const opt = document.createElement('option');
             opt.value = acc.id;
             opt.setAttribute('data-type', acc.type);
+            opt.setAttribute('data-provider', acc.provider || '');
             const typeLabel = acc.type.toUpperCase();
-            opt.textContent = `${acc.id} — ${acc.name} (${typeLabel})`;
+            const provLabel = providerLabels[acc.provider] || '';
+            opt.textContent = `${acc.id} — ${acc.name} (${typeLabel}${provLabel ? ' / ' + provLabel : ''})`;
             if (acc.id === saved) opt.selected = true;
             sel.appendChild(opt);
             activeCount++;
           } else {
             console.log(`[apex] Removed failed account: ${acc.name} (${acc.reason})`);
-            showToast(`Account removed: ${acc.name} — ${acc.reason}`, true);
+            if (acc.id === saved) {
+              showToast(`Account failed: ${acc.name} — ${acc.reason}`, true);
+            }
           }
         });
 
         if (activeCount === 0) {
           const opt = document.createElement('option');
           opt.value = '';
-          opt.textContent = 'No active accounts';
+          opt.textContent = 'No active accounts — add one above';
           sel.appendChild(opt);
-          showToast('All Apex accounts failed. Add new account in NinjaTrader.', true);
+          showToast('All accounts failed or removed. Add a new account.', true);
         }
 
         if (sel.options.length > 0 && !sel.value) {
           sel.selectedIndex = 0;
         }
         syncAccountFields();
+        renderAccountInstances();
       } catch (err) {
         console.warn('[apex] Failed to fetch account status:', err);
       }

@@ -1,7 +1,14 @@
 import fs from "fs";
 import path from "path";
-import YahooFinance from "yahoo-finance2";
-const yahooFinance = new YahooFinance();
+let yahooFinance: any = null;
+async function getYahooFinance() {
+  if (!yahooFinance) {
+    const mod = await import("yahoo-finance2");
+    const YF = mod.default || mod;
+    yahooFinance = typeof YF === "function" ? new YF() : YF;
+  }
+  return yahooFinance;
+}
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
@@ -78,6 +85,8 @@ interface Bar {
 
 interface BacktestTrade {
   date: string;
+  hour?: number;
+  dayOfWeek?: number;
   entry: number;
   stop: number;
   target: number;
@@ -90,6 +99,15 @@ interface BacktestTrade {
   direction: "LONG" | "SHORT";
   confluence?: number;
   volType?: string;
+  timeframe?: string;
+  symbol?: string;
+  rsiVal?: number;
+  adxVal?: number;
+  macdBullish?: boolean;
+  bbPosition?: string;
+  trendScore?: number;
+  aboveEma50?: boolean;
+  aboveSma200?: boolean;
 }
 
 interface BacktestResult {
@@ -323,7 +341,8 @@ async function fetchYahooFinance(symbol: string, from: string, to: string, timef
 
   try {
     console.log(`[yahoo] Fetching ${yahooSymbol} [${interval}] from ${from} to ${to}`);
-    const result = await yahooFinance.chart(yahooSymbol, {
+    const yf = await getYahooFinance();
+    const result = await yf.chart(yahooSymbol, {
       period1: fromDate,
       period2: toDate,
       interval: interval as any,
@@ -359,6 +378,8 @@ function addIndicators(bars: Bar[]): {
   bars: Bar[];
   ema21: number[];
   ema9: number[];
+  ema50: number[];
+  ema200: number[];
   avgRange: number[];
   avgVol: number[];
   atr: number[];
@@ -382,9 +403,25 @@ function addIndicators(bars: Bar[]): {
   isParabolic: boolean[];
   wBottom: boolean[];
   wTop: boolean[];
+  macdLine: number[];
+  macdSignal: number[];
+  macdHist: number[];
+  adx: number[];
+  plusDI: number[];
+  minusDI: number[];
+  bbUpper: number[];
+  bbLower: number[];
+  bbMiddle: number[];
+  bbSqueeze: boolean[];
+  rsi: number[];
+  sma50: number[];
+  sma200: number[];
+  trendStrength: number[];
 } {
   const ema21: number[] = [];
   const ema9: number[] = [];
+  const ema50: number[] = [];
+  const ema200: number[] = [];
   const avgRange: number[] = [];
   const avgVol: number[] = [];
   const atr: number[] = [];
@@ -408,9 +445,35 @@ function addIndicators(bars: Bar[]): {
   const isParabolic: boolean[] = [];
   const wBottom: boolean[] = [];
   const wTop: boolean[] = [];
+  const macdLine: number[] = [];
+  const macdSignal: number[] = [];
+  const macdHist: number[] = [];
+  const adx: number[] = [];
+  const plusDI: number[] = [];
+  const minusDI: number[] = [];
+  const bbUpper: number[] = [];
+  const bbLower: number[] = [];
+  const bbMiddle: number[] = [];
+  const bbSqueeze: boolean[] = [];
+  const rsi: number[] = [];
+  const sma50: number[] = [];
+  const sma200: number[] = [];
+  const trendStrength: number[] = [];
 
   const ema21k = 2 / 22;
   const ema9k = 2 / 10;
+  const ema50k = 2 / 51;
+  const ema200k = 2 / 201;
+  const ema12k = 2 / 13;
+  const ema26k = 2 / 27;
+  const macdSigK = 2 / 10;
+  let ema12 = 0;
+  let ema26 = 0;
+  let rsiAvgGain = 0;
+  let rsiAvgLoss = 0;
+  let smoothedPlusDM = 0;
+  let smoothedMinusDM = 0;
+  let smoothedTR = 0;
 
   let rollingPivotHigh = 0;
   let rollingPivotLow = Infinity;
@@ -443,10 +506,113 @@ function addIndicators(bars: Bar[]): {
     if (i === 0) {
       ema21.push(b.close);
       ema9.push(b.close);
+      ema50.push(b.close);
+      ema200.push(b.close);
+      ema12 = b.close;
+      ema26 = b.close;
     } else {
       ema21.push(b.close * ema21k + ema21[i - 1] * (1 - ema21k));
       ema9.push(b.close * ema9k + ema9[i - 1] * (1 - ema9k));
+      ema50.push(b.close * ema50k + ema50[i - 1] * (1 - ema50k));
+      ema200.push(b.close * ema200k + ema200[i - 1] * (1 - ema200k));
+      ema12 = b.close * ema12k + ema12 * (1 - ema12k);
+      ema26 = b.close * ema26k + ema26 * (1 - ema26k);
     }
+
+    const ml = ema12 - ema26;
+    macdLine.push(ml);
+    if (i === 0) {
+      macdSignal.push(ml);
+    } else {
+      macdSignal.push(ml * macdSigK + macdSignal[i - 1] * (1 - macdSigK));
+    }
+    macdHist.push(ml - macdSignal[i]);
+
+    const rsiPeriod = 14;
+    if (i === 0) {
+      rsi.push(50);
+      rsiAvgGain = 0;
+      rsiAvgLoss = 0;
+    } else {
+      const diff = b.close - bars[i - 1].close;
+      const gain = diff > 0 ? diff : 0;
+      const loss = diff < 0 ? -diff : 0;
+      if (i <= rsiPeriod) {
+        rsiAvgGain = (rsiAvgGain * (i - 1) + gain) / i;
+        rsiAvgLoss = (rsiAvgLoss * (i - 1) + loss) / i;
+      } else {
+        rsiAvgGain = (rsiAvgGain * (rsiPeriod - 1) + gain) / rsiPeriod;
+        rsiAvgLoss = (rsiAvgLoss * (rsiPeriod - 1) + loss) / rsiPeriod;
+      }
+      const rs = rsiAvgLoss === 0 ? 100 : rsiAvgGain / rsiAvgLoss;
+      rsi.push(100 - (100 / (1 + rs)));
+    }
+
+    const adxPeriod = 14;
+    if (i === 0) {
+      adx.push(0); plusDI.push(0); minusDI.push(0);
+    } else {
+      const hi = b.high - bars[i - 1].high;
+      const lo = bars[i - 1].low - b.low;
+      const pDM = (hi > lo && hi > 0) ? hi : 0;
+      const mDM = (lo > hi && lo > 0) ? lo : 0;
+      const tr = Math.max(b.high - b.low, Math.abs(b.high - bars[i - 1].close), Math.abs(b.low - bars[i - 1].close));
+      if (i <= adxPeriod) {
+        smoothedTR += tr;
+        smoothedPlusDM += pDM;
+        smoothedMinusDM += mDM;
+      } else {
+        smoothedTR = smoothedTR - (smoothedTR / adxPeriod) + tr;
+        smoothedPlusDM = smoothedPlusDM - (smoothedPlusDM / adxPeriod) + pDM;
+        smoothedMinusDM = smoothedMinusDM - (smoothedMinusDM / adxPeriod) + mDM;
+      }
+      const pdi = smoothedTR > 0 ? (smoothedPlusDM / smoothedTR) * 100 : 0;
+      const mdi = smoothedTR > 0 ? (smoothedMinusDM / smoothedTR) * 100 : 0;
+      plusDI.push(pdi);
+      minusDI.push(mdi);
+      const diSum = pdi + mdi;
+      const dx = diSum > 0 ? (Math.abs(pdi - mdi) / diSum) * 100 : 0;
+      if (i <= adxPeriod * 2) {
+        adx.push(dx);
+      } else {
+        adx.push((adx[i - 1] * (adxPeriod - 1) + dx) / adxPeriod);
+      }
+    }
+
+    const bbPeriod = 20;
+    if (i < bbPeriod - 1) {
+      bbMiddle.push(b.close); bbUpper.push(b.close); bbLower.push(b.close); bbSqueeze.push(false);
+    } else {
+      const sl = bars.slice(i - bbPeriod + 1, i + 1);
+      const mean = sl.reduce((s, x) => s + x.close, 0) / bbPeriod;
+      const variance = sl.reduce((s, x) => s + (x.close - mean) ** 2, 0) / bbPeriod;
+      const stddev = Math.sqrt(variance);
+      bbMiddle.push(mean);
+      bbUpper.push(mean + 2 * stddev);
+      bbLower.push(mean - 2 * stddev);
+      const bw = mean > 0 ? (4 * stddev) / mean : 0;
+      bbSqueeze.push(bw < 0.02);
+    }
+
+    if (i < 50) {
+      sma50.push(bars.slice(0, i + 1).reduce((s, x) => s + x.close, 0) / (i + 1));
+    } else {
+      sma50.push(bars.slice(i - 49, i + 1).reduce((s, x) => s + x.close, 0) / 50);
+    }
+    if (i < 200) {
+      sma200.push(bars.slice(0, i + 1).reduce((s, x) => s + x.close, 0) / (i + 1));
+    } else {
+      sma200.push(bars.slice(i - 199, i + 1).reduce((s, x) => s + x.close, 0) / 200);
+    }
+
+    let ts = 0;
+    if (ema9[i] > ema21[i]) ts += 1;
+    if (b.close > ema50[i]) ts += 1;
+    if (b.close > sma200[i]) ts += 1;
+    if (macdHist[i] > 0) ts += 1;
+    if (adx[i] > 25) ts += 1;
+    if (rsi[i] > 50) ts += 1;
+    trendStrength.push(ts);
 
     if (i < 20) {
       const sl = bars.slice(0, i + 1);
@@ -549,7 +715,7 @@ function addIndicators(bars: Bar[]): {
     }
   }
 
-  return { bars, ema21, ema9, avgRange, avgVol, atr, range, body, green, tail, wick, bottomingTail, toppingTail, volType, sideways, htfUp, htfDown, pivotHighs, pivotLows, gapUp, gapDown, level2GapUp, level2GapDown, isParabolic, wBottom, wTop };
+  return { bars, ema21, ema9, ema50, ema200, avgRange, avgVol, atr, range, body, green, tail, wick, bottomingTail, toppingTail, volType, sideways, htfUp, htfDown, pivotHighs, pivotLows, gapUp, gapDown, level2GapUp, level2GapDown, isParabolic, wBottom, wTop, macdLine, macdSignal, macdHist, adx, plusDI, minusDI, bbUpper, bbLower, bbMiddle, bbSqueeze, rsi, sma50, sma200, trendStrength };
 }
 
 interface Signal {
@@ -1106,7 +1272,7 @@ function detectClimaxReversal(data: ReturnType<typeof addIndicators>): Signal[] 
 
 function simulateTrades(data: ReturnType<typeof addIndicators>, signals: Signal[], rrRatio = 2, maxHold = 5, pointValue = 50): BacktestTrade[] {
   const trades: BacktestTrade[] = [];
-  const { bars, atr } = data;
+  const { bars, atr, rsi: rsiArr, adx: adxArr, macdHist, bbUpper, bbLower, trendStrength, ema50, sma200 } = data;
 
   for (const sig of signals) {
     const i = sig.index;
@@ -1147,10 +1313,24 @@ function simulateTrades(data: ReturnType<typeof addIndicators>, signals: Signal[
     const pnlPoints = sig.direction === "LONG" ? exit - entry : entry - exit;
     const pnlPct = (pnlPoints / entry) * 100;
     const pnlDollars = pnlPoints * pointValue;
-    const dateStr = new Date(bars[i].timestamp).toISOString().slice(0, 10);
+    const entryDate = new Date(bars[i].timestamp);
+    const dateStr = entryDate.toISOString().slice(0, 10);
+    const etHour = new Date(entryDate.getTime() - 5 * 3600000).getUTCHours();
+    const dayOfWeek = entryDate.getUTCDay();
+
+    const curRsi = rsiArr[i] || 50;
+    const curAdx = adxArr[i] || 0;
+    const macdBull = macdHist[i] > 0;
+    let bbPos = "MIDDLE";
+    if (bars[i].close > bbUpper[i]) bbPos = "ABOVE";
+    else if (bars[i].close < bbLower[i]) bbPos = "BELOW";
+    else if (bars[i].close > (bbUpper[i] + bbLower[i]) / 2) bbPos = "UPPER";
+    else bbPos = "LOWER";
 
     trades.push({
       date: dateStr,
+      hour: etHour,
+      dayOfWeek,
       entry: Math.round(entry * 100) / 100,
       stop: Math.round(sl * 100) / 100,
       target: Math.round(tp * 100) / 100,
@@ -1163,6 +1343,13 @@ function simulateTrades(data: ReturnType<typeof addIndicators>, signals: Signal[
       direction: sig.direction,
       confluence: sig.confluence,
       volType: sig.volType,
+      rsiVal: Math.round(curRsi * 10) / 10,
+      adxVal: Math.round(curAdx * 10) / 10,
+      macdBullish: macdBull,
+      bbPosition: bbPos,
+      trendScore: trendStrength[i] || 0,
+      aboveEma50: bars[i].close > ema50[i],
+      aboveSma200: bars[i].close > sma200[i],
     });
   }
   return trades;

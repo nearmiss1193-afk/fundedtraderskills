@@ -19,6 +19,31 @@ const CONTRACT_CYCLES: Record<string, number[]> = {
     "MBT": [1,2,3,4,5,6,7,8,9,10,11,12], "MET": [1,2,3,4,5,6,7,8,9,10,11,12],
 };
 
+const ROLLOVER_DAYS_BEFORE = 14;
+
+const ENERGY_SYMBOLS = new Set(["CL", "MCL"]);
+
+function getThirdFriday(year: number, month: number): number {
+    const firstDay = new Date(year, month - 1, 1).getDay();
+    const firstFriday = firstDay <= 5 ? (5 - firstDay + 1) : (5 + 7 - firstDay + 1);
+    return firstFriday + 14;
+}
+
+function shouldRollContract(now: Date, contractMonth: number, contractYear: number, symbol?: string): boolean {
+    if (symbol && ENERGY_SYMBOLS.has(symbol)) {
+        let expiryMonth = contractMonth - 1;
+        let expiryYear = contractYear;
+        if (expiryMonth < 1) { expiryMonth = 12; expiryYear -= 1; }
+        const expiryDate = new Date(expiryYear, expiryMonth - 1, 20);
+        const daysUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return daysUntilExpiry <= ROLLOVER_DAYS_BEFORE;
+    }
+    const thirdFriday = getThirdFriday(contractYear, contractMonth);
+    const expiryDate = new Date(contractYear, contractMonth - 1, thirdFriday);
+    const daysUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return daysUntilExpiry <= ROLLOVER_DAYS_BEFORE;
+}
+
 function getNinjaTraderInstrument(symbol: string): string {
     if (symbol.includes(" ")) {
         return symbol;
@@ -38,6 +63,16 @@ function getNinjaTraderInstrument(symbol: string): string {
     if (!contractMonth) {
         contractMonth = cycle[0];
         contractYear = currentYear + 1;
+    }
+
+    if (shouldRollContract(now, contractMonth, contractYear, ntSymbol)) {
+        const idx = cycle.indexOf(contractMonth);
+        if (idx < cycle.length - 1) {
+            contractMonth = cycle[idx + 1];
+        } else {
+            contractMonth = cycle[0];
+            contractYear += 1;
+        }
     }
 
     const mm = String(contractMonth).padStart(2, "0");
@@ -123,6 +158,65 @@ export async function sendClosePosition(instrument: string, account?: string): P
         req.write(payload);
         req.end();
     });
+}
+
+export async function sendBracketOrders(
+    symbol: string,
+    direction: "LONG" | "SHORT",
+    stopPrice: number,
+    targetPrice: number,
+    qty: number,
+    account?: string
+): Promise<{ stopResult: { success: boolean; message: string }; targetResult: { success: boolean; message: string } }> {
+    const targetAccount = account || CROSSTRADE_ACCOUNT_DEFAULT;
+
+    if (!CROSSTRADE_WEBHOOK_URL || !CROSSTRADE_KEY) {
+        const err = { success: false, message: "Missing CrossTrade credentials" };
+        return { stopResult: err, targetResult: err };
+    }
+
+    const ntInstrument = getNinjaTraderInstrument(symbol);
+    const exitAction = direction === "LONG" ? "SELL" : "BUY";
+    const clampedQty = Math.min(qty || 1, MAX_CONTRACTS);
+
+    const stopPayload = `key=${CROSSTRADE_KEY};command=PLACE;account=${targetAccount};instrument=${ntInstrument};action=${exitAction};qty=${clampedQty};order_type=STOPMARKET;stop_price=${stopPrice};tif=GTC;`;
+    const targetPayload = `key=${CROSSTRADE_KEY};command=PLACE;account=${targetAccount};instrument=${ntInstrument};action=${exitAction};qty=${clampedQty};order_type=LIMIT;limit_price=${targetPrice};tif=GTC;`;
+
+    console.log(`[crosstrade] Sending BRACKET orders for ${ntInstrument} on ${targetAccount}: stop=${stopPrice}, target=${targetPrice}`);
+
+    const sendPayload = (payload: string, label: string): Promise<{ success: boolean; message: string }> => {
+        return new Promise((resolve) => {
+            const req = https.request(CROSSTRADE_WEBHOOK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain", "Content-Length": Buffer.byteLength(payload) }
+            }, (res) => {
+                let data = "";
+                res.on("data", (chunk) => data += chunk);
+                res.on("end", () => {
+                    if (res.statusCode === 200 || res.statusCode === 201) {
+                        console.log(`[crosstrade] ${label} order sent. Resp: ${data}`);
+                        resolve({ success: true, message: data });
+                    } else {
+                        console.error(`[crosstrade] ${label} order error ${res.statusCode}: ${data}`);
+                        resolve({ success: false, message: `HTTP ${res.statusCode}: ${data}` });
+                    }
+                });
+            });
+            req.on("error", (err) => {
+                console.error(`[crosstrade] ${label} order network error: ${err.message}`);
+                resolve({ success: false, message: err.message });
+            });
+            req.write(payload);
+            req.end();
+        });
+    };
+
+    const [stopResult, targetResult] = await Promise.all([
+        sendPayload(stopPayload, "STOP-LOSS"),
+        sendPayload(targetPayload, "TAKE-PROFIT"),
+    ]);
+
+    return { stopResult, targetResult };
 }
 
 export async function sendToCrossTrade(signal: CrossTradeSignal): Promise<{ success: boolean; message: string; payload?: string }> {

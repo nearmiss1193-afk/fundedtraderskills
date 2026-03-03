@@ -54,8 +54,8 @@ const DEFAULT_SETTINGS: TraderSettings = {
   riskDollars: 100,
   rewardRatio: 2,
   maxOpenTrades: 3,
-  dailyLossLimit: 1500,
-  enabledPatterns: ["3bar_long", "3bar_short", "buysetup", "sellsetup", "breakout_long", "breakout_short", "climax_long", "climax_short", "wedge_long", "wedge_short", "cuphandle_long", "cuphandle_short", "doublebottom", "doubletop", "headshoulders", "invheadshoulders", "bullflag", "bearflag", "beartrap", "vwapbounce", "4bar_long", "4bar_short", "retest_long", "retest_short"],
+  dailyLossLimit: 800,
+  enabledPatterns: ["3bar_long", "3bar_short", "buysetup", "sellsetup", "breakout_long", "breakout_short", "climax_long", "climax_short", "wedge_long", "wedge_short", "cuphandle_long", "cuphandle_short", "doublebottom", "doubletop", "headshoulders", "invheadshoulders", "bullflag", "bearflag", "beartrap", "vwapbounce", "4bar_long", "4bar_short", "retest_long", "retest_short", "scalp_tail"],
   enabledTimeframes: ["2min", "5min", "15min", "1hour", "4hour", "daily"],
 };
 
@@ -176,6 +176,9 @@ export function loadSettings(): TraderSettings {
       }
       if (raw.enabledPatterns && !raw.enabledPatterns.includes("retest_long")) {
         raw.enabledPatterns.push("retest_long", "retest_short");
+      }
+      if (raw.enabledPatterns && !raw.enabledPatterns.includes("scalp_tail")) {
+        raw.enabledPatterns.push("scalp_tail");
       }
       return { ...DEFAULT_SETTINGS, ...raw };
     }

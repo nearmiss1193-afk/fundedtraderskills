@@ -1,7 +1,7 @@
 import { addJournalEntry, type JournalEntry } from "./journal";
 import { connectTradovate, isTradovateConnected, getTradovateStatus, placeBracketOrder } from "./tradovate";
 import { enqueueSignal } from "./supabase";
-import { sendToCrossTrade, sendClosePosition } from "./services/crosstrade";
+import { sendToCrossTrade, sendClosePosition, sendBracketOrders } from "./services/crosstrade";
 import { isAccountFailed } from "./account-status";
 import { randomBytes } from "crypto";
 
@@ -10,7 +10,7 @@ const POLYGON_BASE = "https://api.polygon.io";
 
 const LIVE_CONFLUENCE_MIN = 8;
 const MAX_RISK_PCT = 0.01;
-const DEFAULT_DAILY_LOSS_LIMIT = 1500;
+const DEFAULT_DAILY_LOSS_LIMIT = 800;
 const DEFAULT_ACCOUNT_SIZE = 50000;
 
 let dailyPnlTracker = 0;
@@ -57,7 +57,7 @@ const APEX_RULES = {
   dailyLossLimit: -0.03,
   trailingDrawdownPct: -0.03,
   rthOnly: true,
-  rthStart: { hour: 9, minute: 30 },
+  rthStart: { hour: 8, minute: 0 },
   rthEnd: { hour: 16, minute: 0 },
   maxContractsPerSymbol: {
     ES: 10, MES: 50, NQ: 8, MNQ: 40, YM: 10, MYM: 50,
@@ -145,6 +145,12 @@ function getApexEvalStatus(accountSize: number = DEFAULT_ACCOUNT_SIZE, planKey: 
   };
 }
 
+export function setRTHWindow(startHour: number, startMinute: number, endHour: number, endMinute: number) {
+  APEX_RULES.rthStart = { hour: startHour, minute: startMinute };
+  APEX_RULES.rthEnd = { hour: endHour, minute: endMinute };
+  console.log(`[apex] RTH window updated: ${startHour}:${String(startMinute).padStart(2, '0')} - ${endHour}:${String(endMinute).padStart(2, '0')} ET`);
+}
+
 export { isRTH, checkApexRules, APEX_RULES, getApexEvalStatus, resetApexTracker };
 
 export function forwardSignalToSupabase(payload: { symbol: string; direction: string; entryPrice: number; stopLoss: number; takeProfit: number; riskReward: string; confluence: number; pattern: string; qty?: number; source?: string }): Promise<{ status: string; signalId: string }> {
@@ -168,12 +174,20 @@ export function forwardSignalToSupabase(payload: { symbol: string; direction: st
   });
 }
 
-const HIGH_IMPACT_KEYWORDS = [
-  "non-farm", "nonfarm", "NFP", "FOMC", "fed rate", "federal reserve",
-  "CPI", "consumer price index", "PPI", "producer price",
-  "GDP", "gross domestic", "unemployment", "jobless claims",
-  "retail sales", "ISM manufacturing", "ISM services",
-  "PCE", "personal consumption", "jackson hole", "powell speaks",
+const HIGH_IMPACT_PHRASES = [
+  "non-farm payroll", "nonfarm payroll", "fomc meeting", "fomc minutes", "fomc statement",
+  "fed rate decision", "federal reserve meeting", "federal reserve rate",
+  "consumer price index", "producer price index",
+  "gross domestic product", "unemployment rate", "jobless claims",
+  "retail sales report", "retail sales data",
+  "ism manufacturing index", "ism services index", "ism manufacturing pmi", "ism services pmi",
+  "personal consumption expenditure", "pce price index",
+  "jackson hole", "powell speaks", "powell testimony",
+  "interest rate decision", "rate hike", "rate cut",
+  "cpi report", "cpi data", "cpi release", "cpi print",
+  "ppi report", "ppi data", "ppi release",
+  "gdp report", "gdp data", "gdp release", "gdp growth rate",
+  "nfp report", "nfp data", "jobs report",
 ];
 
 let newsBlockedUntil = 0;
@@ -209,7 +223,7 @@ async function checkNewsFilter(): Promise<{ blocked: boolean; reason: string }> 
       const desc = (article.description || "").toLowerCase();
       const text = title + " " + desc;
 
-      const match = HIGH_IMPACT_KEYWORDS.find(kw => text.includes(kw.toLowerCase()));
+      const match = HIGH_IMPACT_PHRASES.find(kw => text.includes(kw));
       if (match) {
         const pubTime = new Date(article.published_utc || "").getTime();
         if (now - pubTime < 3600000) {
@@ -330,6 +344,24 @@ async function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entr
     const ctResult = await sendToCrossTrade({ symbol: instrument, direction: dir, orderType: "MARKET", account });
     if (ctResult.success) {
       console.log(`[trader] CrossTrade order sent: ${dir} ${instrument} → ${ctResult.message}`);
+
+      sendBracketOrders(instrument, direction, stop, target, 1, account)
+        .then((bracketResult) => {
+          if (bracketResult.stopResult.success && bracketResult.targetResult.success) {
+            console.log(`[trader] Bracket orders placed for ${instrument}: SL=${stop}, TP=${target}`);
+          } else {
+            if (!bracketResult.stopResult.success) {
+              console.error(`[trader] STOP-LOSS order FAILED for ${instrument}: ${bracketResult.stopResult.message}`);
+            }
+            if (!bracketResult.targetResult.success) {
+              console.error(`[trader] TAKE-PROFIT order FAILED for ${instrument}: ${bracketResult.targetResult.message}`);
+            }
+          }
+        })
+        .catch((err) => {
+          console.error(`[trader] Bracket order error for ${instrument}: ${err.message}`);
+        });
+
       return { sent: true, rejected: false };
     } else {
       console.warn(`[trader] CrossTrade REJECTED: ${ctResult.message}`);
@@ -416,6 +448,31 @@ const CONTRACT_CYCLES: Record<string, number[]> = {
   "MBT": [1,2,3,4,5,6,7,8,9,10,11,12], "MET": [1,2,3,4,5,6,7,8,9,10,11,12],
 };
 
+const ROLLOVER_DAYS_BEFORE = 14;
+
+const ENERGY_SYMBOLS = new Set(["CL", "MCL"]);
+
+function getThirdFriday(year: number, month: number): number {
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const firstFriday = firstDay <= 5 ? (5 - firstDay + 1) : (5 + 7 - firstDay + 1);
+  return firstFriday + 14;
+}
+
+function shouldRollContract(now: Date, contractMonth: number, contractYear: number, symbol?: string): boolean {
+  if (symbol && ENERGY_SYMBOLS.has(symbol)) {
+    let expiryMonth = contractMonth - 1;
+    let expiryYear = contractYear;
+    if (expiryMonth < 1) { expiryMonth = 12; expiryYear -= 1; }
+    const expiryDate = new Date(expiryYear, expiryMonth - 1, 20);
+    const daysUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return daysUntilExpiry <= ROLLOVER_DAYS_BEFORE;
+  }
+  const thirdFriday = getThirdFriday(contractYear, contractMonth);
+  const expiryDate = new Date(contractYear, contractMonth - 1, thirdFriday);
+  const daysUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  return daysUntilExpiry <= ROLLOVER_DAYS_BEFORE;
+}
+
 function getNTInstrument(symbol: string): string {
   const ntSymbol = POLYGON_TO_NT_SYMBOL[symbol] || symbol;
 
@@ -433,6 +490,16 @@ function getNTInstrument(symbol: string): string {
   if (!contractMonth) {
     contractMonth = cycle[0];
     contractYear = currentYear + 1;
+  }
+
+  if (shouldRollContract(now, contractMonth, contractYear, ntSymbol)) {
+    const idx = cycle.indexOf(contractMonth);
+    if (idx < cycle.length - 1) {
+      contractMonth = cycle[idx + 1];
+    } else {
+      contractMonth = cycle[0];
+      contractYear += 1;
+    }
   }
 
   const mm = String(contractMonth).padStart(2, "0");
@@ -673,6 +740,18 @@ const FUNDING_MODE_WHITELIST: Array<{ symbol: string; pattern: string; winRate: 
 
   // === TIER 4: Bear Trap (high confluence required) ===
   { symbol: "MET", pattern: "Bear Trap Reversal", winRate: 50.0, profitFactor: 4.69, timeframe: "5min", minConf: 8 },
+
+  // === SCALP: Tail reversal 1:1 R:R, high confluence required ===
+  { symbol: "NQ", pattern: "Scalp Tail Reversal", winRate: 70.0, profitFactor: 2.33, timeframe: "1min", minConf: 8 },
+  { symbol: "MNQ", pattern: "Scalp Tail Reversal", winRate: 70.0, profitFactor: 2.33, timeframe: "1min", minConf: 8 },
+  { symbol: "CL", pattern: "Scalp Tail Reversal", winRate: 70.0, profitFactor: 2.33, timeframe: "1min", minConf: 8 },
+  { symbol: "MCL", pattern: "Scalp Tail Reversal", winRate: 70.0, profitFactor: 2.33, timeframe: "1min", minConf: 8 },
+  { symbol: "YM", pattern: "Scalp Tail Reversal", winRate: 70.0, profitFactor: 2.33, timeframe: "1min", minConf: 8 },
+  { symbol: "MYM", pattern: "Scalp Tail Reversal", winRate: 70.0, profitFactor: 2.33, timeframe: "1min", minConf: 8 },
+  { symbol: "ES", pattern: "Scalp Tail Reversal", winRate: 70.0, profitFactor: 2.33, timeframe: "1min", minConf: 8 },
+  { symbol: "MES", pattern: "Scalp Tail Reversal", winRate: 70.0, profitFactor: 2.33, timeframe: "1min", minConf: 8 },
+  { symbol: "MBT", pattern: "Scalp Tail Reversal", winRate: 70.0, profitFactor: 2.33, timeframe: "1min", minConf: 8 },
+  { symbol: "MET", pattern: "Scalp Tail Reversal", winRate: 70.0, profitFactor: 2.33, timeframe: "1min", minConf: 8 },
 ];
 
 function isFundingApproved(market: string, pattern: string, confluence?: number): boolean {
@@ -2412,6 +2491,71 @@ function detectRetestShort(bars: Bar[], state: MarketState): { detected: boolean
   return { detected: true, confluence: conf, confluenceLabel: confluenceDescription(conf, factors.length), reason: reasons.slice(0, 5).join(" + ") };
 }
 
+function detectScalpTailReversal(bars: Bar[], state: MarketState): { detected: boolean; direction: "LONG" | "SHORT"; confluence: number; confluenceLabel: string; reason: string } {
+  if (bars.length < 10) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
+
+  const recent = bars.slice(-5);
+  const avgVol = recentAvgVolume(bars, 20);
+  const avgRange = getAvgRange(bars.slice(-10));
+  const reversalBar = recent[recent.length - 1];
+  const priorBar = recent[recent.length - 2];
+
+  const isBottomTail = reversalBar.low < priorBar.low
+    && reversalBar.bullish
+    && reversalBar.tail > reversalBar.body * 1.5;
+  const isTopTail = reversalBar.high > priorBar.high
+    && !reversalBar.bullish
+    && reversalBar.wick > reversalBar.body * 1.5;
+
+  const volSurge = reversalBar.volume > avgVol * 1.5;
+  if (!volSurge) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
+
+  const direction: "LONG" | "SHORT" | null = isBottomTail ? "LONG" : (isTopTail ? "SHORT" : null);
+  if (!direction) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
+
+  const quality = barFormationQuality(reversalBar, direction);
+
+  const factors = [
+    volSurge,
+    direction === "LONG" ? hasBottomingTail(reversalBar) : hasToppingTail(reversalBar),
+    reversalBar.body > avgRange * 0.3,
+    direction === "LONG" ? reversalBar.close > state.ema9 : reversalBar.close < state.ema9,
+    direction === "LONG"
+      ? (state.bias !== "DOWNTREND")
+      : (state.bias !== "UPTREND"),
+    reversalBar.volume > avgVol * 2.0,
+    quality >= 3,
+    isWideRangeBar(reversalBar, avgRange),
+    direction === "LONG" ? reversalBar.close > state.ema21 : reversalBar.close < state.ema21,
+    Math.abs(reversalBar.close - (direction === "LONG" ? state.pivotLow : state.pivotHigh)) < avgRange * 2,
+    state.sentiment === (direction === "LONG" ? "SELLERS_CONTROL" : "BUYERS_CONTROL"),
+  ];
+
+  const conf = calcConfluence(factors);
+  if (conf < 8) return { detected: false, direction: "LONG", confluence: 0, confluenceLabel: "", reason: "" };
+
+  const reasons: string[] = [`Scalp Tail Reversal ${direction}`];
+  if (volSurge) reasons.push(`vol surge ${(reversalBar.volume / avgVol).toFixed(1)}x`);
+  if (direction === "LONG" && hasBottomingTail(reversalBar)) reasons.push("bottoming tail");
+  if (direction === "SHORT" && hasToppingTail(reversalBar)) reasons.push("topping tail");
+  if (quality >= 4) reasons.push("strong bar formation");
+
+  const vpBonus = getVolumeProfileConfluence(bars, state.price);
+  const ofBonus = getOrderFlowConfluence(bars, direction);
+  let bonusLabel = "";
+  let totalConf = conf;
+  if (vpBonus > 0) { totalConf += vpBonus; bonusLabel += ` [VP+${vpBonus.toFixed(1)}]`; }
+  if (ofBonus > 0) { totalConf += ofBonus; bonusLabel += ` [OF+${ofBonus}]`; }
+
+  return {
+    detected: true,
+    direction,
+    confluence: totalConf,
+    confluenceLabel: confluenceDescription(totalConf, factors.length) + bonusLabel,
+    reason: reasons.slice(0, 5).join(" + ")
+  };
+}
+
 function sentimentLabel(s: MarketState): string {
   if (s.sentiment === "BUYERS_CONTROL") return "GREED";
   if (s.sentiment === "SELLERS_CONTROL") return "FEAR";
@@ -2671,8 +2815,9 @@ async function simulateTick(session: TraderSession) {
       let confluence = 0;
       let confluenceLabel = "";
       let entryReason = "";
+      let candidateRROverride: number | undefined = undefined;
 
-      const candidates: Array<{ pattern: string; dir: "LONG" | "SHORT"; conf: number; label: string; reason: string }> = [];
+      const candidates: Array<{ pattern: string; dir: "LONG" | "SHORT"; conf: number; label: string; reason: string; rrOverride?: number }> = [];
 
       if (session.patterns.includes("3bar_long")) {
         const r = detect3BarPlayBuy(bars, state);
@@ -2770,6 +2915,10 @@ async function simulateTick(session: TraderSession) {
         const r = detectRetestShort(bars, state);
         if (r.detected) candidates.push({ pattern: r.reason.split(" at ")[0] || "Retest Sell", dir: "SHORT", conf: r.confluence, label: r.confluenceLabel, reason: r.reason });
       }
+      if (session.patterns.includes("scalp_tail")) {
+        const r = detectScalpTailReversal(bars, state);
+        if (r.detected) candidates.push({ pattern: "Scalp Tail Reversal", dir: r.direction, conf: r.confluence, label: r.confluenceLabel, reason: r.reason, rrOverride: 1 });
+      }
 
       if (candidates.length > 0) {
         candidates.sort((a, b) => b.conf - a.conf);
@@ -2779,6 +2928,7 @@ async function simulateTick(session: TraderSession) {
         confluence = best.conf;
         confluenceLabel = best.label;
         entryReason = best.reason;
+        candidateRROverride = best.rrOverride;
 
         const sameDir = candidates.filter(c => c.dir === best.dir && c.pattern !== best.pattern);
         if (sameDir.length >= 1) {
@@ -2878,7 +3028,7 @@ async function simulateTick(session: TraderSession) {
           const entry = state.price;
 
           const riskPointsFromDollars = r2(session.riskDollars / spec.pointValue);
-          const rewardRatio = session.rewardRatio;
+          const rewardRatio = candidateRROverride ?? session.rewardRatio;
           let stop: number, target: number;
 
           if (direction === "LONG") {
@@ -2896,7 +3046,8 @@ async function simulateTick(session: TraderSession) {
             : (state.ema9 < state.ema21 && state.price < state.sma200);
           const volumeConfirmed = bar.volume > state.avgVolume * 1.5;
           const maConfluence = isNearMA(state.price, state.ema9) || isNearMA(state.price, state.ema21);
-          const rrValid = rewardRatio >= 2;
+          const isScalpPattern = detectedPattern.includes("Scalp");
+          const rrValid = isScalpPattern ? rewardRatio >= 1 : rewardRatio >= 2;
 
           const avgRange = bars.slice(-10).reduce((sum, b) => sum + Math.abs(b.high - b.low), 0) / Math.min(bars.length, 10);
           const recentRanges = bars.slice(-5).map(b => Math.abs(b.high - b.low));

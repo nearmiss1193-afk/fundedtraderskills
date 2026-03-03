@@ -3,7 +3,7 @@ import { type Server } from "http";
 import path from "path";
 import fs from "fs";
 import express from "express";
-import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase, getSafetyStatus, getApexEvalStatus, setDailyLossLimit, getNewsFilterStatus, getFundingWhitelist } from "./trader";
+import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase, getSafetyStatus, getApexEvalStatus, setDailyLossLimit, setRTHWindow, getNewsFilterStatus, getFundingWhitelist } from "./trader";
 import { getTradeAck } from "./supabase";
 import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
 import { sendToCrossTrade, sendCloseAll } from "./services/crosstrade";
@@ -15,19 +15,19 @@ let skills: any[] = [];
 interface AccountConfig {
   id: string;
   name: string;
-  type: "sim" | "test" | "funded";
+  type: "sim" | "test" | "funded" | "eval";
+  provider?: "ninjatrader" | "rithmic" | "tradovate";
 }
 
 interface AccountStatus {
-  status: "active" | "failed";
+  status: "active" | "failed" | "passed";
   reason?: string;
   failedAt?: string;
 }
 
 const ACCOUNTS: AccountConfig[] = [
-  { id: "Sim101", name: "NinjaTrader Sim 101", type: "sim" },
-  { id: "APEX22106300000115", name: "Apex Funded 50k #5", type: "funded" },
-  { id: "APEX22106300000114", name: "Apex Funded 50k #4", type: "funded" },
+  { id: "APEX22106300000123", name: "Apex 50k EOD #123", type: "funded", provider: "tradovate" },
+  { id: "APEX22106300000124", name: "Apex 50k EOD #124", type: "funded", provider: "tradovate" },
 ];
 
 const accountStatuses: Record<string, AccountStatus> = {};
@@ -221,17 +221,24 @@ export async function registerRoutes(
     setDailyLossLimit(savedSettings.dailyLossLimit);
   }
 
-  app.get("/", (_req, res) => {
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-    const html = fs.readFileSync(path.resolve(process.cwd(), "public", "index.html"), "utf-8");
-    res.type("html").send(html);
-  });
-
-  app.use("/public", express.static(path.resolve(process.cwd(), "public"), { etag: false, lastModified: false, setHeaders: (res) => { res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate"); } }));
-
   app.get("/health", (_req, res) => res.send("OK"));
+
+  if (process.env.NODE_ENV !== "production") {
+    app.get("/", (_req, res) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      const htmlPath = path.resolve(process.cwd(), "public", "index.html");
+      if (fs.existsSync(htmlPath)) {
+        const html = fs.readFileSync(htmlPath, "utf-8");
+        res.type("html").send(html);
+      } else {
+        res.status(200).send("Sovereign Skill Hub");
+      }
+    });
+
+    app.use("/public", express.static(path.resolve(process.cwd(), "public"), { etag: false, lastModified: false, setHeaders: (res) => { res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate"); } }));
+  }
 
   app.post("/api/create-skill", (req, res) => {
     const { name, description } = req.body;
@@ -276,12 +283,15 @@ export async function registerRoutes(
   });
 
   app.post("/api/trader/start", (req, res) => {
-    const { markets, timeframes, riskDollars, rewardRatio, maxOpenTrades, dailyLossLimit, account, accounts, patterns, customCondition, forceTrading, fundingMode } = req.body;
+    const { markets, timeframes, riskDollars, rewardRatio, maxOpenTrades, dailyLossLimit, account, accounts, patterns, customCondition, forceTrading, fundingMode, rthStartHour, rthEndHour } = req.body;
     if (!markets?.length || !timeframes?.length || !patterns?.length) {
       return res.status(400).json({ error: "markets, timeframes, and patterns are required." });
     }
     if (dailyLossLimit && dailyLossLimit > 0) {
       setDailyLossLimit(dailyLossLimit);
+    }
+    if (rthStartHour !== undefined && rthEndHour !== undefined) {
+      setRTHWindow(rthStartHour, 0, rthEndHour, 0);
     }
     const resolvedAccounts = Array.isArray(accounts) && accounts.length > 0 ? accounts : [account || "SIM101"];
     const sessionId = startTrader({ markets, timeframes, riskDollars: riskDollars || 100, rewardRatio: rewardRatio || 2, maxOpenTrades: maxOpenTrades || 3, account: resolvedAccounts[0], accounts: resolvedAccounts, patterns, customCondition: customCondition || "", forceTrading: !!forceTrading, fundingMode: !!fundingMode });
@@ -416,13 +426,50 @@ export async function registerRoutes(
     res.json({ accounts: ACCOUNTS, active: activeAccount });
   });
 
+  app.get("/api/nt-accounts", (_req, res) => {
+    const accountsWithStatus = ACCOUNTS.map(a => {
+      const st = accountStatuses[a.id] || { status: "active" };
+      return { ...a, status: st.status, reason: st.reason, failedAt: st.failedAt };
+    });
+    res.json(accountsWithStatus);
+  });
+
+  app.post("/api/accounts/add", (req, res) => {
+    const { id, name, type, provider } = req.body;
+    if (!id || !name) return res.status(400).json({ success: false, error: "id and name required" });
+    if (ACCOUNTS.find(a => a.id === id)) return res.status(400).json({ success: false, error: `Account ${id} already exists` });
+    const validTypes = ["sim", "test", "funded", "eval"];
+    const acctType = validTypes.includes(type) ? type : "eval";
+    const acctProvider = provider || "rithmic";
+    const newAccount: AccountConfig = { id, name, type: acctType, provider: acctProvider };
+    ACCOUNTS.push(newAccount);
+    accountStatuses[id] = { status: "active" };
+    console.log(`[accounts] Added account: ${id} (${name}) type=${acctType} provider=${acctProvider}`);
+    res.json({ success: true, account: newAccount });
+  });
+
+  app.post("/api/accounts/remove", (req, res) => {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ success: false, error: "id required" });
+    const idx = ACCOUNTS.findIndex(a => a.id === id);
+    if (idx === -1) return res.status(404).json({ success: false, error: `Account ${id} not found` });
+    const removed = ACCOUNTS.splice(idx, 1)[0];
+    delete accountStatuses[id];
+    if (activeAccount.id === id) {
+      activeAccount = ACCOUNTS[0] || { id: "Sim101", name: "Default Sim", type: "sim" as const };
+      console.log(`[accounts] Active account was removed, switched to: ${activeAccount.id}`);
+    }
+    console.log(`[accounts] Removed account: ${id} (${removed.name})`);
+    res.json({ success: true, removed });
+  });
+
   app.get("/api/apex/eval-status", (_req, res) => {
     const safety = getSafetyStatus();
     const evalStatus = getApexEvalStatus();
 
     const accountsWithStatus = ACCOUNTS.map(a => {
       const st = accountStatuses[a.id] || { status: "active" };
-      if (a.type === "funded" && st.status === "active") {
+      if ((a.type === "funded" || a.type === "eval") && st.status === "active") {
         if (safety.dailyLimitHit) {
           markAccountFailed(a.id, "Daily loss limit breached");
           return { ...a, status: "failed" as const, reason: "Daily loss limit breached" };
@@ -461,8 +508,8 @@ export async function registerRoutes(
     if (!isAccountActive(account)) {
       return res.status(400).json({ success: false, error: `Account ${account} has failed eval — cannot select` });
     }
-    if (found.type === "funded" && process.env.ALLOW_LIVE_TRADES !== "true") {
-      console.warn(`[account] Switched to funded account ${found.id} — execution disabled (ALLOW_LIVE_TRADES != true)`);
+    if ((found.type === "funded" || found.type === "eval") && process.env.ALLOW_LIVE_TRADES !== "true") {
+      console.warn(`[account] Switched to ${found.type} account ${found.id} — execution disabled (ALLOW_LIVE_TRADES != true)`);
     }
     activeAccount = found;
     console.log(`[account] Active account switched to: ${found.id} (${found.type})`);
@@ -574,6 +621,19 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("[backtest] Error:", err);
       res.status(500).json({ success: false, error: err.message || "Backtest failed" });
+    }
+  });
+
+  app.post("/api/backtest/trades", async (req, res) => {
+    const { symbol, pattern, from, to, rrRatio, minConfluence, timeframe, dataSource } = req.body;
+    const tf = timeframe || "5min";
+    try {
+      const result = await runBacktest({ symbol, pattern: pattern || "all", from, to, rrRatio, minConfluence: Number(minConfluence) || 0, timeframe: tf, dataSource });
+      if (result.error) return res.status(400).json({ success: false, error: result.error });
+      const trades = result.allTrades.map(t => ({ ...t, symbol: symbol || "ES", timeframe: tf }));
+      res.json({ success: true, trades, summary: { total: trades.length, wins: trades.filter(t => t.outcome === "WIN").length, losses: trades.filter(t => t.outcome === "LOSS").length, timeouts: trades.filter(t => t.outcome === "TIMEOUT").length } });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
@@ -772,7 +832,7 @@ export async function registerRoutes(
         accountSize: Number(accountSize) || 50000,
         profitTarget: Number(profitTarget) || 1000,
         trailingDrawdownMax: Number(trailingDrawdownMax) || 1500,
-        dailyLossLimit: Number(dailyLossLimit) || 1500,
+        dailyLossLimit: Number(dailyLossLimit) || 800,
         minTradeDays: Number(minTradeDays) || 5,
         riskPerTrade: Number(riskPerTrade) || 100,
         mode: (mode === "funded" ? "funded" : "eval") as "eval" | "funded",
