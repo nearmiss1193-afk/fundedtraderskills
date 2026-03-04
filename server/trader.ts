@@ -12,6 +12,7 @@ const LIVE_CONFLUENCE_MIN = 9;
 const MAX_RISK_PCT = 0.01;
 const DEFAULT_DAILY_LOSS_LIMIT = 800;
 const DEFAULT_ACCOUNT_SIZE = 50000;
+const MAX_CONTRACTS = parseInt(process.env.MAX_CONTRACTS || "1", 10);
 
 let dailyPnlTracker = 0;
 let dailyPnlDate = new Date().toDateString();
@@ -3056,7 +3057,9 @@ async function simulateTick(session: TraderSession) {
           target = r2(entry - riskPointsFromDollars * rewardRatio);
         }
 
+        const apexCheck = checkApexRules(direction as "LONG" | "SHORT", 1, mk);
         const clampedRisk = riskPointsFromDollars;
+        const clampedQty = Math.max(1, Math.min(apexCheck.adjustedQty || 1, MAX_CONTRACTS));
 
         const htfAligned = direction === "LONG"
           ? (state.ema9 > state.ema21 && state.price > state.sma200)
@@ -3147,7 +3150,7 @@ async function simulateTick(session: TraderSession) {
           }
 
           if (isTradovateConnected()) {
-            placeBracketOrder(mk, direction, entry, stop, target, 1).then(result => {
+            placeBracketOrder(mk, direction, entry, stop, target, clampedQty).then(result => {
               if (result.success) {
                 session.logs.push(makeLog({
                   id: logIdCounter++, timestamp: getESTTime(), market: mk, timeframe: tf, pattern: detectedPattern,
