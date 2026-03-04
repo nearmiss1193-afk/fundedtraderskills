@@ -8,7 +8,7 @@ import { randomBytes } from "crypto";
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "";
 const POLYGON_BASE = "https://api.polygon.io";
 
-const LIVE_CONFLUENCE_MIN = 8;
+const LIVE_CONFLUENCE_MIN = 9;
 const MAX_RISK_PCT = 0.01;
 const DEFAULT_DAILY_LOSS_LIMIT = 800;
 const DEFAULT_ACCOUNT_SIZE = 50000;
@@ -245,21 +245,21 @@ export function getNewsFilterStatus(): { blocked: boolean; blockedUntil: number;
 }
 
 const MARKET_SESSIONS_CT: Record<string, { open: number; close: number }[]> = {
-  "ES":  [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "MES": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "NQ":  [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "MNQ": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "YM":  [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "MYM": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "RTY": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "M2K": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "CL":  [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "MCL": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "ZC":  [{ open: 19*60, close: 24*60 }, { open: 0, close: 7*60+45 }, { open: 8*60+30, close: 13*60+20 }],
-  "ZS":  [{ open: 19*60, close: 24*60 }, { open: 0, close: 7*60+45 }, { open: 8*60+30, close: 13*60+20 }],
-  "ZW":  [{ open: 19*60, close: 24*60 }, { open: 0, close: 7*60+45 }, { open: 8*60+30, close: 13*60+20 }],
-  "MBT": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
-  "MET": [{ open: 17*60, close: 24*60 }, { open: 0, close: 16*60 }],
+  "ES": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "MES": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "NQ": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "MNQ": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "YM": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "MYM": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "RTY": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "M2K": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "CL": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "MCL": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "ZC": [{ open: 19 * 60, close: 24 * 60 }, { open: 0, close: 7 * 60 + 45 }, { open: 8 * 60 + 30, close: 13 * 60 + 20 }],
+  "ZS": [{ open: 19 * 60, close: 24 * 60 }, { open: 0, close: 7 * 60 + 45 }, { open: 8 * 60 + 30, close: 13 * 60 + 20 }],
+  "ZW": [{ open: 19 * 60, close: 24 * 60 }, { open: 0, close: 7 * 60 + 45 }, { open: 8 * 60 + 30, close: 13 * 60 + 20 }],
+  "MBT": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
+  "MET": [{ open: 17 * 60, close: 24 * 60 }, { open: 0, close: 16 * 60 }],
 };
 
 function isMarketOpen(symbol: string): boolean {
@@ -276,7 +276,9 @@ function isMarketOpen(symbol: string): boolean {
   return sessions.some(s => minOfDay >= s.open && minOfDay < s.close);
 }
 
-async function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string, account: string): Promise<{ sent: boolean; rejected: boolean; reason?: string }> {
+export async function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT" | string, entry: number, stop: number, target: number, rewardRatio: number, confluence: number, pattern: string, account: string): Promise<{ sent: boolean; rejected: boolean; reason?: string }> {
+  const dirUpper = direction.toUpperCase() as "LONG" | "SHORT";
+
   if (isAccountFailed(account)) {
     console.warn(`[apex] BLOCKED: Account ${account} has failed eval — signal rejected`);
     return { sent: false, rejected: true, reason: `Account ${account} failed eval` };
@@ -298,15 +300,28 @@ async function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entr
     return { sent: false, rejected: true, reason: `${symbol} market closed` };
   }
 
-  const apexCheck = checkApexRules(direction, 1, symbol);
+  const apexCheck = checkApexRules(dirUpper, 1, symbol);
   if (!apexCheck.allowed) {
-    console.warn(`[apex] BLOCKED: ${apexCheck.reason} — ${direction} ${symbol} ${pattern}`);
+    console.warn(`[apex] BLOCKED: ${apexCheck.reason} — ${dirUpper} ${symbol} ${pattern}`);
     return { sent: false, rejected: true, reason: apexCheck.reason };
   }
 
   const signalId = generateSignalId();
-  const dir = direction === "LONG" ? "BUY" : "SELL";
+  const dir = dirUpper === "LONG" ? "BUY" : "SELL";
   const instrument = getNTInstrument(symbol);
+
+  // Ensure SL and TP are absolute prices if they look like offsets
+  let absoluteStop = stop;
+  let absoluteTarget = target;
+
+  if (Math.abs(entry - stop) > 1000 && stop < 1000) {
+    // Treat as point offset
+    absoluteStop = dirUpper === "LONG" ? entry - stop : entry + stop;
+  }
+  if (Math.abs(entry - target) > 1000 && target < 1000) {
+    // Treat as point offset
+    absoluteTarget = dirUpper === "LONG" ? entry + target : entry - target;
+  }
 
   const signalPayload = {
     symbol: instrument,
@@ -315,8 +330,8 @@ async function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entr
     account,
     strategy: pattern,
     entry_price: entry,
-    sl: stop,
-    tp: target,
+    sl: absoluteStop,
+    tp: absoluteTarget,
     rr: `1:${rewardRatio}`,
     timestamp: new Date().toISOString(),
   };
@@ -330,8 +345,8 @@ async function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entr
     qty: 1,
     orderType: "MARKET",
     entryPrice: entry,
-    stopLoss: stop,
-    takeProfit: target,
+    stopLoss: absoluteStop,
+    takeProfit: absoluteTarget,
     pattern,
     confluence,
     riskReward: `1:${rewardRatio}`,
@@ -345,7 +360,7 @@ async function emitTradeSignal(symbol: string, direction: "LONG" | "SHORT", entr
     if (ctResult.success) {
       console.log(`[trader] CrossTrade order sent: ${dir} ${instrument} → ${ctResult.message}`);
 
-      sendBracketOrders(instrument, direction, stop, target, 1, account)
+      sendBracketOrders(instrument, dirUpper, absoluteStop, absoluteTarget, 1, account)
         .then((bracketResult) => {
           if (bracketResult.stopResult.success && bracketResult.targetResult.success) {
             console.log(`[trader] Bracket orders placed for ${instrument}: SL=${stop}, TP=${target}`);
@@ -396,31 +411,31 @@ interface FuturesSpec {
 }
 
 const FUTURES_SPECS: Record<string, FuturesSpec> = {
-  ES:  { name: "E-mini S&P 500",     basePrice: 5400, pointValue: 50,    tickSize: 0.25,  volatility: 1.2, avgVolume: 2000, category: "equity" },
-  MES: { name: "Micro E-mini S&P",   basePrice: 5400, pointValue: 5,     tickSize: 0.25,  volatility: 1.2, avgVolume: 1500, category: "equity" },
-  NQ:  { name: "E-mini Nasdaq 100",  basePrice: 19200,pointValue: 20,    tickSize: 0.25,  volatility: 1.8, avgVolume: 1800, category: "equity" },
-  MNQ: { name: "Micro E-mini Nasdaq",basePrice: 19200,pointValue: 2,     tickSize: 0.25,  volatility: 1.8, avgVolume: 1400, category: "equity" },
-  YM:  { name: "E-mini Dow",         basePrice: 39500,pointValue: 5,     tickSize: 1.0,   volatility: 1.0, avgVolume: 1200, category: "equity" },
-  MYM: { name: "Micro E-mini Dow",   basePrice: 39500,pointValue: 0.50,  tickSize: 1.0,   volatility: 1.0, avgVolume: 1000, category: "equity" },
-  RTY: { name: "E-mini Russell 2000",basePrice: 2050, pointValue: 50,    tickSize: 0.10,  volatility: 1.5, avgVolume: 1000, category: "equity" },
-  M2K: { name: "Micro Russell 2000", basePrice: 2050, pointValue: 5,     tickSize: 0.10,  volatility: 1.5, avgVolume: 800,  category: "equity" },
-  CL:  { name: "Crude Oil",          basePrice: 72,   pointValue: 1000,  tickSize: 0.01,  volatility: 0.8, avgVolume: 2500, category: "energy" },
-  MCL: { name: "Micro Crude Oil",    basePrice: 72,   pointValue: 100,   tickSize: 0.01,  volatility: 0.8, avgVolume: 1500, category: "energy" },
-  GC:  { name: "Gold",               basePrice: 2650, pointValue: 100,   tickSize: 0.10,  volatility: 1.0, avgVolume: 2000, category: "metals" },
-  MGC: { name: "Micro Gold",         basePrice: 2650, pointValue: 10,    tickSize: 0.10,  volatility: 1.0, avgVolume: 1500, category: "metals" },
-  SI:  { name: "Silver",             basePrice: 31,   pointValue: 5000,  tickSize: 0.005, volatility: 1.5, avgVolume: 1200, category: "metals" },
-  HG:  { name: "Copper",             basePrice: 4.2,  pointValue: 25000, tickSize: 0.0005,volatility: 1.0, avgVolume: 1000, category: "metals" },
-  PL:  { name: "Platinum",           basePrice: 980,  pointValue: 50,    tickSize: 0.10,  volatility: 1.2, avgVolume: 600,  category: "metals" },
-  PA:  { name: "Palladium",          basePrice: 1050, pointValue: 100,   tickSize: 0.05,  volatility: 2.0, avgVolume: 400,  category: "metals" },
-  BTC: { name: "Bitcoin Futures",    basePrice: 97000,pointValue: 5,     tickSize: 5.0,   volatility: 3.0, avgVolume: 800,  category: "crypto" },
-  ETH: { name: "Ether Futures",      basePrice: 3400, pointValue: 50,    tickSize: 0.25,  volatility: 3.5, avgVolume: 600,  category: "crypto" },
-  ZB:  { name: "30-Year T-Bond",     basePrice: 118,  pointValue: 1000,  tickSize: 0.03125,volatility:0.4,avgVolume: 1500, category: "bonds" },
-  ZN:  { name: "10-Year T-Note",     basePrice: 110,  pointValue: 1000,  tickSize: 0.015625,volatility:0.3,avgVolume:2000, category: "bonds" },
-  ZT:  { name: "2-Year T-Note",      basePrice: 103,  pointValue: 2000,  tickSize: 0.0078125,volatility:0.15,avgVolume:1500,category: "bonds" },
-  ZF:  { name: "5-Year T-Note",      basePrice: 107,  pointValue: 1000,  tickSize: 0.0078125,volatility:0.2,avgVolume:1800, category: "bonds" },
-  ZC:  { name: "Corn",               basePrice: 450,  pointValue: 50,    tickSize: 0.25,  volatility: 0.8, avgVolume: 1500, category: "ags" },
-  ZS:  { name: "Soybeans",           basePrice: 1020, pointValue: 50,    tickSize: 0.25,  volatility: 1.0, avgVolume: 1200, category: "ags" },
-  ZW:  { name: "Wheat",              basePrice: 560,  pointValue: 50,    tickSize: 0.25,  volatility: 1.2, avgVolume: 1000, category: "ags" },
+  ES: { name: "E-mini S&P 500", basePrice: 5400, pointValue: 50, tickSize: 0.25, volatility: 1.2, avgVolume: 2000, category: "equity" },
+  MES: { name: "Micro E-mini S&P", basePrice: 5400, pointValue: 5, tickSize: 0.25, volatility: 1.2, avgVolume: 1500, category: "equity" },
+  NQ: { name: "E-mini Nasdaq 100", basePrice: 19200, pointValue: 20, tickSize: 0.25, volatility: 1.8, avgVolume: 1800, category: "equity" },
+  MNQ: { name: "Micro E-mini Nasdaq", basePrice: 19200, pointValue: 2, tickSize: 0.25, volatility: 1.8, avgVolume: 1400, category: "equity" },
+  YM: { name: "E-mini Dow", basePrice: 39500, pointValue: 5, tickSize: 1.0, volatility: 1.0, avgVolume: 1200, category: "equity" },
+  MYM: { name: "Micro E-mini Dow", basePrice: 39500, pointValue: 0.50, tickSize: 1.0, volatility: 1.0, avgVolume: 1000, category: "equity" },
+  RTY: { name: "E-mini Russell 2000", basePrice: 2050, pointValue: 50, tickSize: 0.10, volatility: 1.5, avgVolume: 1000, category: "equity" },
+  M2K: { name: "Micro Russell 2000", basePrice: 2050, pointValue: 5, tickSize: 0.10, volatility: 1.5, avgVolume: 800, category: "equity" },
+  CL: { name: "Crude Oil", basePrice: 72, pointValue: 1000, tickSize: 0.01, volatility: 0.8, avgVolume: 2500, category: "energy" },
+  MCL: { name: "Micro Crude Oil", basePrice: 72, pointValue: 100, tickSize: 0.01, volatility: 0.8, avgVolume: 1500, category: "energy" },
+  GC: { name: "Gold", basePrice: 2650, pointValue: 100, tickSize: 0.10, volatility: 1.0, avgVolume: 2000, category: "metals" },
+  MGC: { name: "Micro Gold", basePrice: 2650, pointValue: 10, tickSize: 0.10, volatility: 1.0, avgVolume: 1500, category: "metals" },
+  SI: { name: "Silver", basePrice: 31, pointValue: 5000, tickSize: 0.005, volatility: 1.5, avgVolume: 1200, category: "metals" },
+  HG: { name: "Copper", basePrice: 4.2, pointValue: 25000, tickSize: 0.0005, volatility: 1.0, avgVolume: 1000, category: "metals" },
+  PL: { name: "Platinum", basePrice: 980, pointValue: 50, tickSize: 0.10, volatility: 1.2, avgVolume: 600, category: "metals" },
+  PA: { name: "Palladium", basePrice: 1050, pointValue: 100, tickSize: 0.05, volatility: 2.0, avgVolume: 400, category: "metals" },
+  BTC: { name: "Bitcoin Futures", basePrice: 97000, pointValue: 5, tickSize: 5.0, volatility: 3.0, avgVolume: 800, category: "crypto" },
+  ETH: { name: "Ether Futures", basePrice: 3400, pointValue: 50, tickSize: 0.25, volatility: 3.5, avgVolume: 600, category: "crypto" },
+  ZB: { name: "30-Year T-Bond", basePrice: 118, pointValue: 1000, tickSize: 0.03125, volatility: 0.4, avgVolume: 1500, category: "bonds" },
+  ZN: { name: "10-Year T-Note", basePrice: 110, pointValue: 1000, tickSize: 0.015625, volatility: 0.3, avgVolume: 2000, category: "bonds" },
+  ZT: { name: "2-Year T-Note", basePrice: 103, pointValue: 2000, tickSize: 0.0078125, volatility: 0.15, avgVolume: 1500, category: "bonds" },
+  ZF: { name: "5-Year T-Note", basePrice: 107, pointValue: 1000, tickSize: 0.0078125, volatility: 0.2, avgVolume: 1800, category: "bonds" },
+  ZC: { name: "Corn", basePrice: 450, pointValue: 50, tickSize: 0.25, volatility: 0.8, avgVolume: 1500, category: "ags" },
+  ZS: { name: "Soybeans", basePrice: 1020, pointValue: 50, tickSize: 0.25, volatility: 1.0, avgVolume: 1200, category: "ags" },
+  ZW: { name: "Wheat", basePrice: 560, pointValue: 50, tickSize: 0.25, volatility: 1.2, avgVolume: 1000, category: "ags" },
 };
 
 function getSpec(market: string): FuturesSpec {
@@ -429,6 +444,7 @@ function getSpec(market: string): FuturesSpec {
 
 const POLYGON_TO_NT_SYMBOL: Record<string, string> = {
   "BTC": "MBT", "ETH": "MET",
+  "MES": "MES", "MNQ": "MNQ",
 };
 
 const TRADOVATE_SUPPORTED = new Set([
@@ -438,14 +454,14 @@ const TRADOVATE_SUPPORTED = new Set([
 ]);
 
 const CONTRACT_CYCLES: Record<string, number[]> = {
-  "ES":  [3, 6, 9, 12], "MES": [3, 6, 9, 12],
-  "NQ":  [3, 6, 9, 12], "MNQ": [3, 6, 9, 12],
-  "YM":  [3, 6, 9, 12], "MYM": [3, 6, 9, 12],
+  "ES": [3, 6, 9, 12], "MES": [3, 6, 9, 12],
+  "NQ": [3, 6, 9, 12], "MNQ": [3, 6, 9, 12],
+  "YM": [3, 6, 9, 12], "MYM": [3, 6, 9, 12],
   "RTY": [3, 6, 9, 12], "M2K": [3, 6, 9, 12],
-  "CL":  [1,2,3,4,5,6,7,8,9,10,11,12], "MCL": [1,2,3,4,5,6,7,8,9,10,11,12],
-  "ZC":  [3, 5, 7, 9, 12], "ZS": [1, 3, 5, 7, 8, 9, 11],
-  "ZW":  [3, 5, 7, 9, 12],
-  "MBT": [1,2,3,4,5,6,7,8,9,10,11,12], "MET": [1,2,3,4,5,6,7,8,9,10,11,12],
+  "CL": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "MCL": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+  "ZC": [3, 5, 7, 9, 12], "ZS": [1, 3, 5, 7, 8, 9, 11],
+  "ZW": [3, 5, 7, 9, 12],
+  "MBT": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "MET": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
 };
 
 const ROLLOVER_DAYS_BEFORE = 14;
@@ -553,7 +569,7 @@ async function fetchPolygonPrice(market: string): Promise<PolygonPrice | null> {
         return { price: esPrice, volume, timestamp: now };
       }
     }
-  } catch {}
+  } catch { }
 
   try {
     const aggUrl = `${POLYGON_BASE}/v2/aggs/ticker/SPY/prev?adjusted=true&apiKey=${POLYGON_API_KEY}`;
@@ -577,7 +593,7 @@ async function fetchPolygonPrice(market: string): Promise<PolygonPrice | null> {
         return { price: esPrice, volume, timestamp: now };
       }
     }
-  } catch {}
+  } catch { }
 
   return null;
 }
@@ -767,6 +783,7 @@ export function getFundingWhitelist() {
 }
 
 const sessions: Record<string, TraderSession> = {};
+export function getSessions() { return sessions; }
 let logIdCounter = 1;
 
 const TF_TICKS: Record<string, number> = { "2min": 1, "5min": 2, "15min": 4, "1hour": 8, "4hour": 24, "daily": 60 };
@@ -2984,18 +3001,18 @@ async function simulateTick(session: TraderSession) {
         }
 
         const edgeBoostCombos: Record<string, { patterns: string[]; boost: number }> = {
-          "NQ":  { patterns: ["Double Top"], boost: 2 },
+          "NQ": { patterns: ["Double Top"], boost: 2 },
           "MNQ": { patterns: ["Double Top"], boost: 2 },
-          "SI":  { patterns: ["Inverse H&S", "Double Top", "Buy Setup", "Sell Setup", "Pivot Breakout", "3 Bar Play"], boost: 2 },
+          "SI": { patterns: ["Inverse H&S", "Double Top", "Buy Setup", "Sell Setup", "Pivot Breakout", "3 Bar Play"], boost: 2 },
           "RTY": { patterns: ["Head & Shoulders", "Double Top"], boost: 2 },
           "M2K": { patterns: ["Head & Shoulders", "Double Top"], boost: 2 },
-          "CL":  { patterns: ["Double Bottom", "Inverse H&S"], boost: 1 },
+          "CL": { patterns: ["Double Bottom", "Inverse H&S"], boost: 1 },
           "MCL": { patterns: ["Double Bottom", "Inverse H&S"], boost: 1 },
-          "ES":  { patterns: ["Double Top"], boost: 1 },
+          "ES": { patterns: ["Double Top"], boost: 1 },
           "MES": { patterns: ["Double Top"], boost: 1 },
-          "YM":  { patterns: ["Double Top"], boost: 1 },
+          "YM": { patterns: ["Double Top"], boost: 1 },
           "MYM": { patterns: ["Double Top"], boost: 1 },
-          "ZC":  { patterns: ["Head & Shoulders"], boost: 1 },
+          "ZC": { patterns: ["Head & Shoulders"], boost: 1 },
         };
         const boostEntry = edgeBoostCombos[mk];
         if (boostEntry && boostEntry.patterns.includes(detectedPattern)) {
@@ -3025,60 +3042,60 @@ async function simulateTick(session: TraderSession) {
 
       const openCount = Object.keys(session.openTrades).length;
       if (detectedPattern && !session.openTrades[tradeKey] && openCount < session.maxOpenTrades) {
-          const entry = state.price;
+        const entry = state.price;
 
-          const riskPointsFromDollars = r2(session.riskDollars / spec.pointValue);
-          const rewardRatio = candidateRROverride ?? session.rewardRatio;
-          let stop: number, target: number;
+        const riskPointsFromDollars = r2(session.riskDollars / spec.pointValue);
+        const rewardRatio = candidateRROverride ?? session.rewardRatio;
+        let stop: number, target: number;
 
-          if (direction === "LONG") {
-            stop = r2(entry - riskPointsFromDollars);
-            target = r2(entry + riskPointsFromDollars * rewardRatio);
-          } else {
-            stop = r2(entry + riskPointsFromDollars);
-            target = r2(entry - riskPointsFromDollars * rewardRatio);
-          }
+        if (direction === "LONG") {
+          stop = r2(entry - riskPointsFromDollars);
+          target = r2(entry + riskPointsFromDollars * rewardRatio);
+        } else {
+          stop = r2(entry + riskPointsFromDollars);
+          target = r2(entry - riskPointsFromDollars * rewardRatio);
+        }
 
-          const clampedRisk = riskPointsFromDollars;
+        const clampedRisk = riskPointsFromDollars;
 
-          const htfAligned = direction === "LONG"
-            ? (state.ema9 > state.ema21 && state.price > state.sma200)
-            : (state.ema9 < state.ema21 && state.price < state.sma200);
-          const volumeConfirmed = bar.volume > state.avgVolume * 1.5;
-          const maConfluence = isNearMA(state.price, state.ema9) || isNearMA(state.price, state.ema21);
-          const isScalpPattern = detectedPattern.includes("Scalp");
-          const rrValid = isScalpPattern ? rewardRatio >= 1 : rewardRatio >= 2;
+        const htfAligned = direction === "LONG"
+          ? (state.ema9 > state.ema21 && state.price > state.sma200)
+          : (state.ema9 < state.ema21 && state.price < state.sma200);
+        const volumeConfirmed = bar.volume > state.avgVolume * 1.5;
+        const maConfluence = isNearMA(state.price, state.ema9) || isNearMA(state.price, state.ema21);
+        const isScalpPattern = detectedPattern.includes("Scalp");
+        const rrValid = isScalpPattern ? rewardRatio >= 1 : rewardRatio >= 2;
 
-          const avgRange = bars.slice(-10).reduce((sum, b) => sum + Math.abs(b.high - b.low), 0) / Math.min(bars.length, 10);
-          const recentRanges = bars.slice(-5).map(b => Math.abs(b.high - b.low));
-          const isChoppy = recentRanges.every(r => r < avgRange * 0.5);
-          const noOverlap = !isChoppy;
+        const avgRange = bars.slice(-10).reduce((sum, b) => sum + Math.abs(b.high - b.low), 0) / Math.min(bars.length, 10);
+        const recentRanges = bars.slice(-5).map(b => Math.abs(b.high - b.low));
+        const isChoppy = recentRanges.every(r => r < avgRange * 0.5);
+        const noOverlap = !isChoppy;
 
-          const confluencePass = confluence >= LIVE_CONFLUENCE_MIN;
+        const confluencePass = confluence >= LIVE_CONFLUENCE_MIN;
 
-          const preTradeChecklist = {
-            htfAligned,
-            volumeConfirmed,
-            maConfluence,
-            rrValid,
-            noOverlap,
-            confluencePass,
-          };
+        const preTradeChecklist = {
+          htfAligned,
+          volumeConfirmed,
+          maConfluence,
+          rrValid,
+          noOverlap,
+          confluencePass,
+        };
 
-          const riskSafe = !isRiskTooHigh(session.riskDollars);
-          const dailySafe = !isDailyLossLimitHit();
+        const riskSafe = !isRiskTooHigh(session.riskDollars);
+        const dailySafe = !isDailyLossLimitHit();
 
-          const allPassed = htfAligned && volumeConfirmed && maConfluence && rrValid && noOverlap && confluencePass && riskSafe && dailySafe;
+        const allPassed = htfAligned && volumeConfirmed && maConfluence && rrValid && noOverlap && confluencePass && riskSafe && dailySafe;
 
-          console.log(`[trader] Checklist result for ${mk} ${direction} ${detectedPattern}: ${JSON.stringify({...preTradeChecklist, riskSafe, dailySafe, confluenceMin: LIVE_CONFLUENCE_MIN})} | allPassed=${allPassed}`);
+        console.log(`[trader] Checklist result for ${mk} ${direction} ${detectedPattern}: ${JSON.stringify({ ...preTradeChecklist, riskSafe, dailySafe, confluenceMin: LIVE_CONFLUENCE_MIN })} | allPassed=${allPassed}`);
 
-          const checklist = {
-            patternMatch: true,
-            volumeConfirmation: volumeConfirmed,
-            maRespect: maConfluence,
-            priorPivotSR: isNearPivot(state.price, state.pivotHigh, state.price) || isNearPivot(state.price, state.pivotLow, state.price),
-            barFormation: (entryReason || "").toLowerCase().includes("tail") || (entryReason || "").toLowerCase().includes("bar") || (entryReason || "").toLowerCase().includes("green") || (entryReason || "").toLowerCase().includes("red"),
-          };
+        const checklist = {
+          patternMatch: true,
+          volumeConfirmation: volumeConfirmed,
+          maRespect: maConfluence,
+          priorPivotSR: isNearPivot(state.price, state.pivotHigh, state.price) || isNearPivot(state.price, state.pivotLow, state.price),
+          barFormation: (entryReason || "").toLowerCase().includes("tail") || (entryReason || "").toLowerCase().includes("bar") || (entryReason || "").toLowerCase().includes("green") || (entryReason || "").toLowerCase().includes("red"),
+        };
 
         if (allPassed) {
           session.openTrades[tradeKey] = {
@@ -3126,7 +3143,7 @@ async function simulateTick(session: TraderSession) {
                   }
                 }
               })
-              .catch(() => {});
+              .catch(() => { });
           }
 
           if (isTradovateConnected()) {
@@ -3136,6 +3153,7 @@ async function simulateTick(session: TraderSession) {
                   id: logIdCounter++, timestamp: getESTTime(), market: mk, timeframe: tf, pattern: detectedPattern,
                   action: "TRADOVATE ORDER", direction,
                   entry, stop, target,
+                  cumPnl: session.cumPnl,
                   reason: `Bracket order placed — Entry: ${result.entryOrderId}, SL: ${result.slOrderId}, TP: ${result.tpOrderId}`,
                   dataSource: "TRADOVATE",
                 }));
@@ -3144,6 +3162,7 @@ async function simulateTick(session: TraderSession) {
                   id: logIdCounter++, timestamp: getESTTime(), market: mk, timeframe: tf, pattern: detectedPattern,
                   action: "TRADOVATE ERROR", direction,
                   entry, stop, target,
+                  cumPnl: session.cumPnl,
                   reason: `Order failed: ${result.error}`,
                   dataSource: "TRADOVATE",
                 }));
@@ -3246,6 +3265,7 @@ export function startTrader(config: {
   const enabledTFs = config.timeframes.join(", ");
   session.logs.push(makeLog({
     id: logIdCounter++, timestamp: getESTTime(),
+    cumPnl: session.cumPnl,
     action: "SCANNING",
     reason: `Enabled patterns: ${enabledNames} | Timeframes: ${enabledTFs}`,
   }));
@@ -3254,6 +3274,7 @@ export function startTrader(config: {
     const approved = FUNDING_MODE_WHITELIST.filter(w => config.markets.includes(w.symbol)).map(w => `${w.symbol}/${w.pattern}@${w.timeframe} (${w.winRate}%WR PF${w.profitFactor})`).join(", ");
     session.logs.push(makeLog({
       id: logIdCounter++, timestamp: getESTTime(),
+      cumPnl: session.cumPnl,
       action: "FUNDING MODE",
       reason: `Active — only 45%+ WR setups at 1:2 R:R. Approved: ${approved || "None matching selected markets"}`,
     }));

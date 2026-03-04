@@ -3,7 +3,7 @@ import { type Server } from "http";
 import path from "path";
 import fs from "fs";
 import express from "express";
-import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase, getSafetyStatus, getApexEvalStatus, setDailyLossLimit, setRTHWindow, getNewsFilterStatus, getFundingWhitelist } from "./trader";
+import { startTrader, stopTrader, getTraderLogs, getTraderStatus, isTradingOpen, isForceTradeActive, getTradovateStatus, connectTradovate, forwardSignalToSupabase, getSafetyStatus, getApexEvalStatus, setDailyLossLimit, setRTHWindow, getNewsFilterStatus, getFundingWhitelist, getSessions, emitTradeSignal } from "./trader";
 import { getTradeAck } from "./supabase";
 import { loadJournal, getJournalStats, getAdvancedAnalytics, updateJournalNotes, deleteJournalEntry, clearJournal, loadSettings, saveSettings } from "./journal";
 import { sendToCrossTrade, sendCloseAll } from "./services/crosstrade";
@@ -28,10 +28,25 @@ interface AccountStatus {
 const ACCOUNTS: AccountConfig[] = [
   { id: "APEX22106300000123", name: "Apex 50k EOD #123", type: "funded", provider: "tradovate" },
   { id: "APEX22106300000124", name: "Apex 50k EOD #124", type: "funded", provider: "tradovate" },
+  { id: "APEX22106300000111", name: "Apex 50k EOD #111", type: "eval", provider: "tradovate" },
+  { id: "APEX22106300000112", name: "Apex 50k EOD #112", type: "eval", provider: "tradovate" },
+  { id: "APEX22106300000113", name: "Apex 50k EOD #113", type: "eval", provider: "tradovate" },
+  { id: "APEX22106300000114", name: "Apex 50k EOD #114", type: "eval", provider: "tradovate" },
+  { id: "APEX22106300000115", name: "Apex 50k EOD #115", type: "eval", provider: "tradovate" },
+  { id: "APEX22106300000118", name: "Apex 50k EOD #118", type: "eval", provider: "tradovate" },
+  { id: "PA-221063-23", name: "Funded #23", type: "funded", provider: "tradovate" },
 ];
 
 const accountStatuses: Record<string, AccountStatus> = {};
-ACCOUNTS.forEach(a => { accountStatuses[a.id] = { status: "active" }; });
+ACCOUNTS.forEach(a => {
+  if (a.id === "APEX22106300000118" || a.id === "APEX22106300000124") {
+    accountStatuses[a.id] = { status: "failed", reason: "Evaluation Failed", failedAt: new Date().toISOString() };
+  } else if (a.id.startsWith("BX-M941130")) {
+    accountStatuses[a.id] = { status: "failed", reason: "Pending Activation" };
+  } else {
+    accountStatuses[a.id] = { status: "active" };
+  }
+});
 
 function markAccountFailed(accountId: string, reason: string) {
   accountStatuses[accountId] = { status: "failed", reason, failedAt: new Date().toISOString() };
@@ -268,6 +283,10 @@ export async function registerRoutes(
     res.json({ ...getSafetyStatus(), newsFilter: getNewsFilterStatus() });
   });
 
+  app.get("/api/trader/sessions", (_req, res) => {
+    res.json(Object.values(getSessions()));
+  });
+
   app.get("/api/trader/apex-eval", (req, res) => {
     const plan = (req.query.plan as string) || "50k";
     res.json(getApexEvalStatus(undefined, plan));
@@ -368,12 +387,33 @@ export async function registerRoutes(
       signalId = result.signalId;
       queueStatus = result.status;
       console.log(`[trade-signal] Supabase queue result for ${signal.symbol}: status=${result.status} signalId=${result.signalId}`);
-    } catch (err: any) {
-      console.error(`[trade-signal] Supabase queue error for ${signal.symbol}: ${err.message}`);
-      return res.status(502).json({ success: false, error: `Supabase insert failed: ${err.message}`, signal });
-    }
 
-    res.json({ success: true, message: "Signal received", signal, signalId, queueStatus });
+      // Local Execution Hook
+      const targetAccount = req.body.account || "SIM101";
+      const emission = await emitTradeSignal(
+        signal.symbol,
+        signal.direction as "LONG" | "SHORT",
+        signal.entryPrice,
+        signal.stopLoss,
+        signal.takeProfit,
+        Number(signal.riskReward.toString().split(":")[1] || 2),
+        signal.confluence,
+        signal.pattern,
+        targetAccount
+      );
+
+      res.json({
+        success: true,
+        message: emission.sent ? "Signal reached CrossTrade" : `Signal received but not sent: ${emission.reason || "Unknown"}`,
+        signal,
+        signalId,
+        queueStatus,
+        emission
+      });
+    } catch (err: any) {
+      console.error(`[trade-signal] Execution error: ${err.message}`);
+      return res.status(502).json({ success: false, error: err.message, signal });
+    }
   });
 
   app.get("/api/trade-signals", (_req, res) => {
@@ -397,10 +437,30 @@ export async function registerRoutes(
   });
 
   app.post("/api/crosstrade/test", async (req, res) => {
-    const { symbol, direction, account } = req.body;
+    const { symbol, direction, account, allAccounts } = req.body;
     if (!symbol || !direction) {
       return res.status(400).json({ success: false, error: "Missing symbol or direction" });
     }
+
+    if (allAccounts) {
+      const activeAccounts = ACCOUNTS.filter(a => isAccountActive(a.id));
+      console.log(`[crosstrade] Broadcasting manual signal for ${symbol} to ${activeAccounts.length} accounts`);
+      const results = await Promise.all(activeAccounts.map(a =>
+        sendToCrossTrade({
+          symbol: symbol.toUpperCase(),
+          direction: direction,
+          orderType: "MARKET",
+          account: a.id
+        })
+      ));
+      const successes = results.filter(r => r.success).length;
+      return res.json({
+        success: successes > 0,
+        message: `Broadcast to ${successes}/${activeAccounts.length} accounts successful`,
+        results
+      });
+    }
+
     const result = await sendToCrossTrade({
       symbol: symbol.toUpperCase(),
       direction: direction,
@@ -411,8 +471,18 @@ export async function registerRoutes(
   });
 
   app.post("/api/trader/close-all", async (req, res) => {
-    const { account } = req.body;
+    const { account, allAccounts } = req.body;
     try {
+      if (allAccounts) {
+        const activeAccounts = ACCOUNTS.filter(a => isAccountActive(a.id));
+        console.log(`[trader] Broadcasting FLAT-ALL to ${activeAccounts.length} accounts`);
+        const results = await Promise.all(activeAccounts.map(a => sendCloseAll(a.id)));
+        const successes = results.filter(r => r.success).length;
+        return res.json({
+          success: successes > 0,
+          message: `Close all broadcast to ${successes}/${activeAccounts.length} accounts successful`
+        });
+      }
       const result = await sendCloseAll(account || "Sim101");
       console.log(`[trader] Close all positions: account=${account || "sim101"} result=${result.message}`);
       res.json({ success: result.success, message: result.message });
@@ -543,10 +613,10 @@ export async function registerRoutes(
     const header = "Timestamp,Symbol,Timeframe,Pattern,Direction,Entry,Stop,Target,Exit,P&L Points,P&L $,Confluence,Outcome,R:R Achieved,Reason,Notes";
     const rows = entries.map(e =>
       [e.timestamp, e.symbol, e.timeframe, e.pattern, e.direction,
-       e.entry, e.stop, e.target, e.exit, e.pnlPoints, e.pnlDollars,
-       e.confluence, e.outcome, e.achievedRR,
-       `"${(e.reason || "").replace(/"/g, '""')}"`,
-       `"${(e.notes || "").replace(/"/g, '""')}"`
+      e.entry, e.stop, e.target, e.exit, e.pnlPoints, e.pnlDollars,
+      e.confluence, e.outcome, e.achievedRR,
+      `"${(e.reason || "").replace(/"/g, '""')}"`,
+      `"${(e.notes || "").replace(/"/g, '""')}"`
       ].join(",")
     );
     res.setHeader("Content-Type", "text/csv");
@@ -560,15 +630,15 @@ export async function registerRoutes(
     const timeframes = req.query.timeframes ? String(req.query.timeframes).split(",") : null;
     if (patterns) {
       const allowedCombos = new Set<string>();
-      const keyMap: Record<string, {pattern: string; direction: string}> = {
-        "3bar_long": {pattern: "3 Bar Play", direction: "LONG"},
-        "3bar_short": {pattern: "3 Bar Play", direction: "SHORT"},
-        "buysetup": {pattern: "Buy Setup", direction: "LONG"},
-        "sellsetup": {pattern: "Sell Setup", direction: "SHORT"},
-        "breakout_long": {pattern: "Pivot Breakout", direction: "LONG"},
-        "breakout_short": {pattern: "Pivot Breakout", direction: "SHORT"},
-        "climax_long": {pattern: "Climax Reversal", direction: "LONG"},
-        "climax_short": {pattern: "Climax Reversal", direction: "SHORT"},
+      const keyMap: Record<string, { pattern: string; direction: string }> = {
+        "3bar_long": { pattern: "3 Bar Play", direction: "LONG" },
+        "3bar_short": { pattern: "3 Bar Play", direction: "SHORT" },
+        "buysetup": { pattern: "Buy Setup", direction: "LONG" },
+        "sellsetup": { pattern: "Sell Setup", direction: "SHORT" },
+        "breakout_long": { pattern: "Pivot Breakout", direction: "LONG" },
+        "breakout_short": { pattern: "Pivot Breakout", direction: "SHORT" },
+        "climax_long": { pattern: "Climax Reversal", direction: "LONG" },
+        "climax_short": { pattern: "Climax Reversal", direction: "SHORT" },
       };
       for (const p of patterns) {
         const m = keyMap[p];
@@ -678,43 +748,43 @@ export async function registerRoutes(
       const symTradeList: any[] = [];
 
       for (const tf of tfList) {
-      for (const pat of patternList) {
-        try {
-          const r = await runBacktest({ symbol: symUpper, pattern: pat, from: dateFrom, to: dateTo, rrRatio: rr, maxHold: hold, minConfluence: minConf, timeframe: tf, dataSource });
-          if (!r.error && r.totalTrades > 0) {
-            symTrades += r.totalTrades;
-            symWins += r.wins;
-            symLosses += r.losses;
-            symPnl += r.totalPnlDollars;
-            if (r.trades) symTradeList.push(...r.trades);
+        for (const pat of patternList) {
+          try {
+            const r = await runBacktest({ symbol: symUpper, pattern: pat, from: dateFrom, to: dateTo, rrRatio: rr, maxHold: hold, minConfluence: minConf, timeframe: tf, dataSource });
+            if (!r.error && r.totalTrades > 0) {
+              symTrades += r.totalTrades;
+              symWins += r.wins;
+              symLosses += r.losses;
+              symPnl += r.totalPnlDollars;
+              if (r.trades) symTradeList.push(...r.trades);
 
-            if (!patternAgg[pat]) patternAgg[pat] = { trades: 0, wins: 0, losses: 0, pnl: 0, grossWin: 0, grossLoss: 0 };
-            patternAgg[pat].trades += r.totalTrades;
-            patternAgg[pat].wins += r.wins;
-            patternAgg[pat].losses += r.losses;
-            patternAgg[pat].pnl += r.totalPnlDollars;
-            const patGW = (r.trades || []).filter((t: any) => t.pnlDollars > 0).reduce((s: number, t: any) => s + t.pnlDollars, 0);
-            const patGL = Math.abs((r.trades || []).filter((t: any) => t.pnlDollars < 0).reduce((s: number, t: any) => s + t.pnlDollars, 0));
-            patternAgg[pat].grossWin += patGW;
-            patternAgg[pat].grossLoss += patGL;
+              if (!patternAgg[pat]) patternAgg[pat] = { trades: 0, wins: 0, losses: 0, pnl: 0, grossWin: 0, grossLoss: 0 };
+              patternAgg[pat].trades += r.totalTrades;
+              patternAgg[pat].wins += r.wins;
+              patternAgg[pat].losses += r.losses;
+              patternAgg[pat].pnl += r.totalPnlDollars;
+              const patGW = (r.trades || []).filter((t: any) => t.pnlDollars > 0).reduce((s: number, t: any) => s + t.pnlDollars, 0);
+              const patGL = Math.abs((r.trades || []).filter((t: any) => t.pnlDollars < 0).reduce((s: number, t: any) => s + t.pnlDollars, 0));
+              patternAgg[pat].grossWin += patGW;
+              patternAgg[pat].grossLoss += patGL;
 
-            const cellWR = r.totalTrades > 0 ? Math.round((r.wins / r.totalTrades) * 10000) / 100 : 0;
-            const cellPF = patGL > 0 ? Math.round((patGW / patGL) * 100) / 100 : (patGW > 0 ? 99 : 0);
-            heatmapCells.push({
-              symbol: symUpper,
-              pattern: pat,
-              trades: r.totalTrades,
-              wins: r.wins,
-              winRate: cellWR,
-              pf: cellPF,
-              pnl: Math.round(r.totalPnlDollars * 100) / 100,
-              expectancy: r.totalTrades > 0 ? Math.round((r.totalPnlDollars / r.totalTrades) * 100) / 100 : 0,
-            });
+              const cellWR = r.totalTrades > 0 ? Math.round((r.wins / r.totalTrades) * 10000) / 100 : 0;
+              const cellPF = patGL > 0 ? Math.round((patGW / patGL) * 100) / 100 : (patGW > 0 ? 99 : 0);
+              heatmapCells.push({
+                symbol: symUpper,
+                pattern: pat,
+                trades: r.totalTrades,
+                wins: r.wins,
+                winRate: cellWR,
+                pf: cellPF,
+                pnl: Math.round(r.totalPnlDollars * 100) / 100,
+                expectancy: r.totalTrades > 0 ? Math.round((r.totalPnlDollars / r.totalTrades) * 100) / 100 : 0,
+              });
+            }
+          } catch (err: any) {
+            console.error(`[backtest/multi] ${symUpper}/${pat}/${tf}: ${err.message}`);
           }
-        } catch (err: any) {
-          console.error(`[backtest/multi] ${symUpper}/${pat}/${tf}: ${err.message}`);
         }
-      }
       }
 
       symWR = symTrades > 0 ? symWins / symTrades : 0;
@@ -809,7 +879,7 @@ export async function registerRoutes(
 
   app.post("/api/backtest/apex-sim", async (req, res) => {
     const { symbol, pattern, from, to, rrRatio, maxHold, minConfluence, timeframe,
-            accountSize, profitTarget, trailingDrawdownMax, dailyLossLimit, minTradeDays, riskPerTrade, mode, dataSource } = req.body;
+      accountSize, profitTarget, trailingDrawdownMax, dailyLossLimit, minTradeDays, riskPerTrade, mode, dataSource } = req.body;
 
     const validTimeframes = ["daily", "day", "5min", "15min", "30min", "1min", "2min", "3min", "1hour", "4hour", "week", "weekly"];
     const tf = timeframe && validTimeframes.includes(timeframe) ? timeframe : "daily";
@@ -869,7 +939,7 @@ export async function registerRoutes(
       if (fs.existsSync(SCAN_ARCHIVE_PATH)) {
         return JSON.parse(fs.readFileSync(SCAN_ARCHIVE_PATH, "utf-8"));
       }
-    } catch {}
+    } catch { }
     return [];
   }
 

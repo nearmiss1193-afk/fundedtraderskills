@@ -2442,12 +2442,30 @@
           <button id="btn-close-all"
             style="background:#ef4444;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.85rem;"
             onclick="closeAllPositions()" data-testid="button-close-all">Close All Positions</button>
+
+          <!-- Agent Mode Indicator -->
+          <div id="agent-mode-status"
+            style="display:flex;align-items:center;gap:0.5rem;background:#1e293b;padding:0.5rem 1rem;border-radius:8px;border:1px solid #334155;">
+            <div id="agent-dot"
+              style="width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow: 0 0 8px #22c55e;"></div>
+            <span style="font-size:0.8rem;font-weight:700;color:#94a3b8;">AGENT MODE: <span id="agent-text"
+                style="color:#22c55e;">AUTONOMOUS SCANNING</span></span>
+            <span id="agent-conf-badge"
+              style="font-size:0.7rem;background:#334155;color:#fff;padding:2px 6px;border-radius:4px;">MIN CONF:
+              9+</span>
+          </div>
         </div>
 
-        <div class="crosstrade-row">
+        <div class="crosstrade-row" style="flex-wrap:wrap;gap:0.8rem;">
           <label>Account:</label>
           <span id="ct-account-display" style="font-weight:700;font-size:0.85rem;color:#1a1a2e;"
             data-testid="text-ct-account">Sim101</span>
+
+          <label
+            style="display:flex;align-items:center;gap:0.3rem;cursor:pointer;color:#334155;font-weight:700;font-size:0.85rem;">
+            <input type="checkbox" id="ct-broadcast-all" style="width:16px;height:16px;" /> Broadcast All
+          </label>
+
           <label for="ct-symbol">Symbol:</label>
           <select id="ct-symbol" data-testid="select-ct-symbol">
             <option value="MES">MES</option>
@@ -4487,13 +4505,20 @@
     }
 
     async function closeAllPositions() {
-      if (!confirm('Close ALL open positions? This is irreversible.')) return;
       const account = document.getElementById('tradeAccount').value;
+      const allAccounts = document.getElementById('ct-broadcast-all').checked;
+
+      const confirmMsg = allAccounts
+        ? 'Warning: This will close ALL POSITIONS on ALL ACTIVE ACCOUNTS. Are you sure?'
+        : `Close all positions for account ${account}?`;
+
+      if (!confirm(confirmMsg)) return;
+
       try {
         const res = await fetch('/api/trader/close-all', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account })
+          body: JSON.stringify({ account, allAccounts })
         });
         const data = await res.json();
         if (data.success) {
@@ -4624,18 +4649,19 @@
       const account = document.getElementById('tradeAccount').value;
       const symbol = document.getElementById('ct-symbol').value;
       const direction = document.getElementById('ct-direction').value;
+      const allAccounts = document.getElementById('ct-broadcast-all').checked;
       const btn = document.getElementById('btn-crosstrade');
       const statusEl = document.getElementById('ct-status');
 
       btn.disabled = true;
       statusEl.className = 'crosstrade-status';
-      statusEl.textContent = 'Sending...';
+      statusEl.textContent = allAccounts ? 'Broadcasting...' : 'Sending...';
 
       try {
         const res = await fetch('/api/crosstrade/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol, direction, account })
+          body: JSON.stringify({ symbol, direction, account, allAccounts })
         });
         const data = await res.json();
         if (data.success) {

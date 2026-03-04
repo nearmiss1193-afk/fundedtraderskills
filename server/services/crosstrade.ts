@@ -9,14 +9,14 @@ let dailyTradeCount = 0;
 const POLYGON_TO_NT: Record<string, string> = { "BTC": "MBT", "ETH": "MET" };
 
 const CONTRACT_CYCLES: Record<string, number[]> = {
-    "ES":  [3, 6, 9, 12], "MES": [3, 6, 9, 12],
-    "NQ":  [3, 6, 9, 12], "MNQ": [3, 6, 9, 12],
-    "YM":  [3, 6, 9, 12], "MYM": [3, 6, 9, 12],
+    "ES": [3, 6, 9, 12], "MES": [3, 6, 9, 12],
+    "NQ": [3, 6, 9, 12], "MNQ": [3, 6, 9, 12],
+    "YM": [3, 6, 9, 12], "MYM": [3, 6, 9, 12],
     "RTY": [3, 6, 9, 12], "M2K": [3, 6, 9, 12],
-    "CL":  [1,2,3,4,5,6,7,8,9,10,11,12], "MCL": [1,2,3,4,5,6,7,8,9,10,11,12],
-    "ZC":  [3, 5, 7, 9, 12], "ZS": [1, 3, 5, 7, 8, 9, 11],
-    "ZW":  [3, 5, 7, 9, 12],
-    "MBT": [1,2,3,4,5,6,7,8,9,10,11,12], "MET": [1,2,3,4,5,6,7,8,9,10,11,12],
+    "CL": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "MCL": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "ZC": [3, 5, 7, 9, 12], "ZS": [1, 3, 5, 7, 8, 9, 11],
+    "ZW": [3, 5, 7, 9, 12],
+    "MBT": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "MET": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
 };
 
 const ROLLOVER_DAYS_BEFORE = 14;
@@ -176,10 +176,14 @@ export async function sendBracketOrders(
     }
 
     const ntInstrument = getNinjaTraderInstrument(symbol);
-    const exitAction = direction === "LONG" ? "SELL" : "BUY";
+    const dirUpper = direction.toUpperCase();
+    const exitAction = dirUpper === "LONG" ? "SELL" : "BUY";
     const clampedQty = Math.min(qty || 1, MAX_CONTRACTS);
 
-    const stopPayload = `key=${CROSSTRADE_KEY};command=PLACE;account=${targetAccount};instrument=${ntInstrument};action=${exitAction};qty=${clampedQty};order_type=STOPMARKET;stop_price=${stopPrice};tif=GTC;`;
+    const tickSize = 0.25; // Standard for ES/MES/NQ/MNQ
+    const stopLimitPrice = dirUpper === "LONG" ? stopPrice - tickSize : stopPrice + tickSize;
+
+    const stopPayload = `key=${CROSSTRADE_KEY};command=PLACE;account=${targetAccount};instrument=${ntInstrument};action=${exitAction};qty=${clampedQty};order_type=STOPLIMIT;stop_price=${stopPrice};limit_price=${stopLimitPrice};tif=GTC;`;
     const targetPayload = `key=${CROSSTRADE_KEY};command=PLACE;account=${targetAccount};instrument=${ntInstrument};action=${exitAction};qty=${clampedQty};order_type=LIMIT;limit_price=${targetPrice};tif=GTC;`;
 
     console.log(`[crosstrade] Sending BRACKET orders for ${ntInstrument} on ${targetAccount}: stop=${stopPrice}, target=${targetPrice}`);
@@ -233,7 +237,7 @@ export async function sendToCrossTrade(signal: CrossTradeSignal): Promise<{ succ
     const qty = Math.min(signal.qty || 1, MAX_CONTRACTS);
 
     const ntInstrument = getNinjaTraderInstrument(signal.symbol);
-    const payload = `key=${CROSSTRADE_KEY};command=PLACE;account=${targetAccount};instrument=${ntInstrument};action=${action};qty=${qty};order_type=${signal.orderType || "MARKET"};tif=DAY;`;
+    const payload = `key=${CROSSTRADE_KEY}; command=PLACE; account=${targetAccount}; instrument=${ntInstrument}; action=${action}; qty=${qty}; order_type=${signal.orderType || "MARKET"}; tif=DAY;`;
 
     console.log(`[crosstrade] Sending payload to account ${targetAccount} (${signal.symbol} → ${ntInstrument}): ${payload.replace(CROSSTRADE_KEY, "****")}`);
 
@@ -258,7 +262,7 @@ export async function sendToCrossTrade(signal: CrossTradeSignal): Promise<{ succ
                             resolve({ success: false, message: `Rejected: ${parsed.error}`, payload });
                             return;
                         }
-                    } catch (_) {}
+                    } catch (_) { }
                     if (!hasError) {
                         dailyTradeCount++;
                         console.log(`[crosstrade] Order successful. Resp: ${data}`);

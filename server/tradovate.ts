@@ -180,13 +180,13 @@ export function getTradovateStatus(): { connected: boolean; accountName: string;
 }
 
 const TRADOVATE_SYMBOL_MAP: Record<string, string> = {
-  ES: "ESH5", MES: "MESH5", NQ: "NQH5", MNQ: "MNQH5",
-  YM: "YMH5", MYM: "MYMH5", RTY: "RTYH5", M2K: "M2KH5",
-  CL: "CLJ5", MCL: "MCLJ5", GC: "GCJ5", MGC: "MGCJ5",
-  SI: "SIH5", HG: "HGH5", PL: "PLJ5", PA: "PAH5",
-  BTC: "BTCH5", ETH: "ETHH5",
-  ZB: "ZBH5", ZN: "ZNH5", ZT: "ZTH5", ZF: "ZFH5",
-  ZC: "ZCH5", ZS: "ZSH5", ZW: "ZWH5",
+  ES: "ESH6", MES: "MESH6", NQ: "NQH6", MNQ: "MNQH6",
+  YM: "YMH6", MYM: "MYMH6", RTY: "RTYH6", M2K: "M2KH6",
+  CL: "CLJ6", MCL: "MCLJ6", GC: "GCJ6", MGC: "MGCJ6",
+  SI: "SIH6", HG: "HGH6", PL: "PLJ6", PA: "PAH6",
+  BTC: "BTCH6", ETH: "ETHH6",
+  ZB: "ZBH6", ZN: "ZNH6", ZT: "ZTH6", ZF: "ZFH6",
+  ZC: "ZCH6", ZS: "ZSH6", ZW: "ZWH6",
 };
 
 function getTradovateSymbol(symbol: string): string {
@@ -262,6 +262,10 @@ export async function placeBracketOrder(
     const action = direction === "LONG" ? "Buy" : "Sell";
     const exitAction = direction === "LONG" ? "Sell" : "Buy";
 
+    const tickSize = 0.25; // Default for ES/MES/NQ/MNQ
+    const slPrice = direction === "LONG" ? stop : stop;
+    const slLimit = direction === "LONG" ? stop - tickSize : stop + tickSize;
+
     const bracketResult = await apiRequest("POST", "/order/placeOSO", {
       accountSpec: session.accountName,
       accountId: session.accountId,
@@ -272,8 +276,9 @@ export async function placeBracketOrder(
       isAutomated: true,
       bracket1: {
         action: exitAction,
-        orderType: "Stop",
-        price: stop,
+        orderType: "StopLimit",
+        price: slLimit,
+        stopPrice: stop,
         contractId,
       },
       bracket2: {
